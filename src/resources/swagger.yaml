@@ -1,26 +1,7 @@
-# /*
-#  * Copyright (c) 2021 The Ontario Institute for Cancer Research. All rights reserved
-#  *
-#  * This program and the accompanying materials are made available under the terms of
-#  * the GNU Affero General Public License v3.0. You should have received a copy of the
-#  * GNU Affero General Public License along with this program.
-#  *  If not, see <http://www.gnu.org/licenses/>.
-#  *
-#  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
-#  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-#  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
-#  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-#  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-#  * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-#  * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
-#  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-#  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#  */
-
 openapi: 3.0.0
 info:
-  title: DAC API
-  version: 0.1.0
+  title: DACO API
+  version: 1.0.0
 security:
   - bearerAuth: []
 paths:
@@ -38,24 +19,279 @@ paths:
             application/json:
               schema:
                 type: object
-  /protected:
+
+  # TODO change this to upload a file.
+  /admin/pdf-template/update:
+    post:
+      tags:
+        - Admin
+      summary: Update the pdf template by uploading it. 
+      responses:
+        '201':
+          description: uploaded successfully
+
+
+  /applications/:
+    post:
+      tags:
+        - Application
+      summary: Create a new application
+      responses:
+        '201':
+          description: application created and returned in the response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+
+    get:
+      parameters:
+        - name: query
+          required: false
+          in: query
+          schema: 
+            type: string
+        - name: states
+          required: false
+          in: query
+          schema: 
+            type: string
+            format: csv
+        - name: page
+          required: false
+          in: query
+          schema: 
+            type: string
+        - name: size
+          required: false
+          in: query
+          schema: 
+            type: string
+        - name: sort
+          required: false
+          in: query
+          schema: 
+            type: string
+        - name: direction
+          required: false
+          in: query
+          schema: 
+            type: string
+            enum:
+              - "asc"
+              - "desc"
+      tags:
+        - Application
+      summary: Search applications
+      responses:
+        '200':
+          description: search applications by query & state
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    pagingInfo:
+                      type: object
+                      properties:
+                        totalCount:  
+                          type: number
+                        pagesCount:
+                          type: number
+                        pageSize:
+                          type: number
+                        index:
+                          type: number
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ApplicationSummary'
+
+  /applications/{id}/assets/{objectId}/url:
+    parameters:
+      - name: id
+        required: true
+        in: path
+        schema: 
+          type: string
+      - name: objectId
+        required: true
+        in: path
+        schema: 
+          type: string
     get:
       tags:
-        - Tag
-      summary: get something
+        - Application
+      summary: get a presigned url to download a document related to this application 
       responses:
-        '404':
-          description: Requested resource not found
-        '400':
-          description: Invalid parameters or body request
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          $ref: '#/components/responses/ForbiddenError'
-        '500':
-          $ref: '#/components/responses/ServerError'
         '200':
-          description: everything is ok
+          description: application found and returned in the response body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: 
+                    type: string
+                  ttl:
+                    type: number
+
+  /applications/{id}/assets/url:
+    parameters:
+      - name: id
+        required: true
+        in: path
+        schema: 
+          type: string
+    post:
+      tags:
+        - Application
+      summary: Create a presigned url to upload a document related to this application 
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ttl:
+                  type: number
+
+      responses:
+        '200':
+          description: created successfully presigned URL with other metadata  
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: 
+                    type: string
+                  ttl:
+                    type: number
+
+  /applications/{id}:
+    parameters:
+      - name: id
+        required: true
+        in: path
+        schema: 
+          type: string
+    get:
+      tags:
+        - Application
+      summary: Get application by application ID
+      responses:
+        '200':
+          description: application found and returned in the response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+    patch:
+      tags:
+        - Application
+      summary: Update an application section
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Application'
+
+      responses:
+        '500':
+          description: Unexpected error ocurred
+        '200':
+          description: Application updated
+   
+    delete:
+      tags:
+        - Admin
+      summary: Remove application (only available in development environments).
+      responses:
+        '500':
+          description: Unexpected error ocurred
+        '204':
+          description: deleted successfully
+
+  /applications/{id}/collaborators/:
+    parameters:
+      - name: id
+        required: true
+        in: path
+        schema: 
+          type: string
+    post:
+      tags:
+        - Application
+      summary: Create a collaborator 
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Collaborator'
+
+      responses:
+        '201':
+          description: Collaborator was created successfully 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collaborator'
+
+  /applications/{id}/collaborators/{collaboratorId}:
+    parameters:
+      - name: id
+        required: true
+        in: path
+        schema: 
+          type: string
+      - name: collaboratorId
+        required: true
+        in: path
+        schema:
+          type: string
+    
+    delete:
+      tags:
+        - Application
+      summary: Delete single collaborator by id 
+      responses:
+        '204':
+          description: Deleted 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collaborator'
+
+    patch:
+      tags:
+        - Application
+      summary: Update single collaborator by id 
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Collaborator'
+
+      responses:
+        '200':
+          description: Collaborator updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collaborator'
+servers:
+  - url: /
+
+tags:
+  - name: Health
+    description: Service status monitoring
+  - name: Admin
+    description: Admin operations collected for convenience
+  - name: Application
+    description: Application CRUD enpoints
 
 components:
   responses:
@@ -69,8 +305,310 @@ components:
       description: Access token has incorrect scopes
     NotFoundError:
       description: Requested resource was not found
+
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  
+  schemas:
+    Meta:
+      readOnly: true
+      type: object
+      properties:
+        status:
+          type: string
+          enum: ["valid", "invalid", "locked", "revision_requested"]
+        errors: 
+          type: array
+          items:
+            type: object
+            properties:
+              field: 
+                type: string
+              message:
+                type: string
+
+    PersonalInfo:
+      type: object
+      properties:
+        positionTitle:
+          type: string
+        institutionWebsite:
+          type: string
+        primaryAffiliation:
+          type: string
+        institutionEmail:
+          type: string
+        suffix:
+          type: string
+        googleEmail:
+          type: string
+        lastName:
+          type: string
+        middleName:
+          type: string
+        firstName:
+          type: string
+        title:
+          type: string
+
+    Collaborator:
+      type: object
+      properties:
+        meta:
+          $ref: '#/components/schemas/Meta'
+        id:
+          readOnly: true
+          type: string
+        info:
+          $ref: '#/components/schemas/PersonalInfo'
+        type: 
+          type: string
+          enum:
+          - "student"
+          - "researcher"
+
+    RevisionRequest:
+      type: object
+      properties:
+        details: 
+          type: string
+        requested:
+          type: boolean
+
+    AgreementItem:
+      type: object
+      properties:
+        name: 
+          type: string
+        accepted:
+          type: boolean
+
+    Address:
+      type: object
+      properties:
+        building:
+          type: string
+        street:
+          type: string
+        cityAndProvince:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+
+    ApplicationSummary:
+      type: object
+      properties:
+        appId:
+          readOnly: true
+          type: string
+        state:
+          type: string
+          enum:
+            - DRAFT
+            - READY_TO_SUBMIT
+            - IN_REVIEW
+            - REVISION_NEEDED
+            - APPROVED
+            - REOPENED
+            - CLOSED
+            - CLOSED_PERMANENTLY
+            - EXPIRED
+        applicant:
+          type: object
+          properties:
+            info: 
+              $ref: '#/components/schemas/PersonalInfo'
+        submitterId:
+          readOnly: true
+          type: string
+        createdAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        updatedAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        submittedAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        approvedAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        approvedBy:
+          readOnly: true
+          type: string 
+        expiresAtUtc:
+          type: string
+          format: data-time
+        closedAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        closedBy:
+          readOnly: true
+          type: string
+
+    Application:
+      type: object
+      properties:
+        appId:
+          readOnly: true
+          type: string
+        state:
+          type: string
+          enum:
+            - DRAFT
+            - READY_TO_SUBMIT
+            - IN_REVIEW
+            - REVISION_NEEDED
+            - APPROVED
+            - REOPENED
+            - CLOSED
+            - CLOSED_PERMANENTLY
+            - EXPIRED
+        submitterId:
+          readOnly: true
+          type: string
+        signedAppDocObjId:
+          type: string
+        createdAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        updatedAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        submittedAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        approvedAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        approvedBy:
+          readOnly: true
+          type: string 
+        expiresAtUtc:
+          type: string
+          format: data-time
+        closedAtUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        closedBy:
+          readOnly: true
+          type: string
+        denialReason:
+          type: string
+        revisionRequests:
+          type: object
+          properties:
+            applicant: 
+              $ref: '#/components/schemas/RevisionRequest'
+            representative:
+              $ref: '#/components/schemas/RevisionRequest'
+            projectInfo:
+              $ref: '#/components/schemas/RevisionRequest'
+            collaborators: 
+              $ref: '#/components/schemas/RevisionRequest'
+            signature: 
+              $ref: '#/components/schemas/RevisionRequest'
+            general: 
+              $ref: '#/components/schemas/RevisionRequest'
+
+        sections:
+          type: object
+          properties:
+            terms:
+              type: object
+              properties:
+                meta:
+                  $ref: '#/components/schemas/Meta'
+                agreement:
+                  $ref: '#/components/schemas/AgreementItem'
+
+            applicant:
+              type: object
+              properties:
+                meta:
+                  $ref: '#/components/schemas/Meta'
+                info: 
+                  $ref: '#/components/schemas/PersonalInfo'
+                address:
+                  $ref: '#/components/schemas/Address'
+
+            representative:
+              type: object
+              properties:
+                meta:
+                  $ref: '#/components/schemas/Meta'            
+                info: 
+                  $ref: '#/components/schemas/PersonalInfo'
+                address:
+                  $ref: '#/components/schemas/Address'
+                addressSameAsApplicant:
+                  type: boolean
+
+            collaborators:
+              type: object
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Collaborator'
+
+            projectInfo:
+              type: object
+              properties:
+                meta:
+                  $ref: '#/components/schemas/Meta'
+                website:
+                  type: string
+                abstract: 
+                  type: string
+                laySummary:
+                  type: string
+                pubMedIds:
+                  type: array
+                  items:
+                    type: string
+
+            ITAgreements:
+              type: object
+              properties:
+                meta:
+                  $ref: '#/components/schemas/Meta'
+                agreements: 
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AgreementItem'  
+
+            dataAccessAgreements:
+              type: object
+              properties:
+                meta:
+                  $ref: '#/components/schemas/Meta'
+                agreements: 
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AgreementItem'
+
+            appendices:
+              type: object
+              properties:
+                meta:
+                  $ref: '#/components/schemas/Meta'
+                agreements: 
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AgreementItem'  

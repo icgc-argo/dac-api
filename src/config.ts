@@ -20,6 +20,8 @@
 import * as dotenv from 'dotenv';
 import * as vault from './vault';
 
+let currentConfig: AppConfig;
+
 export interface AppConfig {
   // Express
   serverPort: string;
@@ -30,7 +32,9 @@ export interface AppConfig {
     enabled: boolean;
     jwtKeyUrl: string;
     jwtKey: string;
-    WRITE_SCOPE: string;
+    APPLICATION_SCOPE: string;
+    ADMIN_SCOPE: string;
+    REVIEW_SCOPE: string;
   };
 }
 
@@ -93,13 +97,19 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       enabled: process.env.AUTH_ENABLED !== 'false',
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      WRITE_SCOPE: process.env.WRITE_SCOPE || 'SERVICE.WRITE',
+      APPLICATION_SCOPE: process.env.APPLICATION_SCOPE || 'DACO-APPLICATION.WRITE',
+      ADMIN_SCOPE: process.env.ADMIN_SCOPE || 'DACO-SERVICE.WRITE',
+      REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE'
     },
   };
   return config;
 };
 
 export const getAppConfig = async (): Promise<AppConfig> => {
+  if (currentConfig) {
+    return currentConfig;
+  }
   const secrets = await buildBootstrapContext();
-  return buildAppContext(secrets);
+  currentConfig = await buildAppContext(secrets);
+  return currentConfig;
 };

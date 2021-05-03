@@ -25,6 +25,7 @@ import yaml from 'yamljs';
 import { AppConfig } from './config';
 import Auth from '@overture-stack/ego-token-middleware';
 import logger from './logger';
+import createApplicationsRouter from './routes/applications';
 
 console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
@@ -53,19 +54,7 @@ const App = (config: AppConfig): express.Express => {
     return res.status(status).send(resBody);
   });
 
-  const authHandler = authFilter([config.auth.WRITE_SCOPE]);
-
-  app.get(
-    '/protected',
-    authHandler,
-    wrapAsync(async (req: Request, res: Response) => {
-      const r = await new Promise<string>((reso, rej) => {
-         reso('Hello World from Protected');
-      });
-
-      return res.status(200).send(r);
-    }),
-  );
+  app.use(createApplicationsRouter(config, authFilter));
 
   app.use(
     config.openApiPath,
@@ -75,15 +64,6 @@ const App = (config: AppConfig): express.Express => {
 
   app.use(errorHandler);
   return app;
-};
-
-export const wrapAsync = (fn: RequestHandler): RequestHandler => {
-  return (req, res, next) => {
-    const routePromise = fn(req, res, next) as any;
-    if (routePromise.catch) {
-      routePromise.catch(next);
-    }
-  };
 };
 
 // general catch all error handler
