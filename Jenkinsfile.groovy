@@ -20,7 +20,7 @@
 def commit = "UNKNOWN"
 def version = "UNKNOWN"
 def serviceName = "dac-api"
-def dockerRepo = "icgcargo/${serviceName}"
+def dockerRepo = "ghcr.io/icgc-argo/${serviceName}"
 def repoName = "icgc-argo"
 
 pipeline {
