@@ -56,10 +56,12 @@ const App = (config: AppConfig): express.Express => {
 
   app.use(createApplicationsRouter(config, authFilter));
 
+  const swaggerDoc = yaml.load(path.join(__dirname, './resources/swagger.yaml'));
+  swaggerDoc.servers = [{ url: config.basePath }];
   app.use(
     config.openApiPath,
     swaggerUi.serve,
-    swaggerUi.setup(yaml.load(path.join(__dirname, './resources/swagger.yaml'))),
+    swaggerUi.setup(swaggerDoc)
   );
 
   app.use(errorHandler);

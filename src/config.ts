@@ -25,6 +25,7 @@ let currentConfig: AppConfig;
 export interface AppConfig {
   // Express
   serverPort: string;
+  basePath: string;
   openApiPath: string;
   kafkaProperties: KafkaConfigurations;
   mongoProperties: MongoProps;
@@ -79,6 +80,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
   console.log('building app context');
   const config: AppConfig = {
     serverPort: process.env.PORT || '3000',
+    basePath: process.env.BASE_PATH || '/',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
     mongoProperties: {
       dbName: secrets.DB_NAME || process.env.DB_NAME,
