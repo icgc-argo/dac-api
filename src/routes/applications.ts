@@ -5,23 +5,22 @@ import { AppConfig } from '../config';
 import wrapAsync from '../utils/wrapAsync';
 import { create, getById, search } from '../domain/service';
 import { BadRequest } from '../utils/errors';
-import injectIdentity, { Identity } from '../utils/identity';
+import { Identity } from '../utils/identity';
 
 interface IRequest extends Request {
   identity: Identity;
 }
 
-const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
+const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler, identityFilter: RequestHandler) => {
   const router = Router();
 
   router.post(
     '/applications/',
     authFilter([
-      config.auth.APPLICATION_SCOPE,
       config.auth.REVIEW_SCOPE,
       config.auth.ADMIN_SCOPE
     ]),
-    injectIdentity,
+    identityFilter,
     wrapAsync(async (req: Request, res: Response) => {
       const app = await create((req as IRequest).identity);
       return res.status(200).send(app);
@@ -31,11 +30,10 @@ const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string
   router.get(
     '/applications/',
     authFilter([
-      config.auth.APPLICATION_SCOPE,
       config.auth.REVIEW_SCOPE,
       config.auth.ADMIN_SCOPE
     ]),
-    injectIdentity,
+    identityFilter,
     wrapAsync(async (req: Request, res: Response) => {
       const app = await search((req as IRequest).identity);
       return res.status(200).send(app);
@@ -45,11 +43,10 @@ const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string
   router.get(
     '/applications/:id',
     authFilter([
-      config.auth.APPLICATION_SCOPE,
       config.auth.REVIEW_SCOPE,
       config.auth.ADMIN_SCOPE
     ]),
-    injectIdentity,
+    identityFilter,
     wrapAsync(async (req: Request, res: Response) => {
       const id = req.params.id;
       const validatedId = validateId(id);

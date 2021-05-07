@@ -4,6 +4,10 @@ info:
   version: 1.0.0
 security:
   - bearerAuth: []
+
+servers:
+  - url: /
+
 paths:
   /health:
     get:
@@ -282,8 +286,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Collaborator'
-servers:
-  - url: /
 
 tags:
   - name: Health

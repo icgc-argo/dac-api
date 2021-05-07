@@ -26,6 +26,7 @@ import { AppConfig } from './config';
 import Auth from '@overture-stack/ego-token-middleware';
 import logger from './logger';
 import createApplicationsRouter from './routes/applications';
+import identityFilterCreator from './utils/identity';
 
 console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
@@ -39,6 +40,8 @@ const App = (config: AppConfig): express.Express => {
     : (scope: string[]) => {
         return noOpReqHandler;
       };
+
+  const identityFilter =  identityFilterCreator(config.auth.jwtKey) ;
 
   const app = express();
   app.set('port', process.env.PORT || 3000);
@@ -54,12 +57,14 @@ const App = (config: AppConfig): express.Express => {
     return res.status(status).send(resBody);
   });
 
-  app.use(createApplicationsRouter(config, authFilter));
+  app.use(createApplicationsRouter(config, authFilter, identityFilter));
 
+  const swaggerDoc = yaml.load(path.join(__dirname, './resources/swagger.yaml'));
+  swaggerDoc.servers = [{ url: config.basePath }];
   app.use(
     config.openApiPath,
     swaggerUi.serve,
-    swaggerUi.setup(yaml.load(path.join(__dirname, './resources/swagger.yaml'))),
+    swaggerUi.setup(swaggerDoc)
   );
 
   app.use(errorHandler);
