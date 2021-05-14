@@ -1,4 +1,4 @@
-type State =  'DRAFT' |  'READY_TO_SUBMIT' | 'IN_REVIEW' | 'REVISION_NEEDED' | 'APPROVED' | 'REOPENED' | 'REJECTED' |'CLOSED' | 'EXPIRED';
+export type State =  'DRAFT' | 'READY TO SUBMIT' | 'REVIEW' | 'REVISION REQUESTED' | 'APPROVED' | 'RENEWING' | 'REJECTED' | 'CLOSED' | 'EXPIRED';
 
 interface Meta {
   status: string;
@@ -23,6 +23,7 @@ interface PersonalInfo {
   firstName: string;
   middleName: string;
   lastName: string;
+  displayName: string;
   suffix: string;
   primaryAffiliation: string;
   institutionEmail: string;
@@ -55,7 +56,6 @@ export interface SearchResult {
   pagingInfo: {
     totalCount: number,
     pagesCount: number,
-    pageSize: number,
     index: number,
   };
   items: ApplicationSummary[];
@@ -68,18 +68,28 @@ export interface ApplicationSummary {
   submittedAtUtc: Date;
   approvedAtUtc: Date;
   expiresAtUtc: Date;
+  lastUpdatedAtUtc: Date;
+  createdAtUtc: Date;
   closedAtUtc: Date;
   closedBy: string;
+  ethics: {
+    declaredAsRequired: boolean | undefined;
+  };
   applicant: {
     info: PersonalInfo,
   };
 }
 
 
+export type ApplicationDto = Omit<Application, 'searchField'>;
+
+
 export interface Application {
   appId: string;
+  appNumber: number;
   state: State;
   submitterId: string;
+  submitterEmail: string;
   signedAppDocObjId: string;
   submittedAtUtc: Date;
   approvedAtUtc: Date;
@@ -87,6 +97,11 @@ export interface Application {
   closedAtUtc: Date;
   closedBy: string;
   denialReason: string;
+  lastUpdatedAtDate: string;
+  expiresAtDate: string;
+  lastUpdatedAtUtc?: Date;
+  createdAtUtc?: Date;
+  searchValues: string[];
   revisionRequest: {
     applicant: RevisionRequest,
     representative: RevisionRequest,

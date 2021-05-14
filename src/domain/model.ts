@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 import { Application } from './interface';
 
+mongoose.set('debug', true);
 const Meta = new mongoose.Schema({
   status: { type: String, required: false },
   errorsList: [{
@@ -14,6 +15,7 @@ const PersonalInfo = new mongoose.Schema({
   title: { type: String, required: false },
   firstName: { type: String, required: false },
   middleName: { type: String, required: false },
+  displayName: { type: String, required: false},
   lastName: { type: String, required: false },
   suffix: { type: String, required: false },
   primaryAffiliation: { type: String, required: false },
@@ -53,18 +55,27 @@ const ApplicationUpdate =  new mongoose.Schema({
   date: { type: Date, required: false },
 });
 
+const EthicsLetterDocument =  new mongoose.Schema({
+  objectId: { type: String, required: false },
+  uploadedAtUtc: { type: Date, required: false },
+});
+
 const ApplicationSchema = new mongoose.Schema({
-    appId: { type: Number, index: true, unique: true },
-    // DRAFT, READY_TO_SUBMIT, IN_REVIEW, REVISION_NEEDED , APPROVED, REOPENED, CLOSED, EXPIRED
-    state: { type: String, required: true },
+    appNumber: { type: Number, unique: true },
+    appId: { type: String,  index: true },
+    state: { type: String, required: true, index: true},
     submitterId: { type: String, required: true },
+    submitterEmail: { type: String, required: true },
     signedAppDocObjId: { type: String, required: false },
     submittedAtUtc: { type: Date, required: false },
     approvedAtUtc: { type: Date, required: false },
     expiresAtUtc: { type: Date, required: false },
+    lastUpdatedAtDate: {type: String, index: true},
+    expiresAtDate: { type: String, index: true },
     closedAtUtc:  { type: Date, required: false },
     closedBy: { type: String, required: false },
     denialReason: { type: String, required: false },
+    searchValues: { type: [String], index: true, required: false },
     revisionRequest: {
       applicant: RevisionRequest,
       representative: RevisionRequest,
@@ -98,15 +109,14 @@ const ApplicationSchema = new mongoose.Schema({
         title: { type: String, required: false },
         website: { type: String, required: false },
         abstract: { type: String, required: false },
-        laySummary: { type: String, required: false },
-        pubMedIDs: { type: [String], required: false },
+        aims: { type: String, required: false },
+        methodology: { type: String, required: false },
+        publicationsURLs: { type: [String], required: false },
       },
       ethicsLetter: {
         meta: Meta,
-        declaredAsRequired: {type: Boolean, required: false },
-        approvalLetterObjId: {type: String, required: false},
-        doesExpire: {type: Boolean, required: false},
-        expiryDateUtc: {type: Date, required: false}
+        declaredAsRequired: { type: Boolean, required: false },
+        approvalLetterDocs: EthicsLetterDocument,
       },
       ITAgreements: {
         meta: Meta,
@@ -123,15 +133,42 @@ const ApplicationSchema = new mongoose.Schema({
     },
     updates: [ApplicationUpdate]
   },
-  { timestamps: true, minimize: false, optimisticConcurrency: true },
+  {
+    timestamps: {
+      createdAt: 'createdAtUtc',
+      updatedAt: 'lastUpdatedAtUtc'
+    },
+    minimize: false, optimisticConcurrency: true
+  },
 );
 
-export type ApplicationDocument = mongoose.Document & Omit<Application, 'appId'> & { appId: number };
+ApplicationSchema.index({
+  'sections.applicant.info.displayName': 1,
+});
+
+ApplicationSchema.index({
+  'sections.applicant.info.primaryAffiliation': 1,
+});
+
+ApplicationSchema.index({
+  'sections.applicant.info.googleEmail': 1,
+});
+
+ApplicationSchema.index({
+  'lastUpdatedAtDate': 1,
+});
+
+ApplicationSchema.index({
+  'expiresAtDate': 1,
+});
+
+export type ApplicationDocument = mongoose.Document & Application;
 
 ApplicationSchema.plugin(AutoIncrement, {
-  inc_field: 'appId',
+  inc_field: 'appNumber',
   start_seq: 1,
 });
+
 
 export const ApplicationModel = mongoose.model<ApplicationDocument>(
   'Application',

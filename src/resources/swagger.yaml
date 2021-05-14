@@ -61,29 +61,30 @@ paths:
           schema: 
             type: string
             format: csv
+          example: 'DRAFT, REVIEW'
+          description: see states enum in Application
         - name: page
           required: false
           in: query
           schema: 
-            type: string
-        - name: size
+            type: number
+            default: 0
+        - name: pageSize
           required: false
           in: query
           schema: 
-            type: string
+            type: number
+            default: 25
         - name: sort
           required: false
           in: query
           schema: 
             type: string
-        - name: direction
-          required: false
-          in: query
-          schema: 
-            type: string
-            enum:
-              - "asc"
-              - "desc"
+            format: csv
+            default: 'state:desc'
+          description: 
+            can be any combination of these fields state, primaryAffiliation, displayName, googleEmail, updatedAtUtc, appId, expiresAtUtc (order matters)
+          example: "state:asc, primaryAffiliation:asc, displayName:asc, googleEmail:asc, updatedAtUtc:asc, appId:asc, expiresAtUtc:asc"
       tags:
         - Application
       summary: Search applications
@@ -103,8 +104,6 @@ paths:
                         totalCount:  
                           type: number
                         pagesCount:
-                          type: number
-                        pageSize:
                           type: number
                         index:
                           type: number
@@ -218,6 +217,20 @@ paths:
           description: Unexpected error ocurred
         '204':
           description: deleted successfully
+    put:
+      tags:
+        - Admin
+      summary: update all fields in an application
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Application'
+      responses:
+        '500':
+          description: Unexpected error ocurred
+        '200':
+          description: done successfully
 
   /applications/{id}/collaborators/:
     parameters:
@@ -349,6 +362,8 @@ components:
           type: string
         lastName:
           type: string
+        displayName: 
+          type: string
         middleName:
           type: string
         firstName:
@@ -412,13 +427,13 @@ components:
           type: string
           enum:
             - DRAFT
-            - READY_TO_SUBMIT
-            - IN_REVIEW
-            - REVISION_NEEDED
+            - READY TO SUBMIT
+            - REVIEW
+            - REVISION REQUESTED
+            - REJECTED
             - APPROVED
-            - REOPENED
+            - RENEWING
             - CLOSED
-            - CLOSED_PERMANENTLY
             - EXPIRED
         applicant:
           type: object
@@ -444,6 +459,11 @@ components:
           readOnly: true
           type: string
           format: data-time
+        ethics: 
+          type: object
+          properties:
+            declaredAsRequired:
+              type: boolean
         approvedBy:
           readOnly: true
           type: string 
@@ -468,13 +488,13 @@ components:
           type: string
           enum:
             - DRAFT
-            - READY_TO_SUBMIT
-            - IN_REVIEW
-            - REVISION_NEEDED
+            - READY TO SUBMIT
+            - REVIEW
+            - REVISION REQUESTED
+            - REJECTED
             - APPROVED
-            - REOPENED
+            - RENEWING
             - CLOSED
-            - CLOSED_PERMANENTLY
             - EXPIRED
         submitterId:
           readOnly: true

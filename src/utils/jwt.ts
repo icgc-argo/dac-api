@@ -1,32 +1,3 @@
-import { EgoJwtData } from '@icgc-argo/ego-token-utils/dist/common';
-import egoUtils from '@icgc-argo/ego-token-utils';
-import { RequestHandler } from 'express';
-export type Identity  = {
-  userId: string;
-} & Pick<EgoJwtData, 'context'>;
-
-function getInfoFromToken(key: string, token: string): Identity {
-  const decode = egoUtils(key).decodeToken;
-  const info = decode(token);
-  return {
-    userId: info.sub,
-    context: info.context,
-  };
-}
-
-// wrapper to handle errors from async express route handlers
-const injectIdentityHandlerCreator = (key: string): RequestHandler  => (req, res, next) =>  {
-    // if a token found add it as context in the request.
-    if (!req.headers.authorization) {
-      throw new Error('Inject identity need a token');
-    }
-    const token = req.headers.authorization.replace('Bearer ', '');
-    const identity = getInfoFromToken(key, token);
-    (req as any).identity = identity;
-    next();
-  };
-
-
 export const TEST_PUB_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnzyis1ZjfNB0bBgKFMSv
 vkTtwlvBsaJq7S5wA+kzeVOVpVWwkWdVha4s38XM/pa/yr47av7+z3VTmvDRyAHc
@@ -70,5 +41,3 @@ jg/3747WSsf/zBTcHihTRBdAv6OmdhV4/dD5YBfLAkLrd+mX7iE=
 export const userJwt = `eyJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE2MTk4MjU1NjUsImV4cCI6MTYyOTgyNzM2NSwic3ViIjoiNDlmZWEyZDMtYmE0MS00OGQ5LWFjMjgtMDUxN2RhYzMwOWEyIiwiaXNzIjoiZWdvIiwianRpIjoiOGE2YzIwMWYtMzBmOS00ZmU5LTkzNjItNzdkOGZlMmZkYTk2IiwiY29udGV4dCI6eyJzY29wZSI6WyJEQUNPLUFQUExJQ0FUSU9OLldSSVRFIl0sInVzZXIiOnsibmFtZSI6ImJhbGxhYmFkaUBvaWNyLm9uLmNhIiwiZW1haWwiOiJiYWxsYWJhZGlAb2ljci5vbi5jYSIsInN0YXR1cyI6IkFQUFJPVkVEIiwiZmlyc3ROYW1lIjoiQmFzaGFyIiwibGFzdE5hbWUiOiJBbGxhYmFkaSIsImNyZWF0ZWRBdCI6MTU4MzM0MjI5MTc0NSwibGFzdExvZ2luIjoxNjE5ODI1NTY1NjUxLCJwcmVmZXJyZWRMYW5ndWFnZSI6bnVsbCwidHlwZSI6IkFETUlOIiwiZ3JvdXBzIjpbImIwNDcxMzc4LTRmMWMtNDVlZi05NzViLTU1MjEwNjdmNjUyNCJdfX0sImF1ZCI6W119.iph7tqV9SQwcBrCGsf1Zo1wUuQugbusHf9zdsNrLUB0dqjBUbTzC9P86vyX5QfN8b-V6AGGXswrEyLrJqqE2kCreSkfPw-Tpve0H4Sl4WxRGldEkHlwhe1BDxmI3BLXUza-PPjxNXX3a5KZtXgDte4J-NF1mIRwQ7LgYYoQqKPWkodFUNyqvjcDU1JbmNhdE0irU-jlrirvMRiDHZoEGAGIqhCRD0-dyBMgDnyi6u7wDE8Nr4Ehgpq5DR0VEn1xrh-OBK3nG4BYf8mh6K4pBLC-hmELEMpcdprlNv3O0DcI5lL9QTriqrEZWTftT9mO4-EBT65PxhT0gH2h42tvi6Q`;
 export const reviewerJwt = `eyJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE2MTk4MjU1NjUsImV4cCI6MTYyOTgyNzM2NSwic3ViIjoiNDlmZWEyZDMtYmE0MS00OGQ5LWFjMjgtMDUxN2RhYzMwOWEyIiwiaXNzIjoiZWdvIiwianRpIjoiOGE2YzIwMWYtMzBmOS00ZmU5LTkzNjItNzdkOGZlMmZkYTk2IiwiY29udGV4dCI6eyJzY29wZSI6WyJEQUNPLUFQUExJQ0FUSU9OLVJFVklFVy5XUklURSJdLCJ1c2VyIjp7Im5hbWUiOiJiYWxsYWJhZGlAb2ljci5vbi5jYSIsImVtYWlsIjoiYmFsbGFiYWRpQG9pY3Iub24uY2EiLCJzdGF0dXMiOiJBUFBST1ZFRCIsImZpcnN0TmFtZSI6IkJhc2hhciIsImxhc3ROYW1lIjoiQWxsYWJhZGkiLCJjcmVhdGVkQXQiOjE1ODMzNDIyOTE3NDUsImxhc3RMb2dpbiI6MTYxOTgyNTU2NTY1MSwicHJlZmVycmVkTGFuZ3VhZ2UiOm51bGwsInR5cGUiOiJBRE1JTiIsImdyb3VwcyI6WyJiMDQ3MTM3OC00ZjFjLTQ1ZWYtOTc1Yi01NTIxMDY3ZjY1MjQiXX19LCJhdWQiOltdfQ.BcT2rkmStD9zl6lAIClqe11gy5lOZPtVIA-RO3pJtGAgIP7fOo1H4bxjDjQxUGxLULkxBaPm_jVXPVvkA754dnBtGIbHcPpnI4WuPj9vd8Swxkeu1q9oIgLZf0bl5oKZeparP6htHwTR44PPsye0zUfvPt1BNYictyPr_soYel-PMIZ3UGP4robktOFhjK63iETg7KuymEkvIEF82h3JEeJ2pF3w81jn4yOKMU0Lrwn7n9FJxww2KULrzCgsd5pQtiZnoiDE0cnQjn8IWwuc-BU2HdGJ24BHtG_BZwYqH8UG2rCQORtp0Gpz7m6WOgCEvbp6iY1jxV8P7irOb9WJ-g`;
 export const adminJwt =  `eyJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE2MTk4MjU1NjUsImV4cCI6MTYyOTgyNzM2NSwic3ViIjoiNDlmZWEyZDMtYmE0MS00OGQ5LWFjMjgtMDUxN2RhYzMwOWEyIiwiaXNzIjoiZWdvIiwianRpIjoiOGE2YzIwMWYtMzBmOS00ZmU5LTkzNjItNzdkOGZlMmZkYTk2IiwiY29udGV4dCI6eyJzY29wZSI6WyJEQUNPLVNFUlZJQ0UuV1JJVEUiXSwidXNlciI6eyJuYW1lIjoiYmFsbGFiYWRpQG9pY3Iub24uY2EiLCJlbWFpbCI6ImJhbGxhYmFkaUBvaWNyLm9uLmNhIiwic3RhdHVzIjoiQVBQUk9WRUQiLCJmaXJzdE5hbWUiOiJCYXNoYXIiLCJsYXN0TmFtZSI6IkFsbGFiYWRpIiwiY3JlYXRlZEF0IjoxNTgzMzQyMjkxNzQ1LCJsYXN0TG9naW4iOjE2MTk4MjU1NjU2NTEsInByZWZlcnJlZExhbmd1YWdlIjpudWxsLCJ0eXBlIjoiQURNSU4iLCJncm91cHMiOlsiYjA0NzEzNzgtNGYxYy00NWVmLTk3NWItNTUyMTA2N2Y2NTI0Il19fSwiYXVkIjpbXX0.IHCE6CqJCBfIJYeDpYkHL865q4q7VcbA9D88gJqWXGuXXep0SN1i9GbzRFGJ6kghbwJjjbckpQ4cM6S4_7SGv7KpsT00u8EWrEmxwvunfgSAN-BXDS88sBWatjq-h0VLzoctLVctl5HCuSJzcA9XGuwtEvY9fLDb5TLO5Lw-De6nKgo29Slgb0KLDpdLjXUfAmR2jvhW685GlPJeg5yWOzul6Z7spU0tpSVBtlEYDERZM3hqRy5Y_VfgazaetZcCySLpIrSmFlH85YXFYuAz5FeKbdN3LQVqwK2M1lL2nqRyp-M4bJSpPyTxszvB2OikZdmxZxd65gbfx6lH5868hQ`;
-
-export default injectIdentityHandlerCreator;
