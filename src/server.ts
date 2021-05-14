@@ -108,3 +108,29 @@ console.log('in server.ts');
     logger.info('Press CTRL-C to stop');
   });
 })();
+
+const errorTypes = ['unhandledRejection', 'uncaughtException'];
+const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
+errorTypes.map(type => {
+  process.on(type as any, (e: Error) => {
+    try {
+      console.log(`unhandled error: ${type}`);
+      console.error(e);
+      mongoose.disconnect();
+      process.exit(1001);
+    } catch (_) {
+      process.exit(1);
+    }
+  });
+});
+
+signalTraps.map(type => {
+  process.once(type as any, () => {
+    try {
+      logger.info(`received signal ${type} shutting down..`);
+      mongoose.disconnect();
+    } finally {
+      process.kill(process.pid, type);
+    }
+  });
+});

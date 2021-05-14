@@ -33,8 +33,6 @@ export interface AppConfig {
     enabled: boolean;
     jwtKeyUrl: string;
     jwtKey: string;
-    APPLICATION_SCOPE: string;
-    ADMIN_SCOPE: string;
     REVIEW_SCOPE: string;
   };
 }
@@ -99,8 +97,6 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       enabled: process.env.AUTH_ENABLED !== 'false',
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      APPLICATION_SCOPE: process.env.APPLICATION_SCOPE || 'DACO-APPLICATION.WRITE',
-      ADMIN_SCOPE: process.env.ADMIN_SCOPE || 'DACO-SERVICE.WRITE',
       REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE'
     },
   };
