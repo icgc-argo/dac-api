@@ -28,10 +28,7 @@ services:
       MONGODB_PASSWORD: password
       MONGODB_DATABASE: appdb
       MONGODB_ROOT_PASSWORD: password123
-  zookeeper:
-    image: wurstmeister/zookeeper
-    ports:
-      - 2181:2181
+
 
 ################################
 ####    KAFKA containers    ####
@@ -58,7 +55,10 @@ services:
 #   volumes:
 #     - /var/run/docker.sock:/var/run/docker.sock
 #     - ./docker/volumes/kafka:/kafka
-
+# zookeeper:
+#     image: wurstmeister/zookeeper
+#     ports:
+#       - 2181:2181
 # rest-proxy:
 #   image: confluentinc/cp-kafka-rest:5.2.1
 #   depends_on:
