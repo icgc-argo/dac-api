@@ -2,24 +2,220 @@ import { Identity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
 import { NotFound } from '../utils/errors';
 import { getAppConfig } from '../config';
-import { Application, ApplicationSummary, SearchResult, State } from './interface';
+import { Application, AgreementItem, ApplicationSummary, SearchResult, State, Address, Error as SectionError, PersonalInfo } from './interface';
 import { ApplicationDocument, ApplicationModel } from './model';
 import moment from 'moment';
 import 'moment-timezone';
+import _ from 'lodash';
+import { mergeKnown } from '../utils/misc';
 
 export async function create(identity: Identity) {
   const app = newApplication(identity);
   const appDoc = await ApplicationModel.create(app);
   appDoc.appId = `DACO-${appDoc.appNumber}`;
-  appDoc.lastUpdatedAtDate = moment(appDoc.lastUpdatedAtUtc).tz('ET').format('YYYY-MM-DD');
   appDoc.searchValues = getSearchFieldValues(appDoc);
   await appDoc.save();
   const copy = appDoc.toObject();
   return copy;
 }
 
+export async function updatePartial(appPart: Partial<Application>, identity: Identity) {
+  const isReviewer = await hasReviewScope(identity);
+  const query: FilterQuery<ApplicationDocument> = {
+    appId: appPart.appId
+  };
+
+  if (!isReviewer) {
+    query.submitterId = identity.userId;
+  }
+
+  const appDoc = await ApplicationModel.findOne(query).exec();
+
+  if (!appDoc) {
+    throw new NotFound('Application not found');
+  }
+
+  const appDocObj = appDoc.toObject();
+  let merged: Application | undefined = undefined;
+
+  // validations
+  // validate no invalid state change
+  if (appDoc.state == 'SIGN AND SUBMIT') {
+    merged = appDocObj;
+  }
+
+  if (appDoc.state == 'DRAFT') {
+    merged = updateAppStateForDraftApplication(appDocObj, appPart);
+    const isReady = isReadyToSignAndSubmit(merged);
+    if (!isReady) {
+      appDoc.state = 'SIGN AND SUBMIT';
+    }
+  }
+
+  if (!merged) {
+    throw new Error();
+  }
+
+  // save / error
+  merged.lastUpdatedAtUtc = new Date();
+  merged.searchValues = getSearchFieldValues(merged);
+  await ApplicationModel.updateOne({ appId: merged.appId }, merged);
+}
+
+function isReadyToSignAndSubmit(app: Application) {
+  return false;
+}
+
+function validateRequired(val: string, name: string, errors: SectionError[]) {
+  if (!val) {
+    errors.push({
+      field: name,
+      message: `field ${name} is required`
+    });
+    return false;
+  }
+  return true;
+}
+
+
+function updateAppStateForDraftApplication(currentOriginal: Application, updatePart: Partial<Application>) {
+  const current = _.cloneDeep(currentOriginal);
+
+  if (updatePart.revisionRequest) {
+    throw new Error('revision requests cannot be updated for a draft application');
+  }
+
+  if (updatePart.sections?.terms?.agreement.accepted !== undefined) {
+    current.sections.terms.agreement.accepted = updatePart.sections?.terms.agreement.accepted;
+  }
+
+  if (updatePart.sections?.applicant) {
+    current.sections.applicant = mergeKnown(current.sections.applicant, updatePart.sections.applicant);
+    const info = current.sections.applicant.info;
+    if (!!info.firstName.trim() && !!info.lastName.trim()) {
+      current.sections.applicant.info.displayName = info.firstName.trim() + ' ' + info.lastName.trim();
+    }
+    validateApplicantSection(current);
+  }
+
+  if (updatePart.sections?.representative) {
+    current.sections.applicant = mergeKnown(current.sections.representative, updatePart.sections.representative);
+    const info = current.sections.representative.info;
+    if (!!info.firstName.trim() && !!info.lastName.trim()) {
+      current.sections.representative.info.displayName = info.firstName.trim() + ' ' + info.lastName.trim();
+    }
+    validateRepresentativeSection(current);
+  }
+
+  if (updatePart.sections?.projectInfo) {
+    current.sections.projectInfo = mergeKnown(current.sections.projectInfo, updatePart.sections.projectInfo);
+    validateProjectInfo(current);
+  }
+
+  if (updatePart.sections?.ethicsLetter) {
+    current.sections.ethicsLetter = mergeKnown(current.sections.ethicsLetter, updatePart.sections.ethicsLetter);
+  }
+
+  if (updatePart.sections?.ITAgreements?.agreements) {
+    mergeAgreementArray(current.sections.ITAgreements.agreements, updatePart.sections.ITAgreements.agreements);
+  }
+
+  if (updatePart.sections?.dataAccessAgreement?.agreements) {
+    mergeAgreementArray(current.sections.dataAccessAgreement.agreements, updatePart.sections.dataAccessAgreement.agreements);
+  }
+
+  if (updatePart.sections?.appendices?.agreements) {
+    mergeAgreementArray(current.sections.appendices.agreements, updatePart.sections.appendices.agreements);
+  }
+
+  return current;
+}
+
+function validateProjectInfo(app: Application) {
+  const errors: SectionError[]  = [];
+  const validations = [
+    validateRequired(app.sections.projectInfo.title, 'title', errors),
+    // todo: validate website url
+    validateRequired(app.sections.projectInfo.background, 'background', errors),
+    validateWordLength(app.sections.projectInfo.background, 200, 'background', errors),
+    validateRequired(app.sections.projectInfo.aims, 'aims', errors),
+    validateWordLength(app.sections.projectInfo.aims, 200, 'aims', errors),
+    validateRequired(app.sections.projectInfo.methodology, 'methodology', errors),
+    validateWordLength(app.sections.projectInfo.methodology, 200, 'methodology', errors),
+  ];
+  const valid = !validations.some(x => x == false);
+  app.sections.projectInfo.meta.status = valid ? 'COMPLETE' : 'INCOMPLETE';
+  app.sections.projectInfo.meta.errorsList = errors;
+}
+
+function validateWordLength(val: string, length: number, name: string, errors: SectionError[]) {
+  if (val && countWords(val) > length) {
+    errors.push({
+      field: name,
+      message: `field ${name} exceeded allowed number of words`
+    });
+    return false;
+  }
+  return true;
+}
+
+function countWords(str: string) {
+  str = str.replace(/(^\s*)|(\s*$)/gi, '');
+  str = str.replace(/[ ]{2,}/gi, ' ');
+  str = str.replace(/\n /, '\n');
+  return str.split(' ').length;
+}
+
+function validateRepresentativeSection(app: Application) {
+  const errors: SectionError[] = [];
+  const addressResult = validateAddress(app.sections.representative.address, errors);
+  const infoResult = validatePersonalInfo(app.sections.representative.info, errors);
+  app.sections.representative.meta.status = addressResult && infoResult ? 'COMPLETE' : 'INCOMPLETE';
+  app.sections.representative.meta.errorsList = errors;
+}
+
+function validateApplicantSection(app: Application) {
+  const applicantErrors: SectionError[] = [];
+  const addressResult = validateAddress(app.sections.applicant.address, applicantErrors);
+  const infoResult = validatePersonalInfo(app.sections.applicant.info, applicantErrors);
+  app.sections.applicant.meta.status = addressResult && infoResult ? 'COMPLETE' : 'INCOMPLETE';
+  app.sections.applicant.meta.errorsList = applicantErrors;
+}
+
+function validatePersonalInfo(info: PersonalInfo, errors: SectionError[]) {
+  const validations = [
+    validateRequired(info.firstName, 'firstName', errors),
+    validateRequired(info.lastName, 'lastName', errors),
+    validateRequired(info.googleEmail, 'googleEmail', errors),
+    validateRequired(info.institutionEmail, 'institutionEmail', errors),
+    validateRequired(info.primaryAffiliation, 'primaryAffiliation', errors),
+    validateRequired(info.positionTitle, 'positionTitle', errors)
+  ];
+
+  return !validations.some(x => x == false);
+}
+
+function validateAddress(address: Address, errors: SectionError[]) {
+  const validations = [
+    validateRequired(address.streetAddress, 'streetAddress', errors),
+    validateRequired(address.cityAndProvince, 'cityAndProvince', errors),
+    validateRequired(address.country, 'country', errors),
+    validateRequired(address.postalCode, 'postalCode', errors)
+  ];
+  return !validations.some(x => x == false);
+}
+
+function mergeAgreementArray(current: AgreementItem[], update: AgreementItem[]) {
+  update.forEach(ai => {
+    const name = ai.name;
+    const target = current.find(a => a.name == name);
+    if (!target) return;
+    target.accepted = ai.accepted;
+  });
+}
+
 export async function updateFullDocument(app: Application, identity: Identity) {
-  const isAdminOrReviewerResult = await canSeeAnyApplication(identity);
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId: app.appId
   };
@@ -34,7 +230,7 @@ export async function updateFullDocument(app: Application, identity: Identity) {
   }
 
   // this should be ET to match admin location when they do search
-  app.lastUpdatedAtDate = moment().tz('ET').format('YYYY-MM-DD');
+  app.lastUpdatedAtUtc = new Date();
   app.searchValues = getSearchFieldValues(app);
   await ApplicationModel.updateOne({ appId: app.appId }, app);
 }
@@ -46,7 +242,8 @@ export async function search(params: {
   pageSize: number,
   sortBy: { field: string, direction: string } [],
 }, identity: Identity): Promise<SearchResult> {
-  const isAdminOrReviewerResult = await canSeeAnyApplication(identity);
+
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
     query.submitterId = identity.userId;
@@ -79,6 +276,7 @@ export async function search(params: {
       items: []
     };
   }
+
   const apps = await ApplicationModel.find(query)
     .skip( params.page > 0 ? ( ( params.page ) * params.pageSize ) : 0)
     .limit( params.pageSize )
@@ -95,7 +293,8 @@ export async function search(params: {
       expiresAtUtc: app.expiresAtUtc,
       state: app.state,
       ethics: {
-        declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired
+        // tslint:disable-next-line:no-null-keyword
+        declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired || null
       },
       submittedAtUtc: app.submittedAtUtc,
       lastUpdatedAtUtc: app.lastUpdatedAtUtc
@@ -111,9 +310,14 @@ export async function search(params: {
   };
 }
 
+export async function deleteApp(id: string, identity: Identity) {
+  await ApplicationModel.deleteOne({
+    appId: id
+  }).exec();
+}
 
 export async function getById(id: string, identity: Identity) {
-  const isAdminOrReviewerResult = await canSeeAnyApplication(identity);
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId: id
   };
@@ -128,8 +332,6 @@ export async function getById(id: string, identity: Identity) {
   const copy = app.toObject();
   return copy;
 }
-
-
 
 function newApplication(identity: Identity): Partial<Application> {
   const app: Partial<Application> = {
@@ -164,23 +366,23 @@ function newApplication(identity: Identity): Partial<Application> {
     },
     sections: {
       collaborators: {
-        meta: {status: '', errors: []},
+        meta: {status: 'PRISTINE', errorsList: []},
         list: [],
       },
       ITAgreements: {
-        meta: {status: '', errors: []},
+        meta: {status: 'PRISTINE', errorsList: []},
         agreements: getITAgreements()
       },
       appendices: {
-        meta: {status: '', errors: []},
+        meta: {status: 'PRISTINE', errorsList: []},
         agreements: getAppendixAgreements()
       },
       dataAccessAgreement: {
-        meta: {status: '', errors: []},
+        meta: {status: 'PRISTINE', errorsList: []},
         agreements: getDataAccessAgreement()
       },
       terms: {
-        meta: {status: '', errors: []},
+        meta: {status: 'PRISTINE', errorsList: []},
         agreement: {
           accepted: false,
           name: 'introduction_agree_to_terms'
@@ -188,7 +390,7 @@ function newApplication(identity: Identity): Partial<Application> {
       },
 
       applicant: {
-        meta: {status: '', errors: []},
+        meta: {status: 'PRISTINE', errorsList: []},
         address: {
           building: '',
           cityAndProvince: '',
@@ -211,19 +413,19 @@ function newApplication(identity: Identity): Partial<Application> {
         }
       },
       projectInfo: {
-        abstract: '',
-        laySummary: '',
+        background: '',
+        methodology: '',
+        aims: '',
         website: '',
         title: '',
-        pubMedIDs: [],
-        meta: { status: '', errors: [] }
+        publicationsURLs: [],
+        meta: { status: 'PRISTINE', errorsList: [] }
       },
       ethicsLetter: {
-        approvalLetterObjId: undefined,
-        declaredAsRequired: undefined,
-        doesExpire: false,
-        expiryDateUtc: undefined,
-        meta: { status: '', errors: [] }
+        // tslint:disable-next-line:no-null-keyword
+        declaredAsRequired: null,
+        approvalLetterDocs: [ ],
+        meta: { status: 'PRISTINE', errorsList: [] }
       },
       representative: {
         address: {
@@ -247,7 +449,7 @@ function newApplication(identity: Identity): Partial<Application> {
           suffix: '',
           title: '',
         },
-        meta: { status: '', errors: [] }
+        meta: { status: 'PRISTINE', errorsList: [] }
       }
     }
   };
@@ -346,7 +548,7 @@ function getDataAccessAgreement() {
 }
 
 
-async function canSeeAnyApplication(identity: Identity) {
+async function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = (await getAppConfig()).auth.REVIEW_SCOPE;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some(v => v == REVIEW_SCOPE);
@@ -357,8 +559,9 @@ function getSearchFieldValues(appDoc: Application) {
     appDoc.appId,
     appDoc.state,
     appDoc.sections.ethicsLetter.declaredAsRequired ? 'yes' : 'no',
-    appDoc.lastUpdatedAtDate,
-    appDoc.expiresAtDate,
+    // this will be ET to match admin location when they do search
+    moment(appDoc.lastUpdatedAtUtc).tz('ET').format('YYYY-MM-DD'),
+    appDoc.expiresAtUtc ? moment(appDoc.expiresAtUtc).tz('America/Toronto').format('YYYY-MM-DD') : '',
     appDoc.sections.applicant.info.displayName,
     appDoc.sections.applicant.info.googleEmail,
     appDoc.sections.applicant.info.primaryAffiliation,

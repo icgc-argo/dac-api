@@ -10,7 +10,7 @@
     "tslint": "tslint -c tslint.json -p tsconfig.json",
     "build": "npm run build-ts && npm run resources && npm run tslint",
     "debug": "npm run build && sleep 3 && npm run watch-debug",
-    "watch-debug": "ts-node-dev --respawn -- ./src/server.ts",
+    "watch-debug": "ts-node-dev --inspect --respawn -- ./src/server.ts",
     "test": "mocha -r ts-node/register src/test/**/*.spec.ts",
     "migrate-up": "migrate-mongo up",
     "migrate-down": "migrate-mongo down",
