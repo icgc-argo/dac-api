@@ -2,15 +2,16 @@ import { Router, Request, Response, RequestHandler } from 'express';
 
 
 import wrapAsync from '../utils/wrapAsync';
-import { create, getById, search, updateFullDocument } from '../domain/service';
+import { create, deleteApp, getById, search, updateFullDocument, updatePartial } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { Application } from '../domain/interface';
+import { AppConfig } from '../config';
 interface IRequest extends Request {
   identity: Identity;
 }
 
-const createApplicationsRouter = (authFilter: (scopes: string[]) => RequestHandler) => {
+const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
   const router = Router();
 
   router.post(
@@ -64,6 +65,17 @@ const createApplicationsRouter = (authFilter: (scopes: string[]) => RequestHandl
     }),
   );
 
+  router.delete(
+    '/applications/:id',
+    authFilter([ config.auth.REVIEW_SCOPE ]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const id = req.params.id;
+      const validatedId = validateId(id);
+      await deleteApp(validatedId, (req as IRequest).identity);
+      return res.status(200).end();
+    }),
+  );
+
   router.put(
     '/applications/:id',
     authFilter([]),
@@ -75,6 +87,20 @@ const createApplicationsRouter = (authFilter: (scopes: string[]) => RequestHandl
       return res.status(200).send();
     }),
   );
+
+  router.patch(
+    '/applications/:id',
+    authFilter([]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const id = req.params.id;
+      const validatedId = validateId(id);
+      const app = req.body as Application;
+      app.appId = id;
+      await updatePartial(app, (req as IRequest).identity);
+      return res.status(200).send();
+    }),
+  );
+
 
   return router;
 };

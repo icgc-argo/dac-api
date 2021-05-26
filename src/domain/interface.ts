@@ -1,24 +1,21 @@
-export type State =  'DRAFT' | 'READY TO SUBMIT' | 'REVIEW' | 'REVISION REQUESTED' | 'APPROVED' | 'RENEWING' | 'REJECTED' | 'CLOSED' | 'EXPIRED';
+export type State =  'DRAFT' | 'SIGN AND SUBMIT' | 'REVIEW' | 'REVISIONS REQUESTED' | 'APPROVED' | 'RENEWING' | 'REJECTED' | 'CLOSED' | 'EXPIRED';
 
+export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'LOCKED' | 'DISABLED';
 interface Meta {
-  status: string;
-  errors: {
-    field: string;
-    message: string;
-  }[];
+  status: SectionStatus;
+  errorsList: Error[];
 }
-
 interface RevisionRequest {
   details: string;
   requested: boolean;
 }
 
-interface AgreementItem {
+export interface AgreementItem {
   name: string;
   accepted: boolean;
 }
 
-interface PersonalInfo {
+export interface PersonalInfo {
   title: string;
   firstName: string;
   middleName: string;
@@ -32,7 +29,7 @@ interface PersonalInfo {
   positionTitle: string;
 }
 
-interface Address {
+export interface Address {
   country: string;
   building: string;
   streetAddress: string;
@@ -83,7 +80,7 @@ export interface ApplicationSummary {
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
 
-
+export type Error = { field: string, message: string };
 export interface Application {
   appId: string;
   appNumber: number;
@@ -97,8 +94,6 @@ export interface Application {
   closedAtUtc: Date;
   closedBy: string;
   denialReason: string;
-  lastUpdatedAtDate: string;
-  expiresAtDate: string;
   lastUpdatedAtUtc?: Date;
   createdAtUtc?: Date;
   searchValues: string[];
@@ -134,16 +129,18 @@ export interface Application {
       meta: Meta,
       title: string;
       website: string;
-      abstract: string;
-      laySummary: string;
-      pubMedIDs: string[]
+      background: string;
+      aims: string;
+      methodology: string;
+      publicationsURLs: string[]
     },
     ethicsLetter: {
       meta: Meta,
-      declaredAsRequired: boolean | undefined;
-      approvalLetterObjId: string | undefined;
-      doesExpire: boolean
-      expiryDateUtc: Date | undefined;
+      declaredAsRequired: boolean | null;
+      approvalLetterDocs: {
+        objectId: string;
+        uploadedAtUtc: Date
+      }[];
     },
     ITAgreements: {
       meta: Meta,
@@ -160,3 +157,5 @@ export interface Application {
   };
   updates: ApplicationUpdate[];
 }
+
+

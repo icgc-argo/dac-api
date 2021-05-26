@@ -427,9 +427,9 @@ components:
           type: string
           enum:
             - DRAFT
-            - READY TO SUBMIT
+            - SIGN AND SUBMIT
             - REVIEW
-            - REVISION REQUESTED
+            - REVISIONS REQUESTED
             - REJECTED
             - APPROVED
             - RENEWING
@@ -488,9 +488,9 @@ components:
           type: string
           enum:
             - DRAFT
-            - READY TO SUBMIT
+            - SIGN AND SUBMIT
             - REVIEW
-            - REVISION REQUESTED
+            - REVISIONS REQUESTED
             - REJECTED
             - APPROVED
             - RENEWING
@@ -605,6 +605,24 @@ components:
                   items:
                     type: string
 
+            ethicsLetter: 
+              type: object
+              properties:
+                meta: 
+                  $ref: '#/components/schemas/Meta'
+                declaredAsRequired:
+                  type: boolean
+                approvalLetterDocs:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      objectId: 
+                        type: string
+                      uploadedAtUtc:
+                        type: string
+                        format: data-time
+                  
             ITAgreements:
               type: object
               properties:
