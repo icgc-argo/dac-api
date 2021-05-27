@@ -3,7 +3,7 @@ export type State =  'DRAFT' | 'SIGN AND SUBMIT' | 'REVIEW' | 'REVISIONS REQUEST
 export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'LOCKED' | 'DISABLED';
 interface Meta {
   status: SectionStatus;
-  errorsList: Error[];
+  errorsList: SectionError[];
 }
 interface RevisionRequest {
   details: string;
@@ -80,14 +80,13 @@ export interface ApplicationSummary {
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
 
-export type Error = { field: string, message: string };
+export type SectionError = { field: string, message: string };
 export interface Application {
   appId: string;
   appNumber: number;
   state: State;
   submitterId: string;
   submitterEmail: string;
-  signedAppDocObjId: string;
   submittedAtUtc: Date;
   approvedAtUtc: Date;
   expiresAtUtc: Date;
@@ -153,6 +152,10 @@ export interface Application {
     appendices: {
       meta: Meta,
       agreements: AgreementItem[],
+    },
+    signature: {
+      meta: Meta,
+      signedAppDocObjId: string;
     }
   };
   updates: ApplicationUpdate[];
