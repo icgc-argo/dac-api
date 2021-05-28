@@ -108,6 +108,7 @@
     "response-time": "^2.3.2",
     "swagger-ui-express": "^4.1.6",
     "ts-node": "^9.1.1",
+    "validate.js": "^0.13.1",
     "winston": "^3.3.3",
     "yamljs": "^0.3.0"
   },
