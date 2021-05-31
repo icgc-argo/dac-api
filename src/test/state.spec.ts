@@ -2,7 +2,7 @@ import { Identity } from '@overture-stack/ego-token-middleware';
 import { Address, Application, TERMS_AGREEMENT_NAME, UpdateApplication } from '../domain/interface';
 import { ApplicationStateManager, newApplication } from '../domain/state';
 import { expect } from 'chai';
-import _, { fill } from 'lodash';
+import _ from 'lodash';
 
 const newApplication1: Partial<Application> = newApplication({
   userId: 'abc123',

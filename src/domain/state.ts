@@ -2,12 +2,9 @@ import { mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
 import _ from 'lodash';
-import validator from 'validate.js';
+
 import {
   Application,
-  Address,
-  SectionError,
-  PersonalInfo,
   TERMS_AGREEMENT_NAME,
   IT_AGREEMENT_PROTECT_DATA,
   IT_AGREEMENT_MONITOR_ACCESS,
@@ -30,6 +27,15 @@ import {
   DAA_AGREE_TO_TERMS, UpdateApplication, AgreementItem
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
+import {
+  validateAppendices,
+  validateApplicantSection,
+  validateDataAccessAgreement,
+  validateEthicsLetterSection,
+  validateITAgreement,
+  validateProjectInfo,
+  validateRepresentativeSection
+} from './validations';
 
 export class ApplicationStateManager {
   private currentApplication: Application;
@@ -49,6 +55,9 @@ export class ApplicationStateManager {
         merged = updateAppStateForRetrunedApplication(this.currentApplication, updatePart);
         const shouldSubmit = isReadyToSignAndSubmit(merged);
         if (shouldSubmit) {
+          if (merged.sections.collaborators.meta.status == 'PRISTINE') {
+            merged.sections.collaborators.meta.status = 'COMPLETE';
+          }
           merged.sections.signature.meta.status = 'REVISIONS REQUESTED';
           merged.state = 'SIGN AND SUBMIT';
         } else {
@@ -74,6 +83,11 @@ export class ApplicationStateManager {
         // check if it's ready to move to the next state [DRAFT => SIGN & SUBMIT]
         const isReady = isReadyToSignAndSubmit(merged);
         if (isReady) {
+          // if all sections are ready and collaborator is not, then since it's optional
+          // we mark it as complete as discussed on slack.
+          if (merged.sections.collaborators.meta.status == 'PRISTINE') {
+            merged.sections.collaborators.meta.status = 'COMPLETE';
+          }
           merged.sections.signature.meta.status = 'PRISTINE';
           merged.state = 'SIGN AND SUBMIT';
         } else {
@@ -124,7 +138,7 @@ function updateAppInReview(currentApplication: Readonly<Application>, updatePart
   if (updatePart.state == 'REVISIONS REQUESTED') {
     current.state = 'REVISIONS REQUESTED';
     current.revisionRequest = mergeKnown(current.revisionRequest, updatePart.revisionRequest);
-    // iterate over revision sections and update their state
+    // TODO: iterate over revision sections and update their state to revision requested.
     return current;
   }
 }
@@ -165,10 +179,7 @@ function validateUploadedDocument(uploadedDocId: string | undefined) {
 }
 
 function isReadyForReview(application: Application) {
-  if (application.sections.signature.meta.status !== 'COMPLETE') {
-    return false;
-  }
-  return true;
+  return application.sections.signature.meta.status === 'COMPLETE';
 }
 
 function updateAppStateForApprovedApplication(currentApplication: Application, updatePart: Partial<UpdateApplication>, isReviewer: boolean) {
@@ -176,7 +187,6 @@ function updateAppStateForApprovedApplication(currentApplication: Application, u
   updateEthics(updatePart, current);
   return current;
 }
-
 
 function updateAppStateForRetrunedApplication(currentApplication: Application, updatePart: Partial<UpdateApplication>) {
   const current = _.cloneDeep(currentApplication);
@@ -193,6 +203,7 @@ function updateAppStateForDraftApplication(currentApplication: Application, upda
   updateApplicationSection(updatePart, current);
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
+  updateCollaborators(updatePart, current);
   updateEthics(updatePart, current);
   updateITAgreements(updatePart, current);
   updateDataAccessAgreements(updatePart, current);
@@ -200,6 +211,11 @@ function updateAppStateForDraftApplication(currentApplication: Application, upda
   return current;
 }
 
+function updateCollaborators(updatePart: Partial<UpdateApplication>, currentApplication: Application) {
+  if (updatePart.sections?.collaborators?.list) {
+
+  }
+}
 
 function updateAppendices(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.appendices?.agreements) {
@@ -250,7 +266,7 @@ function updateTerms(updatePart: Partial<UpdateApplication>, current: Applicatio
 
 function updateRepresentative(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.representative) {
-    current.sections.applicant = mergeKnown(current.sections.representative, updatePart.sections.representative);
+    current.sections.representative = mergeKnown(current.sections.representative, updatePart.sections.representative);
     const info = current.sections.representative.info;
     if (!!info.firstName.trim() && !!info.lastName.trim()) {
       current.sections.representative.info.displayName = info.firstName.trim() + ' ' + info.lastName.trim();
@@ -270,185 +286,6 @@ function updateApplicationSection(updatePart: Partial<UpdateApplication>, curren
   }
 }
 
-function validateITAgreement(app: Application) {
-  const result = validateAgreementArray(app.sections.ITAgreements.agreements);
-  if (!result) {
-    app.sections.ITAgreements.meta.status = 'INCOMPLETE';
-    return;
-  }
-  app.sections.ITAgreements.meta.status = 'COMPLETE';
-}
-
-function validateAppendices(app: Application) {
-  const result = validateAgreementArray(app.sections.appendices.agreements);
-  if (!result) {
-    app.sections.appendices.meta.status = 'INCOMPLETE';
-    return;
-  }
-  app.sections.appendices.meta.status = 'COMPLETE';
-}
-
-
-function validateEthicsLetterSection(app: Application) {
-  const needsLetter = app.sections.ethicsLetter.declaredAsRequired;
-  const errors: SectionError[] = [];
-  const declared = validateRequired(needsLetter, 'needsLetter', errors);
-  if (!declared) {
-    app.sections.ethicsLetter.meta.status = 'INCOMPLETE';
-    return false;
-  }
-
-  if (needsLetter) {
-    if (app.sections.ethicsLetter.approvalLetterDocs.length == 0) {
-      app.sections.ethicsLetter.meta.status = 'INCOMPLETE';
-      errors.push({
-        field: 'approvalLetterDocs',
-        message: 'At least one ethics letter is required'
-      });
-    }
-    return false;
-  }
-
-  app.sections.ethicsLetter.meta.status = 'COMPLETE';
-  app.sections.ethicsLetter.meta.errorsList = errors;
-  return true;
-}
-
-function validateDataAccessAgreement(app: Application) {
-  const result = validateAgreementArray(app.sections.dataAccessAgreement.agreements);
-  if (!result) {
-    app.sections.dataAccessAgreement.meta.status = 'INCOMPLETE';
-    return;
-  }
-  app.sections.dataAccessAgreement.meta.status = 'COMPLETE';
-}
-
-function validateAgreementArray(ags: AgreementItem[]) {
-  const incomplete = ags.some(ag => {
-    ag.accepted !== true;
-  });
-  return !incomplete;
-}
-
-function validateProjectInfo(app: Application) {
-  const errors: SectionError[] = [];
-  const validations = [
-    validateRequired(app.sections.projectInfo.title, 'title', errors),
-    validateUrl(app.sections.projectInfo.website, 'website', errors),
-    validateRequired(app.sections.projectInfo.background, 'background', errors),
-    validateWordLength(app.sections.projectInfo.background, 200, 'background', errors),
-    validateRequired(app.sections.projectInfo.aims, 'aims', errors),
-    validateWordLength(app.sections.projectInfo.aims, 200, 'aims', errors),
-    validateRequired(app.sections.projectInfo.methodology, 'methodology', errors),
-    validateWordLength(app.sections.projectInfo.methodology, 200, 'methodology', errors),
-    validatePublications(app.sections.projectInfo.publicationsURLs, errors),
-  ];
-  const valid = !validations.some(x => x == false);
-  app.sections.projectInfo.meta.status = valid ? 'COMPLETE' : 'INCOMPLETE';
-  app.sections.projectInfo.meta.errorsList = errors;
-}
-
-function validateUrl(val: string, name: string, errors: SectionError[]) {
-  const error: string[] | undefined = validator.single(val, {
-    url: true
-  });
-  if (error) {
-    errors.push({
-      field: name,
-      message: 'Value is not a valid URL'
-    });
-    return false;
-  }
-  return true;
-}
-
-function validatePublications(publications: string[], errors: SectionError[]) {
-  const uniquePubs = _.uniq(publications);
-  if (uniquePubs.length < 3) {
-    errors.push({
-      field: 'publications',
-      message: 'you need at least 3 unique publications URLs'
-    });
-    return false;
-  }
-
-  const validations = uniquePubs.map((p: string, index: number) => {
-    return validateUrl(p, `publications.${index}`, errors);
-  });
-
-  return !validations.some(x => !x);
-}
-
-function validateWordLength(val: string, length: number, name: string, errors: SectionError[]) {
-  if (val && countWords(val) > length) {
-    errors.push({
-      field: name,
-      message: `field ${name} exceeded allowed number of words`
-    });
-    return false;
-  }
-  return true;
-}
-
-function countWords(str: string) {
-  str = str.replace(/(^\s*)|(\s*$)/gi, '');
-  str = str.replace(/[ ]{2,}/gi, ' ');
-  str = str.replace(/\n /, '\n');
-  return str.split(' ').length;
-}
-
-function validateRepresentativeSection(app: Application) {
-  const errors: SectionError[] = [];
-  const addressResult = validateAddress(app.sections.representative.address, errors);
-  const infoResult = validatePersonalInfo(app.sections.representative.info, errors);
-  app.sections.representative.meta.status = addressResult && infoResult ? 'COMPLETE' : 'INCOMPLETE';
-  app.sections.representative.meta.errorsList = errors;
-}
-
-function validateApplicantSection(app: Application) {
-  const applicantErrors: SectionError[] = [];
-  const addressResult = validateAddress(app.sections.applicant.address, applicantErrors);
-  const infoResult = validatePersonalInfo(app.sections.applicant.info, applicantErrors);
-  app.sections.applicant.meta.status = addressResult && infoResult ? 'COMPLETE' : 'INCOMPLETE';
-  app.sections.applicant.meta.errorsList = applicantErrors;
-}
-
-function isReadyToSignAndSubmit(app: Application) {
-  const sections = app.sections;
-  return sections.terms.meta.status == 'COMPLETE'
-    && sections.applicant.meta.status == 'COMPLETE'
-    && sections.representative.meta.status == 'COMPLETE'
-    && sections.projectInfo.meta.status == 'COMPLETE'
-    && sections.ethicsLetter.meta.status == 'COMPLETE'
-    && sections.ITAgreements.meta.status == 'COMPLETE'
-    && sections.dataAccessAgreement.meta.status == 'COMPLETE'
-    && sections.appendices.meta.status == 'COMPLETE';
-}
-
-
-function validatePersonalInfo(info: PersonalInfo, errors: SectionError[]) {
-  const validations = [
-    validateRequired(info.firstName, 'firstName', errors),
-    validateRequired(info.lastName, 'lastName', errors),
-    validateRequired(info.googleEmail, 'googleEmail', errors),
-    validateRequired(info.institutionEmail, 'institutionEmail', errors),
-    validateRequired(info.primaryAffiliation, 'primaryAffiliation', errors),
-    validateRequired(info.positionTitle, 'positionTitle', errors)
-  ];
-
-  return !validations.some(x => x == false);
-}
-
-function validateAddress(address: Address, errors: SectionError[]) {
-  const validations = [
-    validateRequired(address.streetAddress, 'streetAddress', errors),
-    validateRequired(address.cityAndProvince, 'cityAndProvince', errors),
-    validateRequired(address.country, 'country', errors),
-    validateRequired(address.postalCode, 'postalCode', errors)
-  ];
-  return !validations.some(x => x == false);
-}
-
 function mergeAgreementArray(current: AgreementItem[], update: AgreementItem[]) {
   update.forEach(ai => {
     const name = ai.name;
@@ -458,28 +295,13 @@ function mergeAgreementArray(current: AgreementItem[], update: AgreementItem[]) 
   });
 }
 
-
-function validateRequired(val: string | boolean | null | undefined, name: string, errors: SectionError[]) {
-  if (typeof val == 'boolean') {
-    return val !== null && val !== undefined;
-  }
-  if (!val || val.trim() == '') {
-    errors.push({
-      field: name,
-      message: `field ${name} is required`
-    });
-    return false;
-  }
-  return true;
-}
-
 export function getSearchFieldValues(appDoc: Application) {
   return [
     appDoc.appId,
     appDoc.state,
     appDoc.sections.ethicsLetter.declaredAsRequired ? 'yes' : 'no',
     // this will be ET to match admin location when they do search
-    moment(appDoc.lastUpdatedAtUtc).tz('ET').format('YYYY-MM-DD'),
+    moment(appDoc.lastUpdatedAtUtc).tz('America/Toronto').format('YYYY-MM-DD'),
     appDoc.expiresAtUtc ? moment(appDoc.expiresAtUtc).tz('America/Toronto').format('YYYY-MM-DD') : '',
     appDoc.sections.applicant.info.displayName,
     appDoc.sections.applicant.info.googleEmail,
@@ -487,6 +309,20 @@ export function getSearchFieldValues(appDoc: Application) {
   ].filter(x => !(x === null || x === undefined || x.trim() === ''));
 }
 
+function isReadyToSignAndSubmit(app: Application) {
+  const sections = app.sections;
+  const requiredSectionsComplete = sections.terms.meta.status == 'COMPLETE'
+    && sections.applicant.meta.status == 'COMPLETE'
+    && sections.representative.meta.status == 'COMPLETE'
+    && sections.projectInfo.meta.status == 'COMPLETE'
+    && sections.ethicsLetter.meta.status == 'COMPLETE'
+    && sections.ITAgreements.meta.status == 'COMPLETE'
+    && sections.dataAccessAgreement.meta.status == 'COMPLETE'
+    && sections.appendices.meta.status == 'COMPLETE'
+    // only check that collaborators are not invalid, otherwise it's optional
+    && sections.collaborators.meta.status !== 'INCOMPLETE';
+  return requiredSectionsComplete;
+}
 
 export function newApplication(identity: Identity): Partial<Application> {
   const app: Partial<Application> = {
@@ -684,6 +520,7 @@ function getDataAccessAgreement() {
     },
   ];
 }
+
 export function emptyRevisionRequest() {
   return {
     applicant: {

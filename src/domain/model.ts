@@ -66,7 +66,6 @@ const ApplicationSchema = new mongoose.Schema({
     state: { type: String, required: true, index: true},
     submitterId: { type: String, required: true },
     submitterEmail: { type: String, required: true },
-    signedAppDocObjId: { type: String, required: false },
     submittedAtUtc: { type: Date, required: false },
     approvedAtUtc: { type: Date, required: false },
     expiresAtUtc: { type: Date, required: false },
@@ -79,6 +78,7 @@ const ApplicationSchema = new mongoose.Schema({
       representative: RevisionRequest,
       projectInfo: RevisionRequest,
       collaborators: RevisionRequest,
+      ethicsLetter: RevisionRequest,
       signature: RevisionRequest,
       general: RevisionRequest
     },
@@ -127,6 +127,10 @@ const ApplicationSchema = new mongoose.Schema({
       appendices: {
         meta: Meta,
         agreements: [AgreementItem],
+      },
+      signature: {
+        meta: Meta,
+        signedAppDocObjId: { type: String, required: false }
       }
     },
     updates: [ApplicationUpdate]
