@@ -54,7 +54,7 @@ const App = (config: AppConfig): express.Express => {
     return res.status(status).send(resBody);
   });
 
-  app.use(createApplicationsRouter(authFilter));
+  app.use(createApplicationsRouter(config, authFilter));
 
   const swaggerDoc = yaml.load(path.join(__dirname, './resources/swagger.yaml'));
   swaggerDoc.servers = [{ url: config.basePath }];

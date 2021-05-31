@@ -66,12 +66,9 @@ const ApplicationSchema = new mongoose.Schema({
     state: { type: String, required: true, index: true},
     submitterId: { type: String, required: true },
     submitterEmail: { type: String, required: true },
-    signedAppDocObjId: { type: String, required: false },
     submittedAtUtc: { type: Date, required: false },
     approvedAtUtc: { type: Date, required: false },
     expiresAtUtc: { type: Date, required: false },
-    lastUpdatedAtDate: {type: String, index: true},
-    expiresAtDate: { type: String, index: true },
     closedAtUtc:  { type: Date, required: false },
     closedBy: { type: String, required: false },
     denialReason: { type: String, required: false },
@@ -81,6 +78,7 @@ const ApplicationSchema = new mongoose.Schema({
       representative: RevisionRequest,
       projectInfo: RevisionRequest,
       collaborators: RevisionRequest,
+      ethicsLetter: RevisionRequest,
       signature: RevisionRequest,
       general: RevisionRequest
     },
@@ -108,7 +106,7 @@ const ApplicationSchema = new mongoose.Schema({
         meta: Meta,
         title: { type: String, required: false },
         website: { type: String, required: false },
-        abstract: { type: String, required: false },
+        background: { type: String, required: false },
         aims: { type: String, required: false },
         methodology: { type: String, required: false },
         publicationsURLs: { type: [String], required: false },
@@ -116,7 +114,7 @@ const ApplicationSchema = new mongoose.Schema({
       ethicsLetter: {
         meta: Meta,
         declaredAsRequired: { type: Boolean, required: false },
-        approvalLetterDocs: EthicsLetterDocument,
+        approvalLetterDocs: [EthicsLetterDocument],
       },
       ITAgreements: {
         meta: Meta,
@@ -129,6 +127,10 @@ const ApplicationSchema = new mongoose.Schema({
       appendices: {
         meta: Meta,
         agreements: [AgreementItem],
+      },
+      signature: {
+        meta: Meta,
+        signedAppDocObjId: { type: String, required: false }
       }
     },
     updates: [ApplicationUpdate]
@@ -141,26 +143,6 @@ const ApplicationSchema = new mongoose.Schema({
     minimize: false, optimisticConcurrency: true
   },
 );
-
-ApplicationSchema.index({
-  'sections.applicant.info.displayName': 1,
-});
-
-ApplicationSchema.index({
-  'sections.applicant.info.primaryAffiliation': 1,
-});
-
-ApplicationSchema.index({
-  'sections.applicant.info.googleEmail': 1,
-});
-
-ApplicationSchema.index({
-  'lastUpdatedAtDate': 1,
-});
-
-ApplicationSchema.index({
-  'expiresAtDate': 1,
-});
 
 export type ApplicationDocument = mongoose.Document & Application;
 

@@ -334,7 +334,7 @@ components:
       properties:
         status:
           type: string
-          enum: ["valid", "invalid", "locked", "revision_requested"]
+          enum: [ PRISTINE' , 'COMPLETE' , 'INCOMPLETE' , 'REVISIONS REQUESTED' , 'LOCKED' , 'DISABLED' ]
         errors: 
           type: array
           items:
@@ -408,7 +408,7 @@ components:
       properties:
         building:
           type: string
-        street:
+        streetAddress:
           type: string
         cityAndProvince:
           type: string
@@ -427,9 +427,9 @@ components:
           type: string
           enum:
             - DRAFT
-            - READY TO SUBMIT
+            - SIGN AND SUBMIT
             - REVIEW
-            - REVISION REQUESTED
+            - REVISIONS REQUESTED
             - REJECTED
             - APPROVED
             - RENEWING
@@ -488,9 +488,9 @@ components:
           type: string
           enum:
             - DRAFT
-            - READY TO SUBMIT
+            - SIGN AND SUBMIT
             - REVIEW
-            - REVISION REQUESTED
+            - REVISIONS REQUESTED
             - REJECTED
             - APPROVED
             - RENEWING
@@ -498,8 +498,6 @@ components:
             - EXPIRED
         submitterId:
           readOnly: true
-          type: string
-        signedAppDocObjId:
           type: string
         createdAtUtc:
           readOnly: true
@@ -542,6 +540,8 @@ components:
             projectInfo:
               $ref: '#/components/schemas/RevisionRequest'
             collaborators: 
+              $ref: '#/components/schemas/RevisionRequest'
+            ethicsLetter: 
               $ref: '#/components/schemas/RevisionRequest'
             signature: 
               $ref: '#/components/schemas/RevisionRequest'
@@ -594,17 +594,39 @@ components:
               properties:
                 meta:
                   $ref: '#/components/schemas/Meta'
+                background:
+                  type: string
+                methodology: 
+                  type: string
+                aims:
+                  type: string
+                title:
+                  type: string
                 website:
                   type: string
-                abstract: 
-                  type: string
-                laySummary:
-                  type: string
-                pubMedIds:
+                publicationsURLs:
                   type: array
                   items:
                     type: string
 
+            ethicsLetter: 
+              type: object
+              properties:
+                meta: 
+                  $ref: '#/components/schemas/Meta'
+                declaredAsRequired:
+                  type: boolean
+                approvalLetterDocs:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      objectId: 
+                        type: string
+                      uploadedAtUtc:
+                        type: string
+                        format: data-time
+                  
             ITAgreements:
               type: object
               properties:
@@ -634,3 +656,11 @@ components:
                   type: array
                   items:
                     $ref: '#/components/schemas/AgreementItem'  
+
+            signature:
+              type: object
+              properties:
+                signedAppDocObjId: 
+                  type: string
+                meta:
+                  $ref: '#/components/schemas/Meta'

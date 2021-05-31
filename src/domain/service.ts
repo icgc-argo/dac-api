@@ -2,24 +2,45 @@ import { Identity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
 import { NotFound } from '../utils/errors';
 import { getAppConfig } from '../config';
-import { Application, ApplicationSummary, SearchResult, State } from './interface';
 import { ApplicationDocument, ApplicationModel } from './model';
-import moment from 'moment';
 import 'moment-timezone';
+import _ from 'lodash';
+import { ApplicationStateManager, getSearchFieldValues, newApplication } from './state';
+import { Application, ApplicationSummary, SearchResult, State } from './interface';
 
 export async function create(identity: Identity) {
   const app = newApplication(identity);
   const appDoc = await ApplicationModel.create(app);
   appDoc.appId = `DACO-${appDoc.appNumber}`;
-  appDoc.lastUpdatedAtDate = moment(appDoc.lastUpdatedAtUtc).tz('ET').format('YYYY-MM-DD');
   appDoc.searchValues = getSearchFieldValues(appDoc);
   await appDoc.save();
   const copy = appDoc.toObject();
   return copy;
 }
 
+export async function updatePartial(appPart: Partial<Application>, identity: Identity) {
+  const isReviewer = await hasReviewScope(identity);
+  const query: FilterQuery<ApplicationDocument> = {
+    appId: appPart.appId
+  };
+
+  if (!isReviewer) {
+    query.submitterId = identity.userId;
+  }
+
+  const appDoc = await ApplicationModel.findOne(query).exec();
+  if (!appDoc) {
+    throw new NotFound('Application not found');
+  }
+
+  const appDocObj = appDoc.toObject() as Application;
+  const stateManager = new ApplicationStateManager(appDocObj);
+  const result = stateManager.updateApp(appPart, isReviewer);
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+}
+
 export async function updateFullDocument(app: Application, identity: Identity) {
-  const isAdminOrReviewerResult = await canSeeAnyApplication(identity);
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId: app.appId
   };
@@ -34,7 +55,7 @@ export async function updateFullDocument(app: Application, identity: Identity) {
   }
 
   // this should be ET to match admin location when they do search
-  app.lastUpdatedAtDate = moment().tz('ET').format('YYYY-MM-DD');
+  app.lastUpdatedAtUtc = new Date();
   app.searchValues = getSearchFieldValues(app);
   await ApplicationModel.updateOne({ appId: app.appId }, app);
 }
@@ -46,7 +67,8 @@ export async function search(params: {
   pageSize: number,
   sortBy: { field: string, direction: string } [],
 }, identity: Identity): Promise<SearchResult> {
-  const isAdminOrReviewerResult = await canSeeAnyApplication(identity);
+
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
     query.submitterId = identity.userId;
@@ -79,6 +101,7 @@ export async function search(params: {
       items: []
     };
   }
+
   const apps = await ApplicationModel.find(query)
     .skip( params.page > 0 ? ( ( params.page ) * params.pageSize ) : 0)
     .limit( params.pageSize )
@@ -95,7 +118,8 @@ export async function search(params: {
       expiresAtUtc: app.expiresAtUtc,
       state: app.state,
       ethics: {
-        declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired
+        // tslint:disable-next-line:no-null-keyword
+        declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired || null
       },
       submittedAtUtc: app.submittedAtUtc,
       lastUpdatedAtUtc: app.lastUpdatedAtUtc
@@ -111,9 +135,14 @@ export async function search(params: {
   };
 }
 
+export async function deleteApp(id: string, identity: Identity) {
+  await ApplicationModel.deleteOne({
+    appId: id
+  }).exec();
+}
 
 export async function getById(id: string, identity: Identity) {
-  const isAdminOrReviewerResult = await canSeeAnyApplication(identity);
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId: id
   };
@@ -131,236 +160,8 @@ export async function getById(id: string, identity: Identity) {
 
 
 
-function newApplication(identity: Identity): Partial<Application> {
-  const app: Partial<Application> = {
-    state: 'DRAFT',
-    submitterId: identity.userId,
-    submitterEmail: identity.tokenInfo.context.user.email,
-    revisionRequest: {
-      applicant: {
-        details:  '',
-        requested:  false,
-      },
-      collaborators: {
-        details:  '',
-        requested:  false,
-      },
-      general: {
-        details:  '',
-        requested:  false,
-      },
-      projectInfo: {
-        details:  '',
-        requested:  false,
-      },
-      representative: {
-        details:  '',
-        requested:  false,
-      },
-      signature: {
-        details:  '',
-        requested:  false
-      }
-    },
-    sections: {
-      collaborators: {
-        meta: {status: '', errors: []},
-        list: [],
-      },
-      ITAgreements: {
-        meta: {status: '', errors: []},
-        agreements: getITAgreements()
-      },
-      appendices: {
-        meta: {status: '', errors: []},
-        agreements: getAppendixAgreements()
-      },
-      dataAccessAgreement: {
-        meta: {status: '', errors: []},
-        agreements: getDataAccessAgreement()
-      },
-      terms: {
-        meta: {status: '', errors: []},
-        agreement: {
-          accepted: false,
-          name: 'introduction_agree_to_terms'
-        }
-      },
-
-      applicant: {
-        meta: {status: '', errors: []},
-        address: {
-          building: '',
-          cityAndProvince: '',
-          country: '',
-          postalCode: '',
-          streetAddress: ''
-        },
-        info: {
-          firstName: '',
-          googleEmail: '',
-          displayName: '',
-          institutionEmail: '',
-          institutionWebsite: '',
-          lastName: '',
-          middleName: '',
-          positionTitle: '',
-          primaryAffiliation: '',
-          suffix: '',
-          title: '',
-        }
-      },
-      projectInfo: {
-        abstract: '',
-        laySummary: '',
-        website: '',
-        title: '',
-        pubMedIDs: [],
-        meta: { status: '', errors: [] }
-      },
-      ethicsLetter: {
-        approvalLetterObjId: undefined,
-        declaredAsRequired: undefined,
-        doesExpire: false,
-        expiryDateUtc: undefined,
-        meta: { status: '', errors: [] }
-      },
-      representative: {
-        address: {
-          building: '',
-          cityAndProvince: '',
-          country: '',
-          postalCode: '',
-          streetAddress: ''
-        },
-        addressSameAsApplicant: false,
-        info: {
-          firstName: '',
-          googleEmail: '',
-          institutionEmail: '',
-          displayName: '',
-          institutionWebsite: '',
-          lastName: '',
-          middleName: '',
-          positionTitle: '',
-          primaryAffiliation: '',
-          suffix: '',
-          title: '',
-        },
-        meta: { status: '', errors: [] }
-      }
-    }
-  };
-  return app;
-}
-
-function getITAgreements() {
-  return [
-    {
-      name: 'it_agreement_software_updates',
-      accepted: false,
-    },
-    {
-      name: 'it_agreement_protect_data',
-      accepted: false,
-    },
-    {
-      name: 'it_agreement_monitor_access',
-      accepted: false,
-    },
-    {
-      name: 'it_agreement_destroy_copies',
-      accepted: false,
-    },
-    {
-      name: 'it_agreement_onboard_training',
-      accepted: false,
-    },
-    {
-      name: 'it_agreement_provide_institutional_policies',
-      accepted: false,
-    },
-    {
-      name: 'it_agreement_contact_daco_fraud',
-      accepted: false,
-    },
-    {
-      name: 'it_agreement_cloud_usage_risk',
-      accepted: false,
-    },
-    {
-      name: 'it_agreement_read_cloud_appendix',
-      accepted: false,
-    }
-  ] ;
-}
-
-function getAppendixAgreements() {
-  return [
-    {
-      name: 'appendix_icgc_goals_policies',
-      accepted: false,
-    },
-    {
-      name: 'appendix_large_scale_data_sharing',
-      accepted: false,
-    },
-    {
-      name: 'appendix_prepublication_policy',
-      accepted: false,
-    },
-    {
-      name: 'appendix_publication_policy',
-      accepted: false,
-    },
-    {
-      name: 'appendix_nih_genomic_inventions',
-      accepted: false,
-    },
-    {
-      name: 'appendix_oecd_genetic_inventions',
-      accepted: false,
-    },
-    {
-      name: 'appendix_cloud_security',
-      accepted: false,
-    },
-    {
-      name: 'appendix_ga4gh_framework',
-      accepted: false,
-    }
-  ];
-}
-
-function getDataAccessAgreement() {
-  return [
-    {
-      name: 'daa_correct_application_content',
-      accepted: false,
-    },
-    {
-      name: 'daa_agree_to_terms',
-      accepted: false,
-    },
-  ];
-}
-
-
-async function canSeeAnyApplication(identity: Identity) {
+async function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = (await getAppConfig()).auth.REVIEW_SCOPE;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some(v => v == REVIEW_SCOPE);
-}
-
-function getSearchFieldValues(appDoc: Application) {
-  return [
-    appDoc.appId,
-    appDoc.state,
-    appDoc.sections.ethicsLetter.declaredAsRequired ? 'yes' : 'no',
-    appDoc.lastUpdatedAtDate,
-    appDoc.expiresAtDate,
-    appDoc.sections.applicant.info.displayName,
-    appDoc.sections.applicant.info.googleEmail,
-    appDoc.sections.applicant.info.primaryAffiliation,
-  ].filter(x => !(x === null || x === undefined || x.trim() === ''));
 }

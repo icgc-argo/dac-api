@@ -1,24 +1,21 @@
-export type State =  'DRAFT' | 'READY TO SUBMIT' | 'REVIEW' | 'REVISION REQUESTED' | 'APPROVED' | 'RENEWING' | 'REJECTED' | 'CLOSED' | 'EXPIRED';
+export type State =  'DRAFT' | 'SIGN AND SUBMIT' | 'REVIEW' | 'REVISIONS REQUESTED' | 'APPROVED' | 'RENEWING' | 'REJECTED' | 'CLOSED' | 'EXPIRED';
 
+export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS REQUESTED' | 'LOCKED' | 'DISABLED' ;
 interface Meta {
-  status: string;
-  errors: {
-    field: string;
-    message: string;
-  }[];
+  status: SectionStatus;
+  errorsList: SectionError[];
 }
-
 interface RevisionRequest {
   details: string;
   requested: boolean;
 }
 
-interface AgreementItem {
+export interface AgreementItem {
   name: string;
   accepted: boolean;
 }
 
-interface PersonalInfo {
+export interface PersonalInfo {
   title: string;
   firstName: string;
   middleName: string;
@@ -32,7 +29,7 @@ interface PersonalInfo {
   positionTitle: string;
 }
 
-interface Address {
+export interface Address {
   country: string;
   building: string;
   streetAddress: string;
@@ -83,22 +80,19 @@ export interface ApplicationSummary {
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
 
-
+export type SectionError = { field: string, message: string };
 export interface Application {
   appId: string;
   appNumber: number;
   state: State;
   submitterId: string;
   submitterEmail: string;
-  signedAppDocObjId: string;
   submittedAtUtc: Date;
   approvedAtUtc: Date;
   expiresAtUtc: Date;
   closedAtUtc: Date;
   closedBy: string;
   denialReason: string;
-  lastUpdatedAtDate: string;
-  expiresAtDate: string;
   lastUpdatedAtUtc?: Date;
   createdAtUtc?: Date;
   searchValues: string[];
@@ -108,6 +102,7 @@ export interface Application {
     projectInfo: RevisionRequest,
     collaborators: RevisionRequest,
     signature: RevisionRequest,
+    ethicsLetter: RevisionRequest,
     general: RevisionRequest
   };
   sections: {
@@ -134,16 +129,18 @@ export interface Application {
       meta: Meta,
       title: string;
       website: string;
-      abstract: string;
-      laySummary: string;
-      pubMedIDs: string[]
+      background: string;
+      aims: string;
+      methodology: string;
+      publicationsURLs: string[]
     },
     ethicsLetter: {
       meta: Meta,
-      declaredAsRequired: boolean | undefined;
-      approvalLetterObjId: string | undefined;
-      doesExpire: boolean
-      expiryDateUtc: Date | undefined;
+      declaredAsRequired: boolean | null;
+      approvalLetterDocs: {
+        objectId: string;
+        uploadedAtUtc: Date
+      }[];
     },
     ITAgreements: {
       meta: Meta,
@@ -156,7 +153,93 @@ export interface Application {
     appendices: {
       meta: Meta,
       agreements: AgreementItem[],
+    },
+    signature: {
+      meta: Meta,
+      signedAppDocObjId: string;
     }
   };
   updates: ApplicationUpdate[];
 }
+
+export interface UpdateApplication {
+  state?: State;
+  expiresAtUtc?: Date;
+  denialReason?: string;
+  revisionRequest?: {
+    applicant?: RevisionRequest,
+    representative?: RevisionRequest,
+    projectInfo?: RevisionRequest,
+    collaborators?: RevisionRequest,
+    signature?: RevisionRequest,
+    general?: RevisionRequest
+  };
+  sections: {
+    terms?: {
+      agreement: AgreementItem
+    },
+    applicant?: {
+      info?: Partial<PersonalInfo>,
+      address?: Partial<Address>
+    },
+    representative?: {
+      info?: Partial<PersonalInfo>,
+      addressSameAsApplicant?: boolean;
+      address?: Partial<Address>
+    },
+    collaborators?: {
+      list: Collaborator[],
+    },
+    projectInfo?: {
+      title?: string;
+      website?: string;
+      background?: string;
+      aims?: string;
+      methodology?: string;
+      publicationsURLs?: string[]
+    },
+    ethicsLetter?: {
+      declaredAsRequired?: boolean | null;
+      approvalLetterDocs?: {
+        objectId: string;
+        uploadedAtUtc: Date
+      }[];
+    },
+    ITAgreements?: {
+      agreements: AgreementItem[],
+    },
+    dataAccessAgreement?: {
+      agreements: AgreementItem[],
+    },
+    appendices?: {
+      agreements: AgreementItem[],
+    },
+    signature?: {
+      signedAppDocObjId: string;
+    }
+  };
+}
+
+export const TERMS_AGREEMENT_NAME = 'introduction_agree_to_terms';
+export const IT_AGREEMENT_SOFTWARE_UPDATES = 'it_agreement_software_updates';
+export const IT_AGREEMENT_PROTECT_DATA = 'it_agreement_protect_data';
+export const IT_AGREEMENT_MONITOR_ACCESS = 'it_agreement_monitor_access';
+export const IT_AGREEMENT_DESTROY_COPIES = 'it_agreement_destroy_copies';
+export const IT_AGREEMENT_ONBOARD_TRAINING = 'it_agreement_onboard_training';
+export const IT_AGREEMENT_PROVIDE_INSTITUTIONAL_POLICIES = 'it_agreement_provide_institutional_policies';
+export const IT_AGREEMENT_CONTACT_DACO_FRAUD = 'it_agreement_contact_daco_fraud';
+export const IT_AGREEMENT_CLOUD_USAGE_RISK = 'it_agreement_cloud_usage_risk';
+export const IT_AGREEMENT_READ_CLOUD_APPENDIX = 'it_agreement_read_cloud_appendix';
+
+
+export const  APPENDIX_ICGC_GOALS_POLICIES = 'appendix_icgc_goals_policies';
+export const  APPENDIX_LARGE_SCALE_DATA_SHARING = 'appendix_large_scale_data_sharing';
+export const  APPENDIX_PREPUBLICATION_POLICY = 'appendix_prepublication_policy';
+export const  APPENDIX_PUBLICATION_POLICY = 'appendix_publication_policy';
+export const  APPENDIX_NIH_GENOMIC_INVENTIONS = 'appendix_nih_genomic_inventions';
+export const  APPENDIX_OECD_GENETIC_INVENTIONS = 'appendix_oecd_genetic_inventions';
+export const  APPENDIX_CLOUD_SECURITY = 'appendix_cloud_security';
+export const  APPENDIX_GA4GH_FRAMEWORK = 'appendix_ga4gh_framework';
+
+export const DAA_CORRECT_APPLICATION_CONTENT = 'daa_correct_application_content';
+export const DAA_AGREE_TO_TERMS = 'daa_agree_to_terms';
