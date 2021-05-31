@@ -30,7 +30,8 @@ console.log('in server.ts');
   const appConfig = await getAppConfig();
 
   /**
-   * This check is to avoid setting falsy value for user/pass if there is no user pass provided because process.env will force string "undefined"
+   * This check is to avoid setting falsy value for user/pass if
+   * there is no user pass provided because process.env will force string "undefined"
    * which will fail the auth (used by migrate mongo config file).
    */
   const mongoProps = appConfig.mongoProperties;

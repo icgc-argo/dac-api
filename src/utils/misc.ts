@@ -15,7 +15,9 @@ const _mergeKnown = (a: any, b: any) => {
         return;
     }
     console.log('override [' + k + '] is found ');
-    if (typeof a[k] !== 'object') {
+    console.log(`type a[k] (${a[k]}) = `, typeof a[k]);
+    // tslint:disable-next-line:no-null-keyword
+    if (a[k] == null || typeof a[k] !== 'object') {
       console.log(' value for [' + k + '] is premitive ');
       a[k] = b[k];
       return;
@@ -26,6 +28,7 @@ const _mergeKnown = (a: any, b: any) => {
       return;
     }
 
+    // a[k] is an object
     if (typeof a[k] == typeof b[k]) {
       _mergeKnown(a[k], b[k]);
     } else {
