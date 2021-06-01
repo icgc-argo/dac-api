@@ -37,8 +37,9 @@ export interface Address {
   postalCode: string;
 }
 
-interface Collaborator {
+export interface Collaborator {
   meta: Meta;
+  id?: string;
   info: PersonalInfo;
   type: string;
 }

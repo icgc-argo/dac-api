@@ -1,8 +1,7 @@
 import { mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
-import _ from 'lodash';
-
+import _, { uniqueId } from 'lodash';
 import {
   Application,
   TERMS_AGREEMENT_NAME,
@@ -24,24 +23,64 @@ import {
   APPENDIX_CLOUD_SECURITY,
   APPENDIX_GA4GH_FRAMEWORK,
   DAA_CORRECT_APPLICATION_CONTENT,
-  DAA_AGREE_TO_TERMS, UpdateApplication, AgreementItem
+  DAA_AGREE_TO_TERMS, UpdateApplication, AgreementItem, Collaborator
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
   validateAppendices,
   validateApplicantSection,
+  validateCollaborator,
   validateDataAccessAgreement,
   validateEthicsLetterSection,
   validateITAgreement,
   validateProjectInfo,
   validateRepresentativeSection
 } from './validations';
+import { BadRequest, NotFound } from '../utils/errors';
 
 export class ApplicationStateManager {
-  private currentApplication: Application;
+  private readonly currentApplication: Application;
 
   constructor(application: Application) {
     this.currentApplication = _.cloneDeep(application);
+  }
+
+  deleteCollaborator(collaboratorId: string) {
+    const current = _.cloneDeep(this.currentApplication) as Application;
+    current.sections.collaborators.list = current.sections.collaborators.list.filter(c => c.id?.toString() !== collaboratorId);
+    return current;
+  }
+
+  updateCollaborator(collaborator: Collaborator) {
+    const current = _.cloneDeep(this.currentApplication) as Application;
+    const { valid, errors } = validateCollaborator(collaborator);
+    if (!valid) {
+      // TODO: return errors
+      throw new BadRequest();
+    }
+    const existing = current.sections.collaborators.list.find(c => c.id == collaborator.id);
+    if (!existing) {
+      throw new NotFound('No collaborator with this id');
+    }
+    const updated = mergeKnown(existing, collaborator);
+    current.sections.collaborators.list = current.sections.collaborators.list.filter(c => c.id !== collaborator.id);
+    current.sections.collaborators.list.push(updated);
+    current.sections.collaborators.meta.status = 'COMPLETE';
+    return current;
+  }
+
+  addCollaborator(collaborator: Collaborator) {
+    const current = _.cloneDeep(this.currentApplication) as Application;
+    const { valid, errors } = validateCollaborator(collaborator);
+    if (!valid) {
+      // TODO: return errors
+      throw new BadRequest();
+    }
+
+    collaborator.id = new Date().getTime().toString();
+    current.sections.collaborators.list.push(collaborator);
+    current.sections.collaborators.meta.status = 'COMPLETE';
+    return current;
   }
 
   updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean) {
@@ -203,7 +242,6 @@ function updateAppStateForDraftApplication(currentApplication: Application, upda
   updateApplicationSection(updatePart, current);
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
-  updateCollaborators(updatePart, current);
   updateEthics(updatePart, current);
   updateITAgreements(updatePart, current);
   updateDataAccessAgreements(updatePart, current);
@@ -211,11 +249,6 @@ function updateAppStateForDraftApplication(currentApplication: Application, upda
   return current;
 }
 
-function updateCollaborators(updatePart: Partial<UpdateApplication>, currentApplication: Application) {
-  if (updatePart.sections?.collaborators?.list) {
-
-  }
-}
 
 function updateAppendices(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.appendices?.agreements) {
@@ -319,7 +352,7 @@ function isReadyToSignAndSubmit(app: Application) {
     && sections.ITAgreements.meta.status == 'COMPLETE'
     && sections.dataAccessAgreement.meta.status == 'COMPLETE'
     && sections.appendices.meta.status == 'COMPLETE'
-    // only check that collaborators are not invalid, otherwise it's optional
+    // only check that collaborators section is not incomplete (which shouldn't happen !)
     && sections.collaborators.meta.status !== 'INCOMPLETE';
   return requiredSectionsComplete;
 }
