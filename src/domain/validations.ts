@@ -1,5 +1,5 @@
 import { BadRequest } from '../utils/errors';
-import { Address, AgreementItem, Application, PersonalInfo, SectionError } from './interface';
+import { Address, AgreementItem, Application, Collaborator, PersonalInfo, SectionError } from './interface';
 import validator from 'validate.js';
 import _ from 'lodash';
 
@@ -92,6 +92,16 @@ export function validateAgreementArray(ags: AgreementItem[]) {
     ag.accepted !== true;
   });
   return !incomplete;
+}
+
+export function validateCollaborator(collaborator: Collaborator) {
+  const errors: SectionError[] = [];
+  const validations = [
+    validatePersonalInfo(collaborator.info, errors),
+    validateRequired(collaborator.type, 'type' , errors)
+  ];
+  const valid = !validations.some(x => x == false);
+  return { valid, errors };
 }
 
 export function validateProjectInfo(app: Application) {

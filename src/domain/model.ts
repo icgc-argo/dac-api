@@ -36,8 +36,9 @@ const Address = new mongoose.Schema({
 const Collaborator = new mongoose.Schema({
   meta: Meta,
   info: PersonalInfo,
-  type: { type: String, required: false },
-}, { _id: false });
+  id: {type: String, required: true},
+  type: { type: String, required: true },
+}, {_id: false});
 
 const AgreementItem = new mongoose.Schema({
   name: { type: String, required: false },
