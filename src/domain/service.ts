@@ -52,6 +52,8 @@ export async function updatePartial(appPart: Partial<Application>, identity: Ide
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.updateApp(appPart, isReviewer);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
+  const updated = await findApplication(c(result.appId), identity);
+  return updated.toObject();
 }
 
 export async function updateFullDocument(app: Application, identity: Identity) {

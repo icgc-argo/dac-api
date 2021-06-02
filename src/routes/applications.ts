@@ -19,7 +19,7 @@ const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string
     authFilter([]),
     wrapAsync(async (req: Request, res: Response) => {
       const app = await create((req as IRequest).identity);
-      return res.status(200).send(app);
+      return res.status(201).send(app);
     }),
   );
 
@@ -135,8 +135,8 @@ const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string
       const validatedId = validateId(id);
       const app = req.body as Application;
       app.appId = id;
-      await updatePartial(app, (req as IRequest).identity);
-      return res.status(200).send();
+      const updated = await updatePartial(app, (req as IRequest).identity);
+      return res.status(200).send(updated);
     }),
   );
 

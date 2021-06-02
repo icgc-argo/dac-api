@@ -207,6 +207,10 @@ paths:
           description: Unexpected error ocurred
         '200':
           description: Application updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
    
     delete:
       tags:
@@ -385,7 +389,7 @@ components:
           type: string
           enum:
           - "student"
-          - "researcher"
+          - "personnel"
 
     RevisionRequest:
       type: object

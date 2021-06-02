@@ -16,14 +16,36 @@ export function validateId(id: string) {
   }
 }
 
+export function validateCollaboratorsSection(app: Application) {
+  const validations = app.sections.collaborators.list.map(c => {
+    const { valid, errors } = validateCollaborator(c, app);
+    if (valid) {
+      c.meta.status = 'COMPLETE';
+      c.meta.errorsList = [];
+      return true;
+    }
+    c.meta.status = 'INCOMPLETE';
+    c.meta.errorsList = errors;
+    return false;
+  });
+
+  // if any collaborator is invalid mark the section as incomplete
+  if (validations.some(x => x == false)) {
+    app.sections.collaborators.meta.status = 'INCOMPLETE';
+  }
+}
 export function validateRepresentativeSection(app: Application) {
   const errors: SectionError[] = [];
   let addressResult = true;
   if (!app.sections.representative.addressSameAsApplicant) {
     addressResult = validateAddress(app.sections.representative.address, errors);
   }
-  const infoResult = validatePersonalInfo(app.sections.representative.info, errors);
-  app.sections.representative.meta.status = addressResult && infoResult ? 'COMPLETE' : 'INCOMPLETE';
+  const validations = [
+    validatePersonalInfo(app.sections.representative.info, errors),
+    validatePrimaryAffiliationMatching(app.sections.representative.info.primaryAffiliation, app.sections.applicant.info.primaryAffiliation, errors)
+  ];
+
+  app.sections.representative.meta.status = addressResult && !validations.some(x => x == false) ? 'COMPLETE' : 'INCOMPLETE';
   app.sections.representative.meta.errorsList = errors;
 }
 
@@ -94,11 +116,12 @@ export function validateAgreementArray(ags: AgreementItem[]) {
   return !incomplete;
 }
 
-export function validateCollaborator(collaborator: Collaborator) {
+export function validateCollaborator(collaborator: Collaborator, application: Application) {
   const errors: SectionError[] = [];
   const validations = [
     validatePersonalInfo(collaborator.info, errors),
-    validateRequired(collaborator.type, 'type' , errors)
+    validateRequired(collaborator.type, 'type' , errors),
+    validatePrimaryAffiliationMatching(collaborator.info.primaryAffiliation, application.sections.applicant.info.primaryAffiliation, errors)
   ];
   const valid = !validations.some(x => x == false);
   return { valid, errors };
@@ -120,6 +143,21 @@ export function validateProjectInfo(app: Application) {
   const valid = !validations.some(x => x == false);
   app.sections.projectInfo.meta.status = valid ? 'COMPLETE' : 'INCOMPLETE';
   app.sections.projectInfo.meta.errorsList = errors;
+}
+
+function validatePrimaryAffiliationMatching(val: string, referenceVal: string, errors: SectionError[]) {
+  if (!referenceVal) {
+    return true;
+  }
+  if (val === referenceVal) {
+    return true;
+  }
+
+  errors.push({
+    field: 'primaryAffililation',
+    message: 'Primary Affiliation must be the same as the Applicant'
+  });
+  return false;
 }
 
 function validateUrl(val: string, name: string, errors: SectionError[]) {
@@ -199,7 +237,8 @@ function validatePersonalInfo(info: PersonalInfo, errors: SectionError[]) {
     validateRequired(info.institutionEmail, 'institutionEmail', errors),
     validateEmail(info.institutionEmail, 'institutionEmail', errors),
     validateRequired(info.primaryAffiliation, 'primaryAffiliation', errors),
-    validateRequired(info.positionTitle, 'positionTitle', errors)
+    validateRequired(info.positionTitle, 'positionTitle', errors),
+    validateUrl(info.institutionWebsite, 'institutionWebsite', errors),
   ];
 
   return !validations.some(x => x == false);
