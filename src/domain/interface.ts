@@ -41,7 +41,7 @@ export interface Collaborator {
   meta: Meta;
   id?: string;
   info: PersonalInfo;
-  type: string;
+  type: 'student' | 'personnel';
 }
 
 interface ApplicationUpdate {
@@ -81,7 +81,11 @@ export interface ApplicationSummary {
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
 
-export type SectionError = { field: string, message: string };
+export type SectionError = {
+  field: string,
+  message: string,
+  code?: string
+};
 export interface Application {
   appId: string;
   appNumber: number;

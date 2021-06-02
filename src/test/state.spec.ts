@@ -1,8 +1,9 @@
 import { Identity } from '@overture-stack/ego-token-middleware';
-import { Address, Application, TERMS_AGREEMENT_NAME, UpdateApplication } from '../domain/interface';
+import { Address, Application, Collaborator, TERMS_AGREEMENT_NAME, UpdateApplication } from '../domain/interface';
 import { ApplicationStateManager, newApplication } from '../domain/state';
 import { expect } from 'chai';
 import _ from 'lodash';
+import { BadRequest } from '../utils/errors';
 
 const newApplication1: Partial<Application> = newApplication({
   userId: 'abc123',
@@ -20,7 +21,7 @@ describe('state manager', () => {
   it('should update terms application', () => {
     const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
     const state = new ApplicationStateManager(emptyApp);
-    const terms =  {
+    const terms = {
       agreement: {
         name: TERMS_AGREEMENT_NAME,
         accepted: true
@@ -46,9 +47,9 @@ describe('state manager', () => {
         applicant: {
           info: {
             firstName: 'Bashar',
-            lastName : 'Allabadi',
-            googleEmail : 'bashar@example.com',
-            primaryAffiliation : 'OICR'
+            lastName: 'Allabadi',
+            googleEmail: 'bashar@example.com',
+            primaryAffiliation: 'OICR'
           }
         }
       }
@@ -58,6 +59,70 @@ describe('state manager', () => {
     expect(result.sections.applicant.info).to.include(updatePart.sections?.applicant?.info);
   });
 
+  it('should add collaborator', () => {
+    const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
+    const state = new ApplicationStateManager(emptyApp);
+    const collab: Collaborator = {
+      meta: {
+        errorsList: [],
+        status: 'COMPLETE'
+      },
+      info: {
+        firstName: 'Bashar',
+        lastName: 'Allabadi',
+        googleEmail: 'bashar@example.com',
+        primaryAffiliation: 'OICR',
+        institutionEmail: 'adsa@example.com',
+        middleName: '',
+        positionTitle: 'Manager',
+        suffix: '',
+        title: '',
+        displayName: '',
+        institutionWebsite: ''
+      },
+      type: 'personnel'
+    };
+
+    const result = state.addCollaborator(collab);
+    expect(result.sections.collaborators.list[0]).to.include(collab);
+    expect(result.sections.collaborators.list[0].id).to.not.be.empty;
+    expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
+  });
+
+  it('should check collaborator primary affiliation', () => {
+    const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
+    emptyApp.sections.applicant.info.primaryAffiliation = 'ACME';
+    const state = new ApplicationStateManager(emptyApp);
+    const collab: Collaborator = {
+      meta: {
+        errorsList: [],
+        status: 'COMPLETE'
+      },
+      info: {
+        firstName: 'Bashar',
+        lastName: 'Allabadi',
+        googleEmail: 'bashar@example.com',
+        primaryAffiliation: 'OICR',
+        institutionEmail: 'adsa@example.com',
+        middleName: '',
+        positionTitle: 'Manager',
+        suffix: '',
+        title: '',
+        displayName: '',
+        institutionWebsite: ''
+      },
+      type: 'personnel'
+    };
+
+    try {
+      state.addCollaborator(collab);
+    } catch (e) {
+      expect((e as BadRequest).info.errors[0]).to.include({
+        'field': 'primaryAffililation',
+        'message': 'Primary Affiliation must be the same as the Applicant'
+      });
+    }
+  });
 
   it('should change to sign & submit', () => {
     const filledApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
