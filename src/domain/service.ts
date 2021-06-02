@@ -6,7 +6,33 @@ import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import _ from 'lodash';
 import { ApplicationStateManager, getSearchFieldValues, newApplication } from './state';
-import { Application, ApplicationSummary, SearchResult, State } from './interface';
+import { Application, ApplicationSummary, Collaborator, SearchResult, State } from './interface';
+import { c } from '../utils/misc';
+
+export async function createCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
+  const appDoc = await findApplication(appId, identity);
+  const appDocObj = appDoc.toObject() as Application;
+  const stateManager = new ApplicationStateManager(appDocObj);
+  const result = stateManager.addCollaborator(collaborator);
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+  return result.sections.collaborators.list[result.sections.collaborators.list.length - 1];
+}
+
+export async function updateCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
+  const appDoc = await findApplication(appId, identity);
+  const appDocObj = appDoc.toObject() as Application;
+  const stateManager = new ApplicationStateManager(appDocObj);
+  const result = stateManager.updateCollaborator(collaborator);
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+}
+
+export async function deleteCollaborator(appId: string, collaboratorId: string, identity: Identity) {
+  const appDoc = await findApplication(appId, identity);
+  const appDocObj = appDoc.toObject() as Application;
+  const stateManager = new ApplicationStateManager(appDocObj);
+  const result = stateManager.deleteCollaborator(collaboratorId);
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+}
 
 export async function create(identity: Identity) {
   const app = newApplication(identity);
@@ -20,23 +46,14 @@ export async function create(identity: Identity) {
 
 export async function updatePartial(appPart: Partial<Application>, identity: Identity) {
   const isReviewer = await hasReviewScope(identity);
-  const query: FilterQuery<ApplicationDocument> = {
-    appId: appPart.appId
-  };
-
-  if (!isReviewer) {
-    query.submitterId = identity.userId;
-  }
-
-  const appDoc = await ApplicationModel.findOne(query).exec();
-  if (!appDoc) {
-    throw new NotFound('Application not found');
-  }
+  const appDoc = await findApplication(c(appPart.appId), identity);
 
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.updateApp(appPart, isReviewer);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
+  const updated = await findApplication(c(result.appId), identity);
+  return updated.toObject();
 }
 
 export async function updateFullDocument(app: Application, identity: Identity) {
@@ -159,6 +176,22 @@ export async function getById(id: string, identity: Identity) {
 }
 
 
+async function findApplication(appId: string, identity: Identity) {
+  const isReviewer = await hasReviewScope(identity);
+  const query: FilterQuery<ApplicationDocument> = {
+    appId
+  };
+
+  if (!isReviewer) {
+    query.submitterId = identity.userId;
+  }
+
+  const appDoc = await ApplicationModel.findOne(query).exec();
+  if (!appDoc) {
+    throw new NotFound('Application not found');
+  }
+  return appDoc;
+}
 
 async function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = (await getAppConfig()).auth.REVIEW_SCOPE;

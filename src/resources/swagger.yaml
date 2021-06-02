@@ -207,6 +207,10 @@ paths:
           description: Unexpected error ocurred
         '200':
           description: Application updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
    
     delete:
       tags:
@@ -282,7 +286,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Collaborator'
 
-    patch:
+    put:
       tags:
         - Application
       summary: Update single collaborator by id 
@@ -334,7 +338,7 @@ components:
       properties:
         status:
           type: string
-          enum: [ PRISTINE' , 'COMPLETE' , 'INCOMPLETE' , 'REVISIONS REQUESTED' , 'LOCKED' , 'DISABLED' ]
+          enum: [ 'PRISTINE' , 'COMPLETE' , 'INCOMPLETE' , 'REVISIONS REQUESTED' , 'LOCKED' , 'DISABLED' ]
         errors: 
           type: array
           items:
@@ -385,7 +389,7 @@ components:
           type: string
           enum:
           - "student"
-          - "researcher"
+          - "personnel"
 
     RevisionRequest:
       type: object

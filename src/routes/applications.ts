@@ -2,7 +2,7 @@ import { Router, Request, Response, RequestHandler } from 'express';
 
 
 import wrapAsync from '../utils/wrapAsync';
-import { create, deleteApp, getById, search, updateFullDocument, updatePartial } from '../domain/service';
+import { create, createCollaborator, deleteApp, deleteCollaborator, getById, search, updateCollaborator, updateFullDocument, updatePartial } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { Application } from '../domain/interface';
@@ -19,6 +19,45 @@ const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string
     authFilter([]),
     wrapAsync(async (req: Request, res: Response) => {
       const app = await create((req as IRequest).identity);
+      return res.status(201).send(app);
+    }),
+  );
+
+  router.post(
+    '/applications/:id/collaborators',
+    authFilter([]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const id = req.params.id;
+      const validatedId = validateId(id);
+      // todo validate structure
+      const collaborator = req.body;
+      const app = await createCollaborator(validatedId, collaborator, (req as IRequest).identity);
+      return res.status(200).send(app);
+    }),
+  );
+
+  router.put(
+    '/applications/:id/collaborators/:collaboratorId',
+    authFilter([]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const id = req.params.id;
+      const validatedId = validateId(id);
+      const collaboratorId = req.params.collaboratorId;
+      // todo validate structure
+      const collaborator = req.body;
+      const app = await updateCollaborator(validatedId, collaborator, (req as IRequest).identity);
+      return res.status(200).send(app);
+    }),
+  );
+
+  router.delete(
+    '/applications/:id/collaborators/:collaboratorId',
+    authFilter([]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const id = req.params.id;
+      const validatedId = validateId(id);
+      const collaboratorId = req.params.collaboratorId;
+      const app = await deleteCollaborator(validatedId, collaboratorId, (req as IRequest).identity);
       return res.status(200).send(app);
     }),
   );
@@ -59,7 +98,7 @@ const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string
       const validatedId = validateId(id);
       const result = await getById(validatedId, (req as IRequest).identity);
       if (!result) {
-        return res.status(404);
+        return res.status(404).send();
       }
       return res.status(200).send(result);
     }),
@@ -96,8 +135,8 @@ const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string
       const validatedId = validateId(id);
       const app = req.body as Application;
       app.appId = id;
-      await updatePartial(app, (req as IRequest).identity);
-      return res.status(200).send();
+      const updated = await updatePartial(app, (req as IRequest).identity);
+      return res.status(200).send(updated);
     }),
   );
 

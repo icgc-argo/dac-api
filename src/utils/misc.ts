@@ -1,5 +1,12 @@
 import _ from 'lodash';
 
+export function c<T>(val: T | undefined): T {
+  if (val === undefined || val === null) {
+    throw new Error('value is not defined');
+  }
+  return val;
+}
+
 export const mergeKnown = (a: any, b: any) => {
   const t = _.cloneDeep(a);
   _mergeKnown(t, b);
@@ -36,3 +43,6 @@ const _mergeKnown = (a: any, b: any) => {
     }
   });
 };
+
+
+

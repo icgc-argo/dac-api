@@ -1,8 +1,7 @@
 import { mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
-import _ from 'lodash';
-
+import _, { uniqueId } from 'lodash';
 import {
   Application,
   TERMS_AGREEMENT_NAME,
@@ -24,24 +23,79 @@ import {
   APPENDIX_CLOUD_SECURITY,
   APPENDIX_GA4GH_FRAMEWORK,
   DAA_CORRECT_APPLICATION_CONTENT,
-  DAA_AGREE_TO_TERMS, UpdateApplication, AgreementItem
+  DAA_AGREE_TO_TERMS, UpdateApplication, AgreementItem, Collaborator
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
   validateAppendices,
   validateApplicantSection,
+  validateCollaborator,
+  validateCollaboratorsSection,
   validateDataAccessAgreement,
   validateEthicsLetterSection,
   validateITAgreement,
   validateProjectInfo,
   validateRepresentativeSection
 } from './validations';
+import { BadRequest, NotFound } from '../utils/errors';
 
 export class ApplicationStateManager {
-  private currentApplication: Application;
+  private readonly currentApplication: Application;
 
   constructor(application: Application) {
     this.currentApplication = _.cloneDeep(application);
+  }
+
+  deleteCollaborator(collaboratorId: string) {
+    const current = _.cloneDeep(this.currentApplication) as Application;
+    current.sections.collaborators.list = current.sections.collaborators.list.filter(c => c.id?.toString() !== collaboratorId);
+    current.sections.collaborators.meta.status =
+      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ?  'INCOMPLETE' : 'COMPLETE';
+    return current;
+  }
+
+  updateCollaborator(collaborator: Collaborator) {
+    const current = _.cloneDeep(this.currentApplication) as Application;
+    if (current.state != 'DRAFT'
+        && current.state != 'REVISIONS REQUESTED') {
+      throw new Error('cannot update collaborators, only create or delete');
+    }
+    const { valid, errors } = validateCollaborator(collaborator, current);
+    if (!valid) {
+      throw new BadRequest({
+        errors
+      });
+    }
+    const existing = current.sections.collaborators.list.find(c => c.id == collaborator.id);
+    if (!existing) {
+      throw new NotFound('No collaborator with this id');
+    }
+    const updated = mergeKnown(existing, collaborator);
+    current.sections.collaborators.list = current.sections.collaborators.list.filter(c => c.id !== collaborator.id);
+    current.sections.collaborators.list.push(updated);
+    current.sections.collaborators.meta.status =
+      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ?  'INCOMPLETE' : 'COMPLETE';
+    return current;
+  }
+
+  addCollaborator(collaborator: Collaborator) {
+    const current = _.cloneDeep(this.currentApplication) as Application;
+    const { valid, errors } = validateCollaborator(collaborator, current);
+    if (!valid) {
+      throw new BadRequest({
+        errors,
+      });
+    }
+
+    collaborator.id = new Date().getTime().toString();
+    collaborator.meta = {
+      errorsList: [],
+      status: 'COMPLETE'
+    };
+    current.sections.collaborators.list.push(collaborator);
+    current.sections.collaborators.meta.status =
+      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ?  'INCOMPLETE' : 'COMPLETE';
+    return current;
   }
 
   updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean) {
@@ -119,7 +173,6 @@ function updateAppInReview(currentApplication: Readonly<Application>, updatePart
   // admin wants to approve the app
   if (updatePart.state == 'APPROVED') {
     current.state = 'APPROVED';
-    const now = new Date();
 
     // if the admin hasn't set a custom expiry date
     if (!updatePart.expiresAtUtc) {
@@ -190,7 +243,7 @@ function updateAppStateForApprovedApplication(currentApplication: Application, u
 
 function updateAppStateForRetrunedApplication(currentApplication: Application, updatePart: Partial<UpdateApplication>) {
   const current = _.cloneDeep(currentApplication);
-  updateApplicationSection(updatePart, current);
+  updateApplicantSection(updatePart, current);
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
   updateEthics(updatePart, current);
@@ -200,10 +253,9 @@ function updateAppStateForRetrunedApplication(currentApplication: Application, u
 function updateAppStateForDraftApplication(currentApplication: Application, updatePart: Partial<UpdateApplication>) {
   const current = _.cloneDeep(currentApplication);
   updateTerms(updatePart, current);
-  updateApplicationSection(updatePart, current);
+  updateApplicantSection(updatePart, current);
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
-  updateCollaborators(updatePart, current);
   updateEthics(updatePart, current);
   updateITAgreements(updatePart, current);
   updateDataAccessAgreements(updatePart, current);
@@ -211,11 +263,6 @@ function updateAppStateForDraftApplication(currentApplication: Application, upda
   return current;
 }
 
-function updateCollaborators(updatePart: Partial<UpdateApplication>, currentApplication: Application) {
-  if (updatePart.sections?.collaborators?.list) {
-
-  }
-}
 
 function updateAppendices(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.appendices?.agreements) {
@@ -275,7 +322,7 @@ function updateRepresentative(updatePart: Partial<UpdateApplication>, current: A
   }
 }
 
-function updateApplicationSection(updatePart: Partial<UpdateApplication>, current: Application) {
+function updateApplicantSection(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.applicant) {
     current.sections.applicant = mergeKnown(current.sections.applicant, updatePart.sections.applicant);
     const info = current.sections.applicant.info;
@@ -283,6 +330,18 @@ function updateApplicationSection(updatePart: Partial<UpdateApplication>, curren
       current.sections.applicant.info.displayName = info.firstName.trim() + ' ' + info.lastName.trim();
     }
     validateApplicantSection(current);
+
+    // trigger a validation for representative section since there is a dependency on primary affiliation
+    // only if there is data there already
+    if (current.sections.representative.meta.status !== 'PRISTINE' ) {
+      validateRepresentativeSection(current);
+    }
+
+    // trigger a validation for collaborators section since there is a dependency on primary affiliation
+    // only if there is data there already
+    if (current.sections.collaborators.meta.status !== 'PRISTINE' ) {
+      validateCollaboratorsSection(current);
+    }
   }
 }
 
@@ -319,7 +378,7 @@ function isReadyToSignAndSubmit(app: Application) {
     && sections.ITAgreements.meta.status == 'COMPLETE'
     && sections.dataAccessAgreement.meta.status == 'COMPLETE'
     && sections.appendices.meta.status == 'COMPLETE'
-    // only check that collaborators are not invalid, otherwise it's optional
+    // only check that collaborators section is not incomplete (which can happend)
     && sections.collaborators.meta.status !== 'INCOMPLETE';
   return requiredSectionsComplete;
 }
