@@ -161,6 +161,9 @@ function validatePrimaryAffiliationMatching(val: string, referenceVal: string, e
 }
 
 function validateUrl(val: string, name: string, errors: SectionError[]) {
+  if (!val) {
+    return true;
+  }
   const error: string[] | undefined = validator.single(val, {
     url: true
   });

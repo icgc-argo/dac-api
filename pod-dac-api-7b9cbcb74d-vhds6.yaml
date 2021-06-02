@@ -1,0 +1,328 @@
+
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    container.apparmor.security.beta.kubernetes.io/stateless-svc: runtime/default
+    kubernetes.io/psp: restricted
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+  creationTimestamp: "2021-06-01T22:53:31Z"
+  generateName: dac-api-7b9cbcb74d-
+  labels:
+    app.kubernetes.io/instance: dac-api
+    app.kubernetes.io/name: dac-api
+    networkpolicy.role: dac-api
+    pod-template-hash: 7b9cbcb74d
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:generateName: {}
+        f:labels:
+          .: {}
+          f:app.kubernetes.io/instance: {}
+          f:app.kubernetes.io/name: {}
+          f:networkpolicy.role: {}
+          f:pod-template-hash: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"e46aea3a-56c2-49e5-a758-f6d5108b067d"}:
+            .: {}
+            f:apiVersion: {}
+            f:blockOwnerDeletion: {}
+            f:controller: {}
+            f:kind: {}
+            f:name: {}
+            f:uid: {}
+      f:spec:
+        f:containers:
+          k:{"name":"stateless-svc"}:
+            .: {}
+            f:env:
+              .: {}
+              k:{"name":"BASE_PATH"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"DB_NAME"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"DB_URL"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"ENABLE_TEST_ENDPOINT"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"JWT_KEY"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"LOG_LEVEL"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"PORT"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"REVIEW_SCOPE"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"VAULT_ENABLED"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"VAULT_ROLE"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"VAULT_SECRETS_PATH"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+              k:{"name":"VAULT_URL"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+            f:image: {}
+            f:imagePullPolicy: {}
+            f:livenessProbe:
+              .: {}
+              f:failureThreshold: {}
+              f:httpGet:
+                .: {}
+                f:path: {}
+                f:port: {}
+                f:scheme: {}
+              f:initialDelaySeconds: {}
+              f:periodSeconds: {}
+              f:successThreshold: {}
+              f:timeoutSeconds: {}
+            f:name: {}
+            f:ports:
+              .: {}
+              k:{"containerPort":3000,"protocol":"TCP"}:
+                .: {}
+                f:containerPort: {}
+                f:name: {}
+                f:protocol: {}
+            f:readinessProbe:
+              .: {}
+              f:failureThreshold: {}
+              f:httpGet:
+                .: {}
+                f:path: {}
+                f:port: {}
+                f:scheme: {}
+              f:initialDelaySeconds: {}
+              f:periodSeconds: {}
+              f:successThreshold: {}
+              f:timeoutSeconds: {}
+            f:resources: {}
+            f:securityContext: {}
+            f:terminationMessagePath: {}
+            f:terminationMessagePolicy: {}
+        f:dnsPolicy: {}
+        f:enableServiceLinks: {}
+        f:restartPolicy: {}
+        f:schedulerName: {}
+        f:securityContext:
+          .: {}
+          f:runAsGroup: {}
+          f:runAsNonRoot: {}
+          f:runAsUser: {}
+        f:serviceAccount: {}
+        f:serviceAccountName: {}
+        f:terminationGracePeriodSeconds: {}
+    manager: kube-controller-manager
+    operation: Update
+    time: "2021-06-01T22:53:31Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:conditions:
+          k:{"type":"ContainersReady"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"Initialized"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"Ready"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:status: {}
+            f:type: {}
+        f:containerStatuses: {}
+        f:hostIP: {}
+        f:phase: {}
+        f:podIP: {}
+        f:podIPs:
+          .: {}
+          k:{"ip":"10.233.125.96"}:
+            .: {}
+            f:ip: {}
+        f:startTime: {}
+    manager: kubelet
+    operation: Update
+    time: "2021-06-01T22:54:35Z"
+  name: dac-api-7b9cbcb74d-vhds6
+  namespace: argo-dev
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: dac-api-7b9cbcb74d
+    uid: e46aea3a-56c2-49e5-a758-f6d5108b067d
+  resourceVersion: "351141399"
+  selfLink: /api/v1/namespaces/argo-dev/pods/dac-api-7b9cbcb74d-vhds6
+  uid: a57da84f-7e23-45cb-8622-f13b0c0e14e2
+spec:
+  containers:
+  - env:
+    - name: BASE_PATH
+      value: /api
+    - name: DB_NAME
+      value: dac
+    - name: DB_URL
+      value: mongodb://dac-db-mongodb-headless:27017/dac?replicaSet=rs0
+    - name: ENABLE_TEST_ENDPOINT
+      value: "true"
+    - name: JWT_KEY
+      value: |-
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0lOqMuPLCVusc6szklNXQL1FHhSkEgR7An+8BllBqTsRHM4bRYosseGFCbYPn8r8FsWuMDtxp0CwTyMQR2PCbJ740DdpbE1KC6jAfZxqcBete7gP0tooJtbvnA6X4vNpG4ukhtUoN9DzNOO0eqMU0Rgyy5HjERdYEWkwTNB30i9I+nHFOSj4MGLBSxNlnuo3keeomCRgtimCx+L/K3HNo0QHTG1J7RzLVAchfQT0lu3pUJ8kB+UM6/6NG+fVyysJyRZ9gadsr4gvHHckw8oUBp2tHvqBEkEdY+rt1Mf5jppt7JUV7HAPLB/qR5jhALY2FX/8MN+lPLmb/nLQQichVQIDAQAB
+        -----END PUBLIC KEY-----
+    - name: LOG_LEVEL
+      value: info
+    - name: PORT
+      value: "3000"
+    - name: REVIEW_SCOPE
+      value: DACO-REVIEW.WRITE
+    - name: VAULT_ENABLED
+      value: "true"
+    - name: VAULT_ROLE
+      value: dac-api
+    - name: VAULT_SECRETS_PATH
+      value: kv/argo/dev/dac-api
+    - name: VAULT_URL
+      value: https://vault.infra.argo.cancercollaboratory.org
+    image: ghcr.io/icgc-argo/dac-api:0.4.0-ec471b1
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 1
+      httpGet:
+        path: /
+        port: 3000
+        scheme: HTTP
+      initialDelaySeconds: 30
+      periodSeconds: 8
+      successThreshold: 1
+      timeoutSeconds: 2
+    name: stateless-svc
+    ports:
+    - containerPort: 3000
+      name: http
+      protocol: TCP
+    readinessProbe:
+      failureThreshold: 2
+      httpGet:
+        path: /
+        port: 3000
+        scheme: HTTP
+      initialDelaySeconds: 60
+      periodSeconds: 3
+      successThreshold: 1
+      timeoutSeconds: 2
+    resources: {}
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: dac-api-token-q7zzz
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: k8s-node-13
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext:
+    fsGroup: 1
+    runAsGroup: 9999
+    runAsNonRoot: true
+    runAsUser: 9999
+    supplementalGroups:
+    - 1
+  serviceAccount: dac-api
+  serviceAccountName: dac-api
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - name: dac-api-token-q7zzz
+    secret:
+      defaultMode: 420
+      secretName: dac-api-token-q7zzz
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2021-06-01T22:53:31Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2021-06-01T22:54:35Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2021-06-01T22:54:35Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2021-06-01T22:53:31Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: docker://2832ef49130a68b793890f2dc1ff3a3c4ccaa2acc6abec0f0ee3ffaf50fc70b1
+    image: ghcr.io/icgc-argo/dac-api:0.4.0-ec471b1
+    imageID: docker-pullable://ghcr.io/icgc-argo/dac-api@sha256:f3df7cac9b30c80b4d91952ab3d74af92045bda6b322ddc39bc5cfd3a4d72bba
+    lastState: {}
+    name: stateless-svc
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2021-06-01T22:53:33Z"
+  hostIP: 10.10.3.229
+  phase: Running
+  podIP: 10.233.125.96
+  podIPs:
+  - ip: 10.233.125.96
+  qosClass: BestEffort
+  startTime: "2021-06-01T22:53:31Z"
