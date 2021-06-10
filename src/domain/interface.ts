@@ -1,6 +1,8 @@
 export type State =  'DRAFT' | 'SIGN AND SUBMIT' | 'REVIEW' | 'REVISIONS REQUESTED' | 'APPROVED' | 'RENEWING' | 'REJECTED' | 'CLOSED' | 'EXPIRED';
 
-export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS REQUESTED' | 'LOCKED' | 'DISABLED' ;
+export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS REQUESTED' | 'LOCKED' | 'DISABLED' | 'DISABLED REVISIONS REQUESTED';
+
+export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP';
 interface Meta {
   status: SectionStatus;
   errorsList: SectionError[];
@@ -144,7 +146,8 @@ export interface Application {
       declaredAsRequired: boolean | null;
       approvalLetterDocs: {
         objectId: string;
-        uploadedAtUtc: Date
+        uploadedAtUtc: Date;
+        name: string;
       }[];
     },
     ITAgreements: {
@@ -162,6 +165,8 @@ export interface Application {
     signature: {
       meta: Meta,
       signedAppDocObjId: string;
+      signedAtUtc?: Date;
+      signedDocName: string;
     }
   };
   updates: ApplicationUpdate[];
@@ -206,6 +211,7 @@ export interface UpdateApplication {
     ethicsLetter?: {
       declaredAsRequired?: boolean | null;
       approvalLetterDocs?: {
+        name: string;
         objectId: string;
         uploadedAtUtc: Date
       }[];

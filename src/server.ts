@@ -16,14 +16,14 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+import { getAppConfig } from './config';
 import App, { setDBStatus, Status } from './app';
 import mongoose from 'mongoose';
 import logger from './logger';
 import { Server } from 'http';
-import { getAppConfig } from './config';
+import AWS from 'aws-sdk';
 import { database, up } from 'migrate-mongo';
-
+import { Storage } from './storage';
 let server: Server;
 console.log('in server.ts');
 (async () => {
@@ -100,10 +100,19 @@ console.log('in server.ts');
     process.exit(-20);
   }
 
+  // set the timeouts for the s3 client
+  if (AWS.config.httpOptions) {
+    AWS.config.httpOptions.timeout = appConfig.storage.timeout;
+    AWS.config.httpOptions.connectTimeout = appConfig.storage.timeout;
+  }
+
+  const storageClient: Storage = new Storage(appConfig);
+  await storageClient.createBucket();
+
   /**
    * Start Express server.
    */
-  const app = App(appConfig);
+  const app = App(appConfig, storageClient);
   server = app.listen(app.get('port'), () => {
     logger.info(`App is running at http://localhost:${app.get('port')} in ${app.get('env')} mode`);
     logger.info('Press CTRL-C to stop');

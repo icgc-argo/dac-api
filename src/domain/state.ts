@@ -1,7 +1,7 @@
 import { mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
-import _, { uniqueId } from 'lodash';
+import _ from 'lodash';
 import {
   Application,
   TERMS_AGREEMENT_NAME,
@@ -23,7 +23,9 @@ import {
   APPENDIX_CLOUD_SECURITY,
   APPENDIX_GA4GH_FRAMEWORK,
   DAA_CORRECT_APPLICATION_CONTENT,
-  DAA_AGREE_TO_TERMS, UpdateApplication, AgreementItem, Collaborator
+  DAA_AGREE_TO_TERMS, UpdateApplication,
+  AgreementItem, Collaborator, State,
+  SectionStatus, UploadDocumentType
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -40,10 +42,98 @@ import {
 import { BadRequest, NotFound } from '../utils/errors';
 
 export class ApplicationStateManager {
+
   private readonly currentApplication: Application;
 
   constructor(application: Application) {
     this.currentApplication = _.cloneDeep(application);
+  }
+
+  deleteDocument(objectId: string, type: UploadDocumentType) {
+    const current = _.cloneDeep(this.currentApplication) as Application;
+    if (type == 'ETHICS') {
+      if (!current.sections.ethicsLetter.declaredAsRequired) {
+        throw new Error('Must decalre ethics letter as requried first');
+      }
+
+      if (!current.sections.ethicsLetter.approvalLetterDocs.some(x => x.objectId == objectId)) {
+        throw new Error('this id doesnt exist');
+      }
+
+      const updatePart: Partial<UpdateApplication> = {
+        sections: {
+          ethicsLetter: {
+            // send the all the items without the deleted one
+            approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.filter(d => d.objectId !== objectId),
+          }
+        }
+      };
+
+      if (current.state == 'DRAFT') {
+        return updateAppStateForDraftApplication(current, updatePart, true);
+      } else if (current.state == 'REVISIONS REQUESTED'
+        && current.sections.ethicsLetter.meta.status == 'REVISIONS REQUESTED') {
+        return updateAppStateForRetrunedApplication(current, updatePart, true);
+      }  else {
+        throw new Error('Cannot delete ethics letter in this application state');
+      }
+      return current;
+    }
+
+    if (type == 'SIGNED_APP') {
+      if (current.state == 'SIGN AND SUBMIT'
+        && current.sections.signature.signedAppDocObjId == objectId) {
+        current.sections.signature.signedAppDocObjId = '';
+        current.sections.signature.signedAtUtc = undefined;
+        current.sections.signature.signedDocName = '';
+        current.sections.signature.meta.status = 'INCOMPLETE';
+        return current;
+      }
+      throw new Error('Cannot upload signed application in this state');
+    }
+    throw new Error('Unknown file type');
+  }
+
+  addDocument(id: string, name: string, type: UploadDocumentType) {
+    const current = _.cloneDeep(this.currentApplication) as Application;
+    if (type == 'ETHICS') {
+      if (!current.sections.ethicsLetter.declaredAsRequired) {
+        throw new Error('Must decalre ethics letter as requried first');
+      }
+      const updatePart: Partial<UpdateApplication> = {
+        sections: {
+          ethicsLetter: {
+            // we need to provide the existing items as well for the merge logic to work correctly and not delete array items
+            approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.concat([{
+              name,
+              objectId: id,
+              uploadedAtUtc: new Date(),
+            }]),
+          }
+        }
+      };
+
+      if (current.state == 'DRAFT') {
+        return updateAppStateForDraftApplication(current, updatePart, true);
+      } else if (current.state == 'REVISIONS REQUESTED') {
+        return updateAppStateForRetrunedApplication(current, updatePart, true);
+      } else if (current.state == 'APPROVED') {
+        return updateAppStateForApprovedApplication(current, updatePart, false);
+      }
+      return current;
+    }
+
+    if (type == 'SIGNED_APP') {
+      if (current.state == 'SIGN AND SUBMIT') {
+        current.sections.signature.signedAppDocObjId = id;
+        current.sections.signature.signedAtUtc = new Date();
+        current.sections.signature.signedDocName = name;
+        current.sections.signature.meta.status = 'COMPLETE';
+        return current;
+      }
+      throw new Error('Cannot upload signed application in this state');
+    }
+    throw new Error('Unknown file type');
   }
 
   deleteCollaborator(collaboratorId: string) {
@@ -107,19 +197,7 @@ export class ApplicationStateManager {
         break;
       case 'REVISIONS REQUESTED':
         merged = updateAppStateForRetrunedApplication(this.currentApplication, updatePart);
-        const shouldSubmit = isReadyToSignAndSubmit(merged);
-        if (shouldSubmit) {
-          if (merged.sections.collaborators.meta.status == 'PRISTINE') {
-            merged.sections.collaborators.meta.status = 'COMPLETE';
-          }
-          merged.sections.signature.meta.status = 'REVISIONS REQUESTED';
-          merged.state = 'SIGN AND SUBMIT';
-        } else {
-          merged.sections.signature.meta.status = 'DISABLED';
-          merged.state = 'REVISIONS REQUESTED';
-        }
         break;
-
       case 'REVIEW':
         // we are updating an application in review state (admin wants to a. approve, b. reject, c. request revisions)
         if (!isReviewer) {
@@ -134,20 +212,6 @@ export class ApplicationStateManager {
 
       case 'DRAFT':
         merged = updateAppStateForDraftApplication(this.currentApplication, updatePart);
-        // check if it's ready to move to the next state [DRAFT => SIGN & SUBMIT]
-        const isReady = isReadyToSignAndSubmit(merged);
-        if (isReady) {
-          // if all sections are ready and collaborator is not, then since it's optional
-          // we mark it as complete as discussed on slack.
-          if (merged.sections.collaborators.meta.status == 'PRISTINE') {
-            merged.sections.collaborators.meta.status = 'COMPLETE';
-          }
-          merged.sections.signature.meta.status = 'PRISTINE';
-          merged.state = 'SIGN AND SUBMIT';
-        } else {
-          merged.sections.signature.meta.status = 'DISABLED';
-          merged.state = 'DRAFT';
-        }
         break;
     }
 
@@ -161,6 +225,7 @@ export class ApplicationStateManager {
     return merged;
   }
 }
+
 
 function updateAppInReview(currentApplication: Readonly<Application>, updatePart: Partial<UpdateApplication>) {
   const current = _.cloneDeep(currentApplication) as Application;
@@ -191,9 +256,41 @@ function updateAppInReview(currentApplication: Readonly<Application>, updatePart
   if (updatePart.state == 'REVISIONS REQUESTED') {
     current.state = 'REVISIONS REQUESTED';
     current.revisionRequest = mergeKnown(current.revisionRequest, updatePart.revisionRequest);
-    // TODO: iterate over revision sections and update their state to revision requested.
+    markSectionsForReview(current);
     return current;
   }
+}
+
+function markSectionsForReview(current: Application) {
+  let otherSectionsRequested = false;
+  if (current.revisionRequest.applicant.requested) {
+    otherSectionsRequested = true;
+    current.sections.applicant.meta.status = 'REVISIONS REQUESTED';
+  }
+  if (current.revisionRequest.collaborators.requested) {
+    otherSectionsRequested = true;
+    current.sections.collaborators.meta.status = 'REVISIONS REQUESTED';
+  }
+  if (current.revisionRequest.ethicsLetter.requested) {
+    otherSectionsRequested = true;
+    current.sections.ethicsLetter.meta.status = 'REVISIONS REQUESTED';
+  }
+  if (current.revisionRequest.projectInfo.requested) {
+    otherSectionsRequested = true;
+    current.sections.projectInfo.meta.status = 'REVISIONS REQUESTED';
+  }
+  if (current.revisionRequest.representative.requested) {
+    otherSectionsRequested = true;
+    current.sections.representative.meta.status = 'REVISIONS REQUESTED';
+  }
+  if (current.revisionRequest.signature.requested) {
+    if (otherSectionsRequested) {
+      current.sections.signature.meta.status = 'DISABLED REVISIONS REQUESTED';
+    } else {
+      current.sections.signature.meta.status = 'REVISIONS REQUESTED';
+    }
+  }
+
 }
 
 function updateAppStateForSignAndSubmit(currentApplication: Readonly<Application>, updatePart: Partial<UpdateApplication>) {
@@ -209,60 +306,86 @@ function updateAppStateForSignAndSubmit(currentApplication: Readonly<Application
     return current;
   }
 
-  // applicant wants to update the signed document
-  const uploadedDocId = updatePart.sections?.signature?.signedAppDocObjId;
-  const validDocId = validateUploadedDocument(uploadedDocId);
-
-  if (!uploadedDocId || !validDocId) {
-    current.sections.signature.meta.errorsList.push({
-      field: 'signedDocument',
-      message: 'invalid document Id'
-    });
-    current.sections.signature.meta.status = 'INCOMPLETE';
-    return current;
+  if (!updatePart.sections) {
+    throw new Error();
   }
 
-  current.sections.signature.signedAppDocObjId = uploadedDocId;
-  current.sections.signature.meta.status = 'COMPLETE';
-  return current;
+  // applicant went back and updated completed sections (we treat that as an update in draft state)
+  const updated = updateAppStateForDraftApplication(current, updatePart);
+  return updated;
 }
 
-function validateUploadedDocument(uploadedDocId: string | undefined) {
-  return true;
-}
 
 function isReadyForReview(application: Application) {
   return application.sections.signature.meta.status === 'COMPLETE';
 }
 
-function updateAppStateForApprovedApplication(currentApplication: Application, updatePart: Partial<UpdateApplication>, isReviewer: boolean) {
+// TODO handle possible changes after approval (close)
+function updateAppStateForApprovedApplication(currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  isReviewer: boolean) {
   const current = _.cloneDeep(currentApplication);
-  updateEthics(updatePart, current);
   return current;
 }
 
-function updateAppStateForRetrunedApplication(currentApplication: Application, updatePart: Partial<UpdateApplication>) {
+function updateAppStateForRetrunedApplication(currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  updateDocs?: boolean) {
   const current = _.cloneDeep(currentApplication);
   updateApplicantSection(updatePart, current);
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
-  updateEthics(updatePart, current);
+  updateEthics(updatePart, current, updateDocs);
+
+  const signatureSectionStatus = currentApplication.revisionRequest.signature.requested ?
+    'REVISIONS REQUESTED' : 'PRISTINE';
+
+  const rollBackSignatureStatus = currentApplication.revisionRequest.signature.requested ?
+    'DISABLED REVISIONS REQUESTED' : 'DISABLED';
+
+  transitionToSignAndSubmitOrRollBack(current, signatureSectionStatus, rollBackSignatureStatus, 'REVISIONS REQUESTED');
   return current;
 }
 
-function updateAppStateForDraftApplication(currentApplication: Application, updatePart: Partial<UpdateApplication>) {
+function updateAppStateForDraftApplication(currentApplication: Application,
+   updatePart: Partial<UpdateApplication>,
+   updateDocs?: boolean) {
   const current = _.cloneDeep(currentApplication);
   updateTerms(updatePart, current);
   updateApplicantSection(updatePart, current);
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
-  updateEthics(updatePart, current);
+  updateEthics(updatePart, current, updateDocs);
   updateITAgreements(updatePart, current);
   updateDataAccessAgreements(updatePart, current);
   updateAppendices(updatePart, current);
+
+  // check if it's ready to move to the next state [DRAFT => SIGN & SUBMIT] OR should move back to draft from SIGN & SUBMIT
+  transitionToSignAndSubmitOrRollBack(current, 'PRISTINE', 'DISABLED', 'DRAFT');
+
   return current;
 }
 
+
+function transitionToSignAndSubmitOrRollBack(current: Application, signatureSectionStateAfter: SectionStatus, rollBackSignatureStatus: SectionStatus, rollbackStatus: State) {
+  const isReady = isReadyToSignAndSubmit(current);
+  if (isReady) {
+    toSignAndSubmit(current, signatureSectionStateAfter);
+  } else {
+    current.sections.signature.meta.status = rollBackSignatureStatus;
+    current.state = rollbackStatus;
+  }
+}
+
+function toSignAndSubmit(app: Application, signatureSectionState: SectionStatus) {
+  // if all sections are ready and collaborator is not, then since it's optional
+ // we mark it as complete as discussed on slack.
+ if (app.sections.collaborators.meta.status == 'PRISTINE') {
+   app.sections.collaborators.meta.status = 'COMPLETE';
+ }
+ app.sections.signature.meta.status = signatureSectionState;
+ app.state = 'SIGN AND SUBMIT';
+}
 
 function updateAppendices(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.appendices?.agreements) {
@@ -285,9 +408,12 @@ function updateITAgreements(updatePart: Partial<UpdateApplication>, current: App
   }
 }
 
-function updateEthics(updatePart: Partial<UpdateApplication>, current: Application) {
+function updateEthics(updatePart: Partial<UpdateApplication>, current: Application, updateDocs?: boolean) {
   if (updatePart.sections?.ethicsLetter) {
-    // TODO: after approval ethics letter declaration cannot be changed.
+    // prevent update of the documents from here
+    if (!updateDocs) {
+      delete updatePart.sections.ethicsLetter.approvalLetterDocs;
+    }
     current.sections.ethicsLetter = mergeKnown(current.sections.ethicsLetter, updatePart.sections.ethicsLetter);
     validateEthicsLetterSection(current);
   }
@@ -481,6 +607,7 @@ export function newApplication(identity: Identity): Partial<Application> {
           errorsList: []
         },
         signedAppDocObjId: '',
+        signedDocName: ''
       }
     }
   };

@@ -6,8 +6,48 @@ import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import _ from 'lodash';
 import { ApplicationStateManager, getSearchFieldValues, newApplication } from './state';
-import { Application, ApplicationSummary, Collaborator, SearchResult, State } from './interface';
+import { Application, ApplicationSummary, Collaborator, SearchResult, State, UploadDocumentType } from './interface';
 import { c } from '../utils/misc';
+import { UploadedFile } from 'express-fileupload';
+import { Storage } from '../storage';
+
+
+export async function deleteDocument(
+  appId: string,
+  type: UploadDocumentType,
+  objectId: string,
+  identity: Identity,
+  storageClient: Storage) {
+
+  const appDoc = await findApplication(appId, identity);
+  const appDocObj = appDoc.toObject() as Application;
+  const stateManager = new ApplicationStateManager(appDocObj);
+  const result = stateManager.deleteDocument(objectId, type);
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+  await storageClient.delete(objectId);
+  const updated = await findApplication(c(result.appId), identity);
+  return updated.toObject();
+}
+
+export async function uploadDocument(appId: string,
+  type: UploadDocumentType,
+  file: UploadedFile,
+  identity: Identity,
+  storageClient: Storage) {
+
+  const appDoc = await findApplication(appId, identity);
+  const appDocObj = appDoc.toObject() as Application;
+  let existingId: string | undefined = undefined;
+  if (type == 'SIGNED_APP') {
+    existingId = appDocObj.sections.signature.signedAppDocObjId;
+  }
+  const id = await storageClient.upload(file, existingId);
+  const stateManager = new ApplicationStateManager(appDocObj);
+  const result = stateManager.addDocument(id, file.name, type);
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+  const updated = await findApplication(c(result.appId), identity);
+  return updated.toObject();
+}
 
 export async function createCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
   const appDoc = await findApplication(appId, identity);
@@ -82,7 +122,7 @@ export async function search(params: {
   states: string[],
   page: number,
   pageSize: number,
-  sortBy: { field: string, direction: string } [],
+  sortBy: { field: string, direction: string }[],
 }, identity: Identity): Promise<SearchResult> {
 
   const isAdminOrReviewerResult = await hasReviewScope(identity);
@@ -142,6 +182,7 @@ export async function search(params: {
       lastUpdatedAtUtc: app.lastUpdatedAtUtc
     } as ApplicationSummary)
   );
+
   return {
     pagingInfo: {
       totalCount: count,
