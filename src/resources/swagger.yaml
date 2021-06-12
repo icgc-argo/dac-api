@@ -141,8 +141,45 @@ paths:
                   ttl:
                     type: number
 
-  /applications/{id}/assets/url:
+
+  /applications/{id}/assets/{type}/assetId/{assetId}:
     parameters:
+      - name: type
+        required: true
+        in: path
+        schema: 
+          type: string
+          enum: [ 'ETHICS', 'SIGNED_APP' ]
+      - name: id
+        required: true
+        in: path
+        schema: 
+          type: string
+      - name: assetId
+        required: true
+        in: path
+        schema: 
+          type: string
+    delete:
+      tags:
+        - Application
+      summary: Delete a document by type and Id
+      responses:
+        '200':
+          description: document deleted and the updated application returned in the body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+
+  /applications/{id}/assets/{type}/upload:
+    parameters:
+      - name: type
+        required: true
+        in: path
+        schema: 
+          type: string
+          enum: [ 'ETHICS', 'SIGNED_APP' ]
       - name: id
         required: true
         in: path
@@ -154,25 +191,21 @@ paths:
       summary: Create a presigned url to upload a document related to this application 
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
-                ttl:
-                  type: number
+                file:
+                  type: string
+                  format: binary
 
       responses:
         '200':
-          description: created successfully presigned URL with other metadata  
+          description: document uploaded and returned in the response body
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  url: 
-                    type: string
-                  ttl:
-                    type: number
+                $ref: '#/components/schemas/Application'
 
   /applications/{id}:
     parameters:
@@ -338,7 +371,7 @@ components:
       properties:
         status:
           type: string
-          enum: [ 'PRISTINE' , 'COMPLETE' , 'INCOMPLETE' , 'REVISIONS REQUESTED' , 'LOCKED' , 'DISABLED' ]
+          enum: [ 'PRISTINE' , 'COMPLETE' , 'INCOMPLETE' , 'REVISIONS REQUESTED' , 'LOCKED' , 'DISABLED', 'DISABLED REVISIONS REQUESTED' ]
         errors: 
           type: array
           items:
@@ -625,6 +658,8 @@ components:
                   items:
                     type: object
                     properties:
+                      name: 
+                        type: string
                       objectId: 
                         type: string
                       uploadedAtUtc:
@@ -666,5 +701,10 @@ components:
               properties:
                 signedAppDocObjId: 
                   type: string
+                signedDocName: 
+                  type: string
+                signedAtUtc: 
+                  type: string
+                  format: date
                 meta:
                   $ref: '#/components/schemas/Meta'

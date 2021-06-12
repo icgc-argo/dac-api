@@ -1,6 +1,8 @@
 export type State =  'DRAFT' | 'SIGN AND SUBMIT' | 'REVIEW' | 'REVISIONS REQUESTED' | 'APPROVED' | 'RENEWING' | 'REJECTED' | 'CLOSED' | 'EXPIRED';
 
-export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS REQUESTED' | 'LOCKED' | 'DISABLED' ;
+export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS REQUESTED' | 'LOCKED' | 'DISABLED' | 'DISABLED REVISIONS REQUESTED';
+
+export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP';
 interface Meta {
   status: SectionStatus;
   errorsList: SectionError[];
@@ -144,7 +146,8 @@ export interface Application {
       declaredAsRequired: boolean | null;
       approvalLetterDocs: {
         objectId: string;
-        uploadedAtUtc: Date
+        uploadedAtUtc: Date;
+        name: string;
       }[];
     },
     ITAgreements: {
@@ -162,23 +165,26 @@ export interface Application {
     signature: {
       meta: Meta,
       signedAppDocObjId: string;
+      signedAtUtc?: Date;
+      signedDocName: string;
     }
   };
   updates: ApplicationUpdate[];
 }
 
+export type RevisionRequestUpdate = {
+  applicant?: RevisionRequest,
+  representative?: RevisionRequest,
+  projectInfo?: RevisionRequest,
+  collaborators?: RevisionRequest,
+  signature?: RevisionRequest,
+  general?: RevisionRequest
+};
 export interface UpdateApplication {
   state?: State;
   expiresAtUtc?: Date;
   denialReason?: string;
-  revisionRequest?: {
-    applicant?: RevisionRequest,
-    representative?: RevisionRequest,
-    projectInfo?: RevisionRequest,
-    collaborators?: RevisionRequest,
-    signature?: RevisionRequest,
-    general?: RevisionRequest
-  };
+  revisionRequest?: RevisionRequestUpdate;
   sections: {
     terms?: {
       agreement: AgreementItem
@@ -206,6 +212,7 @@ export interface UpdateApplication {
     ethicsLetter?: {
       declaredAsRequired?: boolean | null;
       approvalLetterDocs?: {
+        name: string;
         objectId: string;
         uploadedAtUtc: Date
       }[];

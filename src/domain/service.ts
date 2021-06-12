@@ -6,8 +6,47 @@ import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import _ from 'lodash';
 import { ApplicationStateManager, getSearchFieldValues, newApplication } from './state';
-import { Application, ApplicationSummary, Collaborator, SearchResult, State } from './interface';
+import { Application, ApplicationSummary, Collaborator, SearchResult, State, UploadDocumentType } from './interface';
 import { c } from '../utils/misc';
+import { UploadedFile } from 'express-fileupload';
+import { Storage } from '../storage';
+import logger from '../logger';
+
+export async function deleteDocument(appId: string,
+                                    type: UploadDocumentType,
+                                    objectId: string,
+                                    identity: Identity,
+                                    storageClient: Storage) {
+
+  const appDoc = await findApplication(appId, identity);
+  const appDocObj = appDoc.toObject() as Application;
+  const stateManager = new ApplicationStateManager(appDocObj);
+  const result = stateManager.deleteDocument(objectId, type);
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+  await storageClient.delete(objectId);
+  const updated = await findApplication(c(result.appId), identity);
+  return updated.toObject();
+}
+
+export async function uploadDocument(appId: string,
+                                    type: UploadDocumentType,
+                                    file: UploadedFile,
+                                    identity: Identity,
+                                    storageClient: Storage) {
+
+  const appDoc = await findApplication(appId, identity);
+  const appDocObj = appDoc.toObject() as Application;
+  let existingId: string | undefined = undefined;
+  if (type == 'SIGNED_APP') {
+    existingId = appDocObj.sections.signature.signedAppDocObjId;
+  }
+  const id = await storageClient.upload(file, existingId);
+  const stateManager = new ApplicationStateManager(appDocObj);
+  const result = stateManager.addDocument(id, file.name, type);
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+  const updated = await findApplication(c(result.appId), identity);
+  return updated.toObject();
+}
 
 export async function createCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
   const appDoc = await findApplication(appId, identity);
@@ -44,14 +83,22 @@ export async function create(identity: Identity) {
   return copy;
 }
 
-export async function updatePartial(appPart: Partial<Application>, identity: Identity) {
+export async function updatePartial(appPart: Partial<Application>, identity: Identity, storageClient: Storage) {
   const isReviewer = await hasReviewScope(identity);
   const appDoc = await findApplication(c(appPart.appId), identity);
-
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.updateApp(appPart, isReviewer);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
+  const deleted = checkDeletedDocuments(appDocObj, result);
+  // Delete orphan documents that are no longer associated with the application in the background
+  // this can be a result of applicantion getting updated :
+  // - Changing selection of ethics letter from required to not required
+  // - Admin requests revisions (signed app has to be uploaded again)
+  // - Applicant changes a completed section when the application is in state sign & submit
+  deleted.map(d => storageClient.delete(d)
+    .catch(e => logger.error(`failed to delete document ${d}`, e))
+  );
   const updated = await findApplication(c(result.appId), identity);
   return updated.toObject();
 }
@@ -78,12 +125,12 @@ export async function updateFullDocument(app: Application, identity: Identity) {
 }
 
 export async function search(params: {
-  query: string,
-  states: string[],
-  page: number,
-  pageSize: number,
-  sortBy: { field: string, direction: string } [],
-}, identity: Identity): Promise<SearchResult> {
+                              query: string,
+                              states: string[],
+                              page: number,
+                              pageSize: number,
+                              sortBy: { field: string, direction: string }[],
+                            }, identity: Identity): Promise<SearchResult> {
 
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
@@ -142,6 +189,7 @@ export async function search(params: {
       lastUpdatedAtUtc: app.lastUpdatedAtUtc
     } as ApplicationSummary)
   );
+
   return {
     pagingInfo: {
       totalCount: count,
@@ -198,3 +246,22 @@ async function hasReviewScope(identity: Identity) {
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some(v => v == REVIEW_SCOPE);
 }
+
+function checkDeletedDocuments(appDocObj: Application, result: Application) {
+  const removedIds: string[] = [];
+  const ethicsArrayBefore =
+    appDocObj.sections.ethicsLetter.approvalLetterDocs.sort((a, b) => a.objectId.localeCompare(b.objectId));
+  const ethicsArrayAfter =
+    result.sections.ethicsLetter.approvalLetterDocs.sort((a, b) => a.objectId.localeCompare(b.objectId));
+  const diff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
+  diff.map(v => v.objectId)
+    .forEach(o => removedIds.push(o));
+
+  if (appDocObj.sections.signature.signedAppDocObjId
+      && appDocObj.sections.signature.signedAppDocObjId != result.sections.signature.signedAppDocObjId) {
+    removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
+  }
+
+  return removedIds;
+}
+
