@@ -658,6 +658,8 @@ components:
                   items:
                     type: object
                     properties:
+                      name: 
+                        type: string
                       objectId: 
                         type: string
                       uploadedAtUtc:
@@ -699,5 +701,10 @@ components:
               properties:
                 signedAppDocObjId: 
                   type: string
+                signedDocName: 
+                  type: string
+                signedAtUtc: 
+                  type: string
+                  format: date
                 meta:
                   $ref: '#/components/schemas/Meta'

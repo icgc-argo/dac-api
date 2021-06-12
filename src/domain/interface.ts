@@ -172,18 +172,19 @@ export interface Application {
   updates: ApplicationUpdate[];
 }
 
+export type RevisionRequestUpdate = {
+  applicant?: RevisionRequest,
+  representative?: RevisionRequest,
+  projectInfo?: RevisionRequest,
+  collaborators?: RevisionRequest,
+  signature?: RevisionRequest,
+  general?: RevisionRequest
+};
 export interface UpdateApplication {
   state?: State;
   expiresAtUtc?: Date;
   denialReason?: string;
-  revisionRequest?: {
-    applicant?: RevisionRequest,
-    representative?: RevisionRequest,
-    projectInfo?: RevisionRequest,
-    collaborators?: RevisionRequest,
-    signature?: RevisionRequest,
-    general?: RevisionRequest
-  };
+  revisionRequest?: RevisionRequestUpdate;
   sections: {
     terms?: {
       agreement: AgreementItem

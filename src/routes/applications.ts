@@ -169,7 +169,7 @@ const createApplicationsRouter = (config: AppConfig,
       const validatedId = validateId(id);
       const app = req.body as Application;
       app.appId = id;
-      const updated = await updatePartial(app, (req as IRequest).identity);
+      const updated = await updatePartial(app, (req as IRequest).identity, storageClient);
       return res.status(200).send(updated);
     }),
   );
