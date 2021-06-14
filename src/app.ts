@@ -26,9 +26,11 @@ import { AppConfig } from './config';
 import Auth from '@overture-stack/ego-token-middleware';
 import logger from './logger';
 import createApplicationsRouter from './routes/applications';
+import fileUpload from 'express-fileupload';
+import { Storage } from './storage';
 
 console.log('in App.ts');
-const App = (config: AppConfig): express.Express => {
+const App = (config: AppConfig, storageClient: Storage): express.Express => {
   // Auth middleware
   const noOpReqHandler: RequestHandler = (req, res, next) => {
     logger.warn('calling protected endpoint without auth enabled');
@@ -43,7 +45,7 @@ const App = (config: AppConfig): express.Express => {
   const app = express();
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
-
+  app.use(fileUpload());
   app.get('/', (req, res) => res.status(200).send('hello world'));
   app.get('/health', (req, res) => {
     const status = dbHealth.status == Status.OK ? 200 : 500;
@@ -54,7 +56,7 @@ const App = (config: AppConfig): express.Express => {
     return res.status(status).send(resBody);
   });
 
-  app.use(createApplicationsRouter(config, authFilter));
+  app.use(createApplicationsRouter(config, authFilter, storageClient));
 
   const swaggerDoc = yaml.load(path.join(__dirname, './resources/swagger.yaml'));
   swaggerDoc.servers = [{ url: config.basePath }];

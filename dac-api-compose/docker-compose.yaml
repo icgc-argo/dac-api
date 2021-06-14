@@ -29,7 +29,16 @@ services:
       MONGODB_DATABASE: appdb
       MONGODB_ROOT_PASSWORD: password123
 
-
+  object-storage:
+    image: minio/minio
+    container_name: object-storage
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    command: server /data
+    ports:
+      - "8085:9000"
+      
 ################################
 ####    KAFKA containers    ####
 ################################

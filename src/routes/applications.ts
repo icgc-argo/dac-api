@@ -2,17 +2,51 @@ import { Router, Request, Response, RequestHandler } from 'express';
 
 
 import wrapAsync from '../utils/wrapAsync';
-import { create, createCollaborator, deleteApp, deleteCollaborator, getById, search, updateCollaborator, updateFullDocument, updatePartial } from '../domain/service';
+import { create, createCollaborator, deleteApp, deleteCollaborator, getById, search, updateCollaborator, updateFullDocument, uploadDocument, updatePartial, deleteDocument } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { Application } from '../domain/interface';
 import { AppConfig } from '../config';
+import _ from 'lodash';
+import { Storage } from '../storage';
+
 interface IRequest extends Request {
   identity: Identity;
 }
 
-const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
+const createApplicationsRouter = (config: AppConfig,
+                                  authFilter: (scopes: string[]) => RequestHandler,
+                                  storageClient: Storage) => {
+
   const router = Router();
+
+  router.delete('/applications/:id/assets/:type/assetId/:assetId',
+    authFilter([]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const appId = validateId(req.params.id);
+      const type = validateType(req.params.type) as 'ETHICS' | 'SIGNED_APP';
+      const objectId = req.params.assetId;
+      const app = await deleteDocument(appId, type, objectId, (req as IRequest).identity, storageClient);
+      return res.status(200).send(app);
+    })
+  );
+
+  router.post('/applications/:id/assets/:type/upload',
+    authFilter([]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const uploadedFile = req.files?.file;
+      if (!uploadedFile) {
+        throw new BadRequest('File is required');
+      }
+      if (_.isArray(uploadedFile)) {
+        throw new BadRequest('Only one file');
+      }
+      const appId = validateId(req.params.id);
+      const type = validateType(req.params.type) as 'ETHICS' | 'SIGNED_APP';
+      const app = await uploadDocument(appId, type, uploadedFile, (req as IRequest).identity, storageClient);
+      return res.status(201).send(app);
+   })
+  );
 
   router.post(
     '/applications/',
@@ -135,7 +169,7 @@ const createApplicationsRouter = (config: AppConfig, authFilter: (scopes: string
       const validatedId = validateId(id);
       const app = req.body as Application;
       app.appId = id;
-      const updated = await updatePartial(app, (req as IRequest).identity);
+      const updated = await updatePartial(app, (req as IRequest).identity, storageClient);
       return res.status(200).send(updated);
     }),
   );
@@ -154,5 +188,11 @@ function validateId(id: string) {
   return id;
 }
 
+function validateType(type: string) {
+  if (!['ETHICS', 'SIGNED_APP'].includes(type)) {
+    throw new BadRequest('unknow document type, should be ETHICS or SIGNED_APP');
+  }
+  return type;
+}
 
 export default createApplicationsRouter;

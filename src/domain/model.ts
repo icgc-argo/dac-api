@@ -58,8 +58,9 @@ const ApplicationUpdate =  new mongoose.Schema({
 
 const EthicsLetterDocument =  new mongoose.Schema({
   objectId: { type: String, required: false },
+  name: { type: String, required: false },
   uploadedAtUtc: { type: Date, required: false },
-});
+}, { _id: false });
 
 const ApplicationSchema = new mongoose.Schema({
     appNumber: { type: Number, unique: true },
@@ -131,7 +132,9 @@ const ApplicationSchema = new mongoose.Schema({
       },
       signature: {
         meta: Meta,
-        signedAppDocObjId: { type: String, required: false }
+        signedAppDocObjId: { type: String, required: false },
+        signedDocName: { type: String, required: false },
+        signedAtUtc: {type: Date, required: false },
       }
     },
     updates: [ApplicationUpdate]

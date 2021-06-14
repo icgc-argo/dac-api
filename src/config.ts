@@ -35,6 +35,14 @@ export interface AppConfig {
     jwtKey: string;
     REVIEW_SCOPE: string;
   };
+  storage: {
+    endpoint: string;
+    region: string;
+    key: string;
+    secret: string;
+    bucket: string;
+    timeout: number;
+  };
 }
 
 export interface MongoProps {
@@ -99,6 +107,14 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       jwtKey: process.env.JWT_KEY || '',
       REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE'
     },
+    storage: {
+      endpoint: process.env.OBJECT_STORAGE_ENDPOINT || '',
+      region: process.env.OBJECT_STORAGE_REGION || 'nova',
+      bucket: process.env.OBJECT_STORAGE_BUCKET || 'daco',
+      key:  secrets.OBJECT_STORAGE_KEY || process.env.OBJECT_STORAGE_KEY,
+      secret: secrets.OBJECT_STORAGE_SECRET || process.env.OBJECT_STORAGE_SECRET,
+      timeout: Number(process.env.OBJECT_STORAGE_TIMEOUT_MILLIS) || 5000,
+    }
   };
   return config;
 };

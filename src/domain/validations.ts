@@ -34,6 +34,7 @@ export function validateCollaboratorsSection(app: Application) {
     app.sections.collaborators.meta.status = 'INCOMPLETE';
   }
 }
+
 export function validateRepresentativeSection(app: Application) {
   const errors: SectionError[] = [];
   let addressResult = true;
@@ -84,14 +85,12 @@ export function validateEthicsLetterSection(app: Application) {
     return false;
   }
 
-  if (needsLetter) {
-    if (app.sections.ethicsLetter.approvalLetterDocs.length == 0) {
-      app.sections.ethicsLetter.meta.status = 'INCOMPLETE';
-      errors.push({
-        field: 'approvalLetterDocs',
-        message: 'At least one ethics letter is required'
-      });
-    }
+  if (needsLetter && app.sections.ethicsLetter.approvalLetterDocs.length == 0) {
+    app.sections.ethicsLetter.meta.status = 'INCOMPLETE';
+    errors.push({
+      field: 'approvalLetterDocs',
+      message: 'At least one ethics letter is required'
+    });
     return false;
   }
 
