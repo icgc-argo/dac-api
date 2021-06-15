@@ -33,7 +33,21 @@ paths:
       responses:
         '201':
           description: uploaded successfully
-
+  
+  /lookups/countries:
+    get:
+      tags:
+        - Lookups
+      summary: List of countries
+      responses:
+        '200':
+          description: List of countries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
 
   /applications/:
     post:
@@ -330,7 +344,8 @@ tags:
     description: Admin operations collected for convenience
   - name: Application
     description: Application CRUD enpoints
-
+  - name: Lookups
+    description: Lookup endpoints for data references
 components:
   responses:
     ServiceUnavailableError:
