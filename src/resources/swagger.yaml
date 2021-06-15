@@ -254,20 +254,6 @@ paths:
           description: Unexpected error ocurred
         '204':
           description: deleted successfully
-    put:
-      tags:
-        - Admin
-      summary: update all fields in an application
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Application'
-      responses:
-        '500':
-          description: Unexpected error ocurred
-        '200':
-          description: done successfully
 
   /applications/{id}/collaborators/:
     parameters:
@@ -371,7 +357,7 @@ components:
       properties:
         status:
           type: string
-          enum: [ 'PRISTINE' , 'COMPLETE' , 'INCOMPLETE' , 'REVISIONS REQUESTED' , 'LOCKED' , 'DISABLED', 'DISABLED REVISIONS REQUESTED' ]
+          enum: [ 'PRISTINE' , 'COMPLETE' , 'INCOMPLETE' , 'REVISIONS REQUESTED' , 'LOCKED' , 'DISABLED', 'REVISIONS REQUESTED DISABLED', 'REVISIONS MADE']
         errors: 
           type: array
           items:

@@ -1,8 +1,9 @@
 export type State =  'DRAFT' | 'SIGN AND SUBMIT' | 'REVIEW' | 'REVISIONS REQUESTED' | 'APPROVED' | 'RENEWING' | 'REJECTED' | 'CLOSED' | 'EXPIRED';
 
-export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS REQUESTED' | 'LOCKED' | 'DISABLED' | 'DISABLED REVISIONS REQUESTED';
+export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS REQUESTED' | 'LOCKED' | 'DISABLED' | 'REVISIONS REQUESTED DISABLED' | 'REVISIONS MADE';
 
 export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP';
+
 interface Meta {
   status: SectionStatus;
   errorsList: SectionError[];
@@ -172,14 +173,9 @@ export interface Application {
   updates: ApplicationUpdate[];
 }
 
-export type RevisionRequestUpdate = {
-  applicant?: RevisionRequest,
-  representative?: RevisionRequest,
-  projectInfo?: RevisionRequest,
-  collaborators?: RevisionRequest,
-  signature?: RevisionRequest,
-  general?: RevisionRequest
-};
+export type AppSections = keyof Application['sections'];
+export type RevisionSections = keyof Pick<Record<AppSections, RevisionRequest>, 'signature' | 'projectInfo' | 'applicant' | 'collaborators' | 'ethicsLetter'> | 'general';
+export type RevisionRequestUpdate = Partial<Record<RevisionSections, RevisionRequest>>;
 export interface UpdateApplication {
   state?: State;
   expiresAtUtc?: Date;

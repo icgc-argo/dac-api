@@ -18,6 +18,10 @@ export async function deleteDocument(appId: string,
                                     identity: Identity,
                                     storageClient: Storage) {
 
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  if (isAdminOrReviewerResult) {
+    throw new Error('not allowed');
+  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
@@ -25,7 +29,8 @@ export async function deleteDocument(appId: string,
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
-  return updated.toObject();
+  const viewAbleApplication = new ApplicationStateManager(updated.toObject()).prepareApplicantionForUser(false);
+  return viewAbleApplication;
 }
 
 export async function uploadDocument(appId: string,
@@ -33,7 +38,10 @@ export async function uploadDocument(appId: string,
                                     file: UploadedFile,
                                     identity: Identity,
                                     storageClient: Storage) {
-
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  if (isAdminOrReviewerResult) {
+    throw new Error('not allowed');
+  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   let existingId: string | undefined = undefined;
@@ -45,10 +53,15 @@ export async function uploadDocument(appId: string,
   const result = stateManager.addDocument(id, file.name, type);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
-  return updated.toObject();
+  const viewAbleApplication = new ApplicationStateManager(updated.toObject()).prepareApplicantionForUser(false);
+  return viewAbleApplication;
 }
 
 export async function createCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  if (isAdminOrReviewerResult) {
+    throw new Error('not allowed');
+  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
@@ -58,6 +71,10 @@ export async function createCollaborator(appId: string, collaborator: Collaborat
 }
 
 export async function updateCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  if (isAdminOrReviewerResult) {
+    throw new Error('not allowed');
+  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
@@ -66,6 +83,10 @@ export async function updateCollaborator(appId: string, collaborator: Collaborat
 }
 
 export async function deleteCollaborator(appId: string, collaboratorId: string, identity: Identity) {
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  if (isAdminOrReviewerResult) {
+    throw new Error('not allowed');
+  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
@@ -74,6 +95,10 @@ export async function deleteCollaborator(appId: string, collaboratorId: string, 
 }
 
 export async function create(identity: Identity) {
+  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  if (isAdminOrReviewerResult) {
+    throw new Error('not allowed');
+  }
   const app = newApplication(identity);
   const appDoc = await ApplicationModel.create(app);
   appDoc.appId = `DACO-${appDoc.appNumber}`;
@@ -100,28 +125,9 @@ export async function updatePartial(appPart: Partial<Application>, identity: Ide
     .catch(e => logger.error(`failed to delete document ${d}`, e))
   );
   const updated = await findApplication(c(result.appId), identity);
-  return updated.toObject();
-}
-
-export async function updateFullDocument(app: Application, identity: Identity) {
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
-  const query: FilterQuery<ApplicationDocument> = {
-    appId: app.appId
-  };
-
-  if (!isAdminOrReviewerResult) {
-    query.submitterId = identity.userId;
-  }
-
-  const appDoc = await ApplicationModel.findOne(query);
-  if (!appDoc) {
-    throw new NotFound('Application not found');
-  }
-
-  // this should be ET to match admin location when they do search
-  app.lastUpdatedAtUtc = new Date();
-  app.searchValues = getSearchFieldValues(app);
-  await ApplicationModel.updateOne({ appId: app.appId }, app);
+  const updatedObj =  updated.toObject();
+  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicantionForUser(isReviewer);
+  return viewAbleApplication;
 }
 
 export async function search(params: {
@@ -220,7 +226,8 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  return copy;
+  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicantionForUser(isAdminOrReviewerResult);
+  return viewAbleApplication;
 }
 
 
