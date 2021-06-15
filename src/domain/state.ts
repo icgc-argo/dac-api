@@ -41,6 +41,53 @@ import {
 } from './validations';
 import { BadRequest, NotFound } from '../utils/errors';
 
+const allSections: Array<keyof Application['sections']> =
+  ['ITAgreements', 'appendices', 'dataAccessAgreement', 'terms', 'applicant', 'collaborators', 'ethicsLetter', 'representative', 'projectInfo', 'signature'];
+
+/**
+ * Array contains mapping that will govern which sections should be marked as locked
+ * depending on which state we are and the role the viewer has.
+ *
+ * for example applicaions in review are completely locked for applicants but partially locked for admins.
+ */
+const stateToLockedSectionsMap: Record<State, Record<'REVIEWER' | 'APPLICANT', Array<keyof Application['sections']>>> = {
+  REVIEW: {
+    APPLICANT: allSections,
+    REVIEWER: allSections,
+  },
+  APPROVED: {
+    APPLICANT: ['ITAgreements', 'appendices', 'dataAccessAgreement', 'terms', 'applicant', 'representative', 'projectInfo', 'signature'],
+    REVIEWER: allSections,
+  },
+  'REVISIONS REQUESTED': {
+    APPLICANT: ['ITAgreements', 'appendices', 'dataAccessAgreement', 'terms'],
+    REVIEWER: allSections,
+  },
+  'SIGN AND SUBMIT': {
+    APPLICANT: [],
+    REVIEWER: allSections,
+  },
+  CLOSED: {
+    APPLICANT: allSections,
+    REVIEWER: allSections,
+  },
+  DRAFT: {
+    APPLICANT: [],
+    REVIEWER: allSections,
+  },
+  EXPIRED: {
+    APPLICANT: allSections,
+    REVIEWER: allSections,
+  },
+  REJECTED: {
+    APPLICANT: allSections,
+    REVIEWER: allSections,
+  },
+  RENEWING: {
+    APPLICANT: [],
+    REVIEWER: []
+  }
+};
 export class ApplicationStateManager {
   private readonly currentApplication: Application;
 
@@ -48,53 +95,30 @@ export class ApplicationStateManager {
     this.currentApplication = _.cloneDeep(application);
   }
 
+  prepareApplicantionForUser(isReviewer: boolean) {
+    allSections.forEach(s => {
+      this.currentApplication.sections[s].meta.status =
+        calculateSectionStatus( this.currentApplication, s, isReviewer);
+    });
+    return this.currentApplication;
+  }
+
   deleteDocument(objectId: string, type: UploadDocumentType) {
-    const current = _.cloneDeep(this.currentApplication) as Application;
+    const current = this.currentApplication;
     if (type == 'ETHICS') {
-      if (!current.sections.ethicsLetter.declaredAsRequired) {
-        throw new Error('Must decalre ethics letter as requried first');
-      }
-
-      if (!current.sections.ethicsLetter.approvalLetterDocs.some(x => x.objectId == objectId)) {
-        throw new Error('this id doesnt exist');
-      }
-
-      const updatePart: Partial<UpdateApplication> = {
-        sections: {
-          ethicsLetter: {
-            // send the all the items without the deleted one
-            approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.filter(d => d.objectId !== objectId),
-          }
-        }
-      };
-
-      if (current.state == 'DRAFT') {
-        updateAppStateForDraftApplication(current, updatePart, true);
-      } else if (current.state == 'REVISIONS REQUESTED'
-                  && current.sections.ethicsLetter.meta.status == 'REVISIONS REQUESTED') {
-        updateAppStateForRetrunedApplication(current, updatePart, true);
-      }  else {
-        throw new Error('Cannot delete ethics letter in this application state');
-      }
-      return current;
+      return deleteEthicsLetterDocument(current, objectId);
     }
 
-    if (type == 'SIGNED_APP') {
-      if (current.state == 'SIGN AND SUBMIT'
-          && current.sections.signature.signedAppDocObjId == objectId) {
-        current.sections.signature.signedAppDocObjId = '';
-        current.sections.signature.signedAtUtc = undefined;
-        current.sections.signature.signedDocName = '';
+    if (type == 'SIGNED_APP' && current.state == 'SIGN AND SUBMIT') {
+        resetSignedDocument(current);
         current.sections.signature.meta.status = 'INCOMPLETE';
         return current;
-      }
-      throw new Error('Cannot upload signed application in this state');
     }
-    throw new Error('Unknown file type');
+    throw new BadRequest('Operation not allowed');
   }
 
   addDocument(id: string, name: string, type: UploadDocumentType) {
-    const current = _.cloneDeep(this.currentApplication) as Application;
+    const current = this.currentApplication;
     if (type == 'ETHICS') {
       uploadEthicsLetter(current, id, name);
       return current;
@@ -108,17 +132,17 @@ export class ApplicationStateManager {
         current.sections.signature.meta.status = 'COMPLETE';
         return current;
       }
-      throw new Error('Cannot upload signed application in this state');
+      throw new BadRequest('Cannot upload signed application in this state');
     }
-    throw new Error('Unknown file type');
+    throw new BadRequest('Unknown file type');
   }
 
   deleteCollaborator(collaboratorId: string) {
-    const current = _.cloneDeep(this.currentApplication) as Application;
+    const current = this.currentApplication;
     current.sections.collaborators.list =
       current.sections.collaborators.list.filter(c => c.id?.toString() !== collaboratorId);
     current.sections.collaborators.meta.status =
-      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ?  'INCOMPLETE' : 'COMPLETE';
+      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
 
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
@@ -127,10 +151,10 @@ export class ApplicationStateManager {
   }
 
   updateCollaborator(collaborator: Collaborator) {
-    const current = _.cloneDeep(this.currentApplication) as Application;
-    if (current.state != 'DRAFT'
-        && current.state != 'SIGN AND SUBMIT'
-        && current.state != 'REVISIONS REQUESTED') {
+    const current = this.currentApplication;
+
+    // collaborators updating is only allowed in these three states
+    if (canUpdateCollaborators(current)) {
       throw new Error('cannot update collaborators, only create or delete');
     }
     const { valid, errors } = validateCollaborator(collaborator, current);
@@ -148,7 +172,7 @@ export class ApplicationStateManager {
       current.sections.collaborators.list.filter(c => c.id !== collaborator.id);
     current.sections.collaborators.list.push(updated);
     current.sections.collaborators.meta.status =
-      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ?  'INCOMPLETE' : 'COMPLETE';
+      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
 
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
@@ -157,7 +181,7 @@ export class ApplicationStateManager {
   }
 
   addCollaborator(collaborator: Collaborator) {
-    const current = _.cloneDeep(this.currentApplication) as Application;
+    const current = this.currentApplication;
     const { valid, errors } = validateCollaborator(collaborator, current);
     if (!valid) {
       throw new BadRequest({
@@ -165,6 +189,9 @@ export class ApplicationStateManager {
       });
     }
 
+    if (isLocked(current.state, 'collaborators', false)) {
+      throw new Error('Operation not allowed');
+    }
     collaborator.id = new Date().getTime().toString();
     collaborator.meta = {
       errorsList: [],
@@ -172,7 +199,7 @@ export class ApplicationStateManager {
     };
     current.sections.collaborators.list.push(collaborator);
     current.sections.collaborators.meta.status =
-      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ?  'INCOMPLETE' : 'COMPLETE';
+      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
 
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
@@ -181,7 +208,7 @@ export class ApplicationStateManager {
   }
 
   updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean) {
-    const current = _.cloneDeep(this.currentApplication);
+    const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
         updateAppStateForApprovedApplication(current, updatePart, isReviewer);
@@ -218,6 +245,41 @@ export class ApplicationStateManager {
   }
 }
 
+
+function canUpdateCollaborators(current: Application) {
+  return current.state != 'DRAFT'
+    && current.state != 'SIGN AND SUBMIT'
+    && (current.state != 'REVISIONS REQUESTED' && current.revisionRequest.collaborators.requested);
+}
+
+function deleteEthicsLetterDocument(current: Application, objectId: string) {
+  if (!current.sections.ethicsLetter.declaredAsRequired) {
+    throw new Error('Must decalre ethics letter as requried first');
+  }
+
+  if (!current.sections.ethicsLetter.approvalLetterDocs.some(x => x.objectId == objectId)) {
+    throw new Error('this id doesnt exist');
+  }
+
+  const updatePart: Partial<UpdateApplication> = {
+    sections: {
+      ethicsLetter: {
+        // send the all the items without the deleted one
+        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.filter(d => d.objectId !== objectId),
+      }
+    }
+  };
+
+  if (current.state == 'DRAFT') {
+    updateAppStateForDraftApplication(current, updatePart, true);
+  } else if (current.state == 'REVISIONS REQUESTED'
+    && current.sections.ethicsLetter.meta.status == 'REVISIONS REQUESTED') {
+    updateAppStateForRetrunedApplication(current, updatePart, true);
+  } else {
+    throw new Error('Cannot delete ethics letter in this application state');
+  }
+  return current;
+}
 
 export function getSearchFieldValues(appDoc: Application) {
   return [
@@ -398,6 +460,12 @@ function uploadEthicsLetter(current: Application, id: string, name: string) {
     throw new Error('cannot update ethics letter at this state');
   }
 }
+
+function lockSections(application: Application, sectionNames: Array<keyof Application['sections']>) {
+  sectionNames.forEach(s => {
+    application.sections[s].meta.status = 'LOCKED';
+  });
+}
 function updateAppStateForReviewApplication(current: Application, updatePart: Partial<UpdateApplication>) {
 
   // if the admin has chosen a custom expiry date and asked to save
@@ -482,24 +550,25 @@ function markSectionsForReview(current: Application) {
 
   Object.keys(current.revisionRequest)
     .map(k => k as keyof RevisionRequestUpdate)
-    .filter(k => k != 'general')
+    .filter(k => k != 'general' && k != 'signature')
     .filter(k => current.revisionRequest[k]?.requested)
     .forEach(k => {
-        type sectionNames = keyof Application['sections'] & keyof Application['revisionRequest'];
-        if (k !== 'signature') {
-          current.sections[k as sectionNames].meta.status = 'REVISIONS REQUESTED';
-          return;
-        }
-
-        // special handling for the signature section since it should be done last thing
-        // and we want to disable it until other sections are updated.
-        if (current.revisionRequest.signature.requested) {
-          current.sections.signature.meta.status =
-            atleastOneNonSignatureRequeted ? 'DISABLED REVISIONS REQUESTED' : 'REVISIONS REQUESTED';
-        } else {
-          current.sections.signature.meta.status = 'DISABLED';
-        }
+      type sectionNames = keyof Application['sections'] & keyof Application['revisionRequest'];
+      if (k !== 'signature') {
+        current.sections[k as sectionNames].meta.status = 'REVISIONS REQUESTED';
+        return;
+      }
     });
+
+
+  // special handling for the signature section since it should be done last thing
+  // and we want to disable it until other sections are updated.
+  if (current.revisionRequest.signature.requested) {
+    current.sections.signature.meta.status =
+      atleastOneNonSignatureRequeted ? 'REVISIONS REQUESTED DISABLED' : 'REVISIONS REQUESTED';
+  } else {
+    current.sections.signature.meta.status = 'DISABLED';
+  }
 }
 
 function updateAppStateForSignAndSubmit(current: Application, updatePart: Partial<UpdateApplication>) {
@@ -542,15 +611,14 @@ function isReadyForReview(application: Application) {
 
 // TODO handle possible changes after approval (close)
 function updateAppStateForApprovedApplication(currentApplication: Application,
-                                              updatePart: Partial<UpdateApplication>,
-                                              isReviewer: boolean) {
-  const current = _.cloneDeep(currentApplication);
-  return current;
+  updatePart: Partial<UpdateApplication>,
+  isReviewer: boolean) {
+  return currentApplication;
 }
 
 function updateAppStateForRetrunedApplication(current: Application,
-                                              updatePart: Partial<UpdateApplication>,
-                                              updateDocs?: boolean) {
+  updatePart: Partial<UpdateApplication>,
+  updateDocs?: boolean) {
   updateApplicantSection(updatePart, current);
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
@@ -560,14 +628,14 @@ function updateAppStateForRetrunedApplication(current: Application,
     'REVISIONS REQUESTED' : 'PRISTINE';
 
   const rollBackSignatureStatus = current.revisionRequest.signature.requested ?
-    'DISABLED REVISIONS REQUESTED' : 'DISABLED';
+    'REVISIONS REQUESTED DISABLED' : 'DISABLED';
 
   transitionToSignAndSubmitOrRollBack(current, signatureSectionStatus, rollBackSignatureStatus, 'REVISIONS REQUESTED');
 }
 
 function updateAppStateForDraftApplication(current: Application,
-                                          updatePart: Partial<UpdateApplication>,
-                                          updateDocs?: boolean) {
+  updatePart: Partial<UpdateApplication>,
+  updateDocs?: boolean) {
 
   updateTerms(updatePart, current);
   updateApplicantSection(updatePart, current);
@@ -584,9 +652,9 @@ function updateAppStateForDraftApplication(current: Application,
 }
 
 function transitionToSignAndSubmitOrRollBack(current: Application,
-                                            signatureSectionStateAfter: SectionStatus,
-                                            rollBackSignatureStatus: SectionStatus,
-                                            rollbackStatus: State) {
+  signatureSectionStateAfter: SectionStatus,
+  rollBackSignatureStatus: SectionStatus,
+  rollbackStatus: State) {
 
   const isReady = isReadyToSignAndSubmit(current);
   if (isReady) {
@@ -599,13 +667,13 @@ function transitionToSignAndSubmitOrRollBack(current: Application,
 }
 
 function toSignAndSubmit(current: Application, signatureSectionState: SectionStatus) {
- // if all sections are ready and collaborator is not, then since it's optional
- // we mark it as complete as discussed on slack.
- if (current.sections.collaborators.meta.status == 'PRISTINE') {
-   current.sections.collaborators.meta.status = 'COMPLETE';
- }
- current.sections.signature.meta.status = signatureSectionState;
- current.state = 'SIGN AND SUBMIT';
+  // if all sections are ready and collaborator is not, then since it's optional
+  // we mark it as complete as discussed on slack.
+  if (current.sections.collaborators.meta.status == 'PRISTINE') {
+    current.sections.collaborators.meta.status = 'COMPLETE';
+  }
+  current.sections.signature.meta.status = signatureSectionState;
+  current.state = 'SIGN AND SUBMIT';
 }
 
 function updateAppendices(updatePart: Partial<UpdateApplication>, current: Application) {
@@ -685,13 +753,13 @@ function updateApplicantSection(updatePart: Partial<UpdateApplication>, current:
 
     // trigger a validation for representative section since there is a dependency on primary affiliation
     // only if there is data there already
-    if (current.sections.representative.meta.status !== 'PRISTINE' ) {
+    if (current.sections.representative.meta.status !== 'PRISTINE') {
       validateRepresentativeSection(current);
     }
 
     // trigger a validation for collaborators section since there is a dependency on primary affiliation
     // only if there is data there already
-    if (current.sections.collaborators.meta.status !== 'PRISTINE' ) {
+    if (current.sections.collaborators.meta.status !== 'PRISTINE') {
       validateCollaboratorsSection(current);
     }
   }
@@ -812,4 +880,33 @@ function getDataAccessAgreement() {
       accepted: false,
     },
   ];
+}
+
+function calculateSectionStatus(app: Application, section: keyof Application['sections'], isReviewer: boolean): SectionStatus {
+    if (isLocked(app.state, section, isReviewer)) {
+      return 'LOCKED';
+    }
+
+    // an extra logic is needed for sections that are usually editable but no revisions required
+    // for them in a returned application Or they have revisions
+    else if (app.state == 'REVISIONS REQUESTED' && !isReviewer) {
+      // mark sections that don't have revision requests as locked
+      // for example if applicant section is ok we lock it.
+      if (section !== 'signature' && app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true) {
+        return 'LOCKED';
+      }
+
+      // mark sections that have revision requests and now completed with custom status to
+      // show they were updated after the revision request
+      if (app.revisionRequest[section as keyof RevisionRequestUpdate].requested === true
+            && app.sections[section].meta.status == 'COMPLETE') {
+        return 'REVISIONS MADE';
+      }
+    }
+
+    return app.sections[section].meta.status;
+}
+
+function isLocked(state: State, section: keyof Application['sections'], isReviewer: boolean) {
+  return stateToLockedSectionsMap[state][isReviewer ? 'REVIEWER' : 'APPLICANT'].includes(section);
 }

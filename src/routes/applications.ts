@@ -2,7 +2,7 @@ import { Router, Request, Response, RequestHandler } from 'express';
 
 
 import wrapAsync from '../utils/wrapAsync';
-import { create, createCollaborator, deleteApp, deleteCollaborator, getById, search, updateCollaborator, updateFullDocument, uploadDocument, updatePartial, deleteDocument } from '../domain/service';
+import { create, createCollaborator, deleteApp, deleteCollaborator, getById, search, updateCollaborator, uploadDocument, updatePartial, deleteDocument } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { Application } from '../domain/interface';
@@ -146,18 +146,6 @@ const createApplicationsRouter = (config: AppConfig,
       const validatedId = validateId(id);
       await deleteApp(validatedId, (req as IRequest).identity);
       return res.status(200).end();
-    }),
-  );
-
-  router.put(
-    '/applications/:id',
-    authFilter([]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const id = req.params.id;
-      const validatedId = validateId(id);
-      const app = req.body as Application;
-      await updateFullDocument(app, (req as IRequest).identity);
-      return res.status(200).send();
     }),
   );
 
