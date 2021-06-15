@@ -2,6 +2,7 @@ import { BadRequest } from '../utils/errors';
 import { Address, AgreementItem, Application, Collaborator, PersonalInfo, SectionError } from './interface';
 import validator from 'validate.js';
 import _ from 'lodash';
+import { countriesList } from '../utils/constants';
 
 export function validateId(id: string) {
   if (!id) {
@@ -251,13 +252,28 @@ function validateAddress(address: Address, errors: SectionError[]) {
     validateRequired(address.streetAddress, 'streetAddress', errors),
     validateRequired(address.cityAndProvince, 'cityAndProvince', errors),
     validateRequired(address.country, 'country', errors),
+    isValidCountry(address.country, errors),
     validateRequired(address.postalCode, 'postalCode', errors)
   ];
   return !validations.some(x => x == false);
 }
 
+function isValidCountry(country: string, errors: SectionError[]): boolean {
+  if (!country) {
+    return true;
+  }
+  const found = countriesList.includes(country);
+  if (!found) {
+    errors.push({
+      field: 'country',
+      message: 'value is not a valid country',
+    });
+    return false;
+  }
+  return true;
+}
 
-function validateRequired(val: string | boolean | null | undefined, name: string, errors: SectionError[]) {
+function validateRequired(val: string | boolean | null | undefined, name: string, errors: SectionError[]): boolean {
   if (typeof val == 'boolean') {
     return val !== null && val !== undefined;
   }
