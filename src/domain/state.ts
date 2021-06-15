@@ -189,7 +189,7 @@ export class ApplicationStateManager {
       });
     }
 
-    if (isLocked(current.state, 'collaborators', false)) {
+    if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
       throw new Error('Operation not allowed');
     }
     collaborator.id = new Date().getTime().toString();
@@ -554,10 +554,7 @@ function markSectionsForReview(current: Application) {
     .filter(k => current.revisionRequest[k]?.requested)
     .forEach(k => {
       type sectionNames = keyof Application['sections'] & keyof Application['revisionRequest'];
-      if (k !== 'signature') {
-        current.sections[k as sectionNames].meta.status = 'REVISIONS REQUESTED';
-        return;
-      }
+      current.sections[k as sectionNames].meta.status = 'REVISIONS REQUESTED';
     });
 
 
@@ -600,7 +597,10 @@ function updateAppStateForSignAndSubmit(current: Application, updatePart: Partia
 function wasInRevisionRequestState(current: Application) {
   const revisionsRequested = Object.keys(current.revisionRequest)
     .map(k => k as keyof Application['revisionRequest'])
-    .some(k => current.revisionRequest[k].requested);
+    .filter(k => k !== 'general')
+    .some(k => {
+      return current.revisionRequest[k].requested;
+    });
 
   return revisionsRequested;
 }
@@ -883,30 +883,35 @@ function getDataAccessAgreement() {
 }
 
 function calculateSectionStatus(app: Application, section: keyof Application['sections'], isReviewer: boolean): SectionStatus {
-    if (isLocked(app.state, section, isReviewer)) {
+  const reviewableSections: Array<keyof RevisionRequestUpdate> = ['applicant', 'collaborators', 'ethicsLetter', 'projectInfo', 'signature'];
+  const reviewableSection = reviewableSections.includes(section as keyof RevisionRequestUpdate);
+
+  if (shouldBeLockedByAtThisState(app.state, section, isReviewer)
+    || (!reviewableSection && wasInRevisionRequestState(app))) {
+      return 'LOCKED';
+  // an extra logic is needed for sections that are usually editable but no revisions required
+  // for them in a returned application Or they have revisions
+  } else if (reviewableSection
+    && (app.state == 'REVISIONS REQUESTED' || wasInRevisionRequestState(app))
+    && !isReviewer) {
+    // mark sections that don't have revision requests as locked
+    // for example if applicant section is ok we lock it.
+    if (section !== 'signature'
+      && app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true) {
       return 'LOCKED';
     }
 
-    // an extra logic is needed for sections that are usually editable but no revisions required
-    // for them in a returned application Or they have revisions
-    else if (app.state == 'REVISIONS REQUESTED' && !isReviewer) {
-      // mark sections that don't have revision requests as locked
-      // for example if applicant section is ok we lock it.
-      if (section !== 'signature' && app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true) {
-        return 'LOCKED';
-      }
-
-      // mark sections that have revision requests and now completed with custom status to
-      // show they were updated after the revision request
-      if (app.revisionRequest[section as keyof RevisionRequestUpdate].requested === true
-            && app.sections[section].meta.status == 'COMPLETE') {
-        return 'REVISIONS MADE';
-      }
+    // mark sections that have revision requests and now completed with custom status to
+    // show they were updated after the revision request
+    if (app.revisionRequest[section as keyof RevisionRequestUpdate].requested === true
+          && app.sections[section].meta.status == 'COMPLETE') {
+      return 'REVISIONS MADE';
     }
+  }
 
-    return app.sections[section].meta.status;
+  return app.sections[section].meta.status;
 }
 
-function isLocked(state: State, section: keyof Application['sections'], isReviewer: boolean) {
+function shouldBeLockedByAtThisState(state: State, section: keyof Application['sections'], isReviewer: boolean) {
   return stateToLockedSectionsMap[state][isReviewer ? 'REVIEWER' : 'APPLICANT'].includes(section);
 }
