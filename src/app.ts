@@ -28,6 +28,7 @@ import logger from './logger';
 import createApplicationsRouter from './routes/applications';
 import fileUpload from 'express-fileupload';
 import { Storage } from './storage';
+import { countriesList } from './utils/constants';
 
 console.log('in App.ts');
 const App = (config: AppConfig, storageClient: Storage): express.Express => {
@@ -57,7 +58,9 @@ const App = (config: AppConfig, storageClient: Storage): express.Express => {
   });
 
   app.use(createApplicationsRouter(config, authFilter, storageClient));
-
+  app.get('/lookups/countries', (req, res) => {
+    return res.status(200).send(countriesList);
+  });
   const swaggerDoc = yaml.load(path.join(__dirname, './resources/swagger.yaml'));
   swaggerDoc.servers = [{ url: config.basePath }];
   app.use(
