@@ -168,6 +168,9 @@ export class ApplicationStateManager {
       throw new NotFound('No collaborator with this id');
     }
     const updated = mergeKnown(existing, collaborator);
+    if (!!updated.firstName.trim() && !!updated.lastName.trim()) {
+      updated.info.displayName = updated.firstName.trim() + ' ' + updated.lastName.trim();
+    }
     current.sections.collaborators.list =
       current.sections.collaborators.list.filter(c => c.id !== collaborator.id);
     current.sections.collaborators.list.push(updated);
@@ -197,9 +200,15 @@ export class ApplicationStateManager {
       errorsList: [],
       status: 'COMPLETE'
     };
+
+    if (!!collaborator.info.firstName.trim() && !!collaborator.info.lastName.trim()) {
+      collaborator.info.displayName = collaborator.info.firstName.trim() + ' ' + collaborator.info.lastName.trim();
+    }
     current.sections.collaborators.list.push(collaborator);
     current.sections.collaborators.meta.status =
-      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
+      current.sections.collaborators
+        .list
+        .some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
 
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
@@ -819,14 +828,6 @@ function getITAgreements() {
     },
     {
       name: IT_AGREEMENT_CONTACT_DACO_FRAUD,
-      accepted: false,
-    },
-    {
-      name: IT_AGREEMENT_CLOUD_USAGE_RISK,
-      accepted: false,
-    },
-    {
-      name: IT_AGREEMENT_READ_CLOUD_APPENDIX,
       accepted: false,
     }
   ];
