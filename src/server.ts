@@ -117,7 +117,7 @@ console.log('in server.ts');
       user: appConfig.email.auth?.user, // generated ethereal user
       pass: appConfig.email.auth?.password, // generated ethereal password
     } : undefined,
-  } as any)
+  } as any);
   /**
    * Start Express server.
    */
