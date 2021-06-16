@@ -29,9 +29,13 @@ import createApplicationsRouter from './routes/applications';
 import fileUpload from 'express-fileupload';
 import { Storage } from './storage';
 import { countriesList } from './utils/constants';
+import { Transport, Transporter } from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 console.log('in App.ts');
-const App = (config: AppConfig, storageClient: Storage): express.Express => {
+const App = (config: AppConfig,
+             storageClient: Storage,
+             emailClient: Transporter<SMTPTransport.SentMessageInfo>): express.Express => {
   // Auth middleware
   const noOpReqHandler: RequestHandler = (req, res, next) => {
     logger.warn('calling protected endpoint without auth enabled');
@@ -57,7 +61,7 @@ const App = (config: AppConfig, storageClient: Storage): express.Express => {
     return res.status(status).send(resBody);
   });
 
-  app.use(createApplicationsRouter(config, authFilter, storageClient));
+  app.use(createApplicationsRouter(config, authFilter, storageClient, emailClient));
   app.get('/lookups/countries', (req, res) => {
     return res.status(200).send(countriesList);
   });
