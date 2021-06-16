@@ -18,6 +18,7 @@
  */
 
 import * as dotenv from 'dotenv';
+import { c } from './utils/misc';
 import * as vault from './vault';
 
 let currentConfig: AppConfig;
@@ -29,6 +30,17 @@ export interface AppConfig {
   openApiPath: string;
   kafkaProperties: KafkaConfigurations;
   mongoProperties: MongoProps;
+  email: {
+    host: string;
+    dacoAddress: string;
+    fromAddress: string;
+    fromName: string;
+    port: number;
+    auth: {
+      user: string | undefined;
+      password: string | undefined;
+    }
+  };
   auth: {
     enabled: boolean;
     jwtKeyUrl: string;
@@ -114,6 +126,17 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       key:  secrets.OBJECT_STORAGE_KEY || process.env.OBJECT_STORAGE_KEY,
       secret: secrets.OBJECT_STORAGE_SECRET || process.env.OBJECT_STORAGE_SECRET,
       timeout: Number(process.env.OBJECT_STORAGE_TIMEOUT_MILLIS) || 5000,
+    },
+    email: {
+      host: c(process.env.EMAIL_HOST),
+      port: Number(c(process.env.EMAIL_PORT)),
+      dacoAddress: c(process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org'),
+      fromName: c(process.env.EMAIL_FROM_NAME || 'DACO'),
+      fromAddress: c(process.env.EMAIL_FROM_ADDRESS || 'noreply-daco@icgc-argo.org'),
+      auth: {
+        user: process.env.EMAIL_USER,
+        password: process.env.EMAIL_PASSWORD,
+      }
     }
   };
   return config;

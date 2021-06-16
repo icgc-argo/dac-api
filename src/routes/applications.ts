@@ -9,14 +9,16 @@ import { Application } from '../domain/interface';
 import { AppConfig } from '../config';
 import _ from 'lodash';
 import { Storage } from '../storage';
-
+import { Transporter } from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 interface IRequest extends Request {
   identity: Identity;
 }
 
 const createApplicationsRouter = (config: AppConfig,
                                   authFilter: (scopes: string[]) => RequestHandler,
-                                  storageClient: Storage) => {
+                                  storageClient: Storage,
+                                  emailClient: Transporter<SMTPTransport.SentMessageInfo>) => {
 
   const router = Router();
 
@@ -157,7 +159,7 @@ const createApplicationsRouter = (config: AppConfig,
       const validatedId = validateId(id);
       const app = req.body as Application;
       app.appId = id;
-      const updated = await updatePartial(app, (req as IRequest).identity, storageClient);
+      const updated = await updatePartial(app, (req as IRequest).identity, storageClient, emailClient);
       return res.status(200).send(updated);
     }),
   );

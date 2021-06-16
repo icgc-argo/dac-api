@@ -11,6 +11,9 @@ import { c } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
+import renderReviewEmail from '../emails/review';
+import nodemail from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 export async function deleteDocument(appId: string,
                                     type: UploadDocumentType,
@@ -108,13 +111,26 @@ export async function create(identity: Identity) {
   return copy;
 }
 
-export async function updatePartial(appPart: Partial<Application>, identity: Identity, storageClient: Storage) {
+export async function updatePartial(appPart: Partial<Application>,
+                                    identity: Identity,
+                                    storageClient: Storage,
+                                    emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
+
   const isReviewer = await hasReviewScope(identity);
   const appDoc = await findApplication(c(appPart.appId), identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.updateApp(appPart, isReviewer);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
+  const stateChanged = appDocObj.state != result.state;
+  const config = await getAppConfig();
+  if (stateChanged) {
+    // if application state changed to REVIEW (ie submitted) send an email to Admin
+    if (result.state == 'REVIEW') {
+      const html = renderReviewEmail(result);
+      await sendEmail(emailClient, config.email.fromAddress, config.email.fromName, [config.email.dacoAddress], 'Application Submitted', html);
+    }
+  }
   const deleted = checkDeletedDocuments(appDocObj, result);
   // Delete orphan documents that are no longer associated with the application in the background
   // this can be a result of applicantion getting updated :
@@ -272,3 +288,16 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   return removedIds;
 }
 
+async function sendEmail(emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  fromEmail: string,
+  fromName: string,
+  to: string[],
+  subject: string,
+  html: string) {
+  const info = await emailClient.sendMail({
+    from: `"${fromName}" <${fromEmail}>`, // sender address
+    to: to.join(','), // list of receivers
+    subject: subject, // Subject line
+    html: html, // html body
+  });
+}

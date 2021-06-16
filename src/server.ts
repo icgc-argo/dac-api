@@ -24,6 +24,7 @@ import { Server } from 'http';
 import AWS from 'aws-sdk';
 import { database, up } from 'migrate-mongo';
 import { Storage } from './storage';
+import nodemailer from 'nodemailer';
 let server: Server;
 console.log('in server.ts');
 (async () => {
@@ -109,10 +110,18 @@ console.log('in server.ts');
   const storageClient: Storage = new Storage(appConfig);
   await storageClient.createBucket();
 
+  const emailClient = nodemailer.createTransport({
+    host: appConfig.email.host,
+    port: appConfig.email.port,
+    auth: appConfig.email.auth.user ? {
+      user: appConfig.email.auth?.user, // generated ethereal user
+      pass: appConfig.email.auth?.password, // generated ethereal password
+    } : undefined,
+  } as any)
   /**
    * Start Express server.
    */
-  const app = App(appConfig, storageClient);
+  const app = App(appConfig, storageClient, emailClient);
   server = app.listen(app.get('port'), () => {
     logger.info(`App is running at http://localhost:${app.get('port')} in ${app.get('env')} mode`);
     logger.info('Press CTRL-C to stop');
