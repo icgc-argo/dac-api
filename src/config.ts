@@ -134,8 +134,8 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       fromName: c(process.env.EMAIL_FROM_NAME || 'DACO'),
       fromAddress: c(process.env.EMAIL_FROM_ADDRESS || 'noreply-daco@icgc-argo.org'),
       auth: {
-        user: process.env.EMAIL_USER,
-        password: process.env.EMAIL_PASSWORD,
+        user: secrets.EMAIL_USER || process.env.EMAIL_USER,
+        password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
       }
     }
   };
