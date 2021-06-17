@@ -128,7 +128,12 @@ export async function updatePartial(appPart: Partial<Application>,
     // if application state changed to REVIEW (ie submitted) send an email to Admin
     if (result.state == 'REVIEW') {
       const html = renderReviewEmail(result);
-      await sendEmail(emailClient, config.email.fromAddress, config.email.fromName, [config.email.dacoAddress], 'Application Submitted', html);
+      await sendEmail(emailClient,
+                      config.email.fromAddress,
+                      config.email.fromName,
+                      [config.email.dacoAddress],
+                      'Application Submitted',
+                      html);
     }
   }
   const deleted = checkDeletedDocuments(appDocObj, result);
