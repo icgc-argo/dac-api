@@ -583,6 +583,7 @@ function updateAppStateForSignAndSubmit(current: Application, updatePart: Partia
     const ready = isReadyForReview(current);
     if (ready) {
       current.state = 'REVIEW';
+      current.submittedAtUtc = new Date();
       // reset revision request section
       current.revisionRequest = emptyRevisionRequest();
     }

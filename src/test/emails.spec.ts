@@ -1,23 +1,26 @@
 import mjml2html from 'mjml';
 import { Application } from '../domain/interface';
+import renderSubmitted from '../emails/submitted';
 import handlerBars from 'handlebars';
+
 import nodemail from 'nodemailer';
+import { getAppInReview } from './state.spec';
 describe('emails', () => {
   // manual test not to be automated
   it.skip('test render with handle bars', async () => {
     const emailTemplte = `
     <mjml>
-    <mj-body>
-        <mj-section>
-        <mj-column>
-          <mj-text>
-            {{#each range}}
-              - Hello {{n}}!\n
-            {{/each}}
-          </mj-text>
-        </mj-column>
-      </mj-section>
-    </mj-body>
+      <mj-body>
+          <mj-section>
+          <mj-column>
+            <mj-text>
+              {{#each range}}
+                - Hello {{n}}!\n
+              {{/each}}
+            </mj-text>
+          </mj-column>
+        </mj-section>
+      </mj-body>
     </mjml>
     `;
 
@@ -50,5 +53,13 @@ describe('emails', () => {
       html: htmlOutput.html, // html body
     });
     return info;
+  });
+
+  describe('email rendering', () => {
+    it.only('should render submission email', () => {
+      const app = getAppInReview();
+      const bodyMjml = renderSubmitted(app);
+      console.log(bodyMjml);
+    });
   });
 });

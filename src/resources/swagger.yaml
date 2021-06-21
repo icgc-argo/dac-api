@@ -97,8 +97,8 @@ paths:
             format: csv
             default: 'state:desc'
           description: 
-            can be any combination of these fields state, primaryAffiliation, displayName, googleEmail, updatedAtUtc, appId, expiresAtUtc (order matters)
-          example: "state:asc, primaryAffiliation:asc, displayName:asc, googleEmail:asc, updatedAtUtc:asc, appId:asc, expiresAtUtc:asc"
+            can be any combination of these fields state, primaryAffiliation, displayName, googleEmail, lastUpdatedAtUtc, appId, expiresAtUtc (order matters)
+          example: "state:asc, primaryAffiliation:asc, displayName:asc, googleEmail:asc, lastUpdatedAtUtc:asc, appId:asc, expiresAtUtc:asc"
       tags:
         - Application
       summary: Search applications
@@ -485,7 +485,7 @@ components:
           readOnly: true
           type: string
           format: data-time
-        updatedAtUtc:
+        lastUpdatedAtUtc:
           readOnly: true
           type: string
           format: data-time
@@ -541,7 +541,7 @@ components:
           readOnly: true
           type: string
           format: data-time
-        updatedAtUtc:
+        lastUpdatedAtUtc:
           readOnly: true
           type: string
           format: data-time

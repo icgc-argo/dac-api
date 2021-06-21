@@ -4,6 +4,7 @@ import { ApplicationStateManager, newApplication } from '../domain/state';
 import { expect } from 'chai';
 import _ from 'lodash';
 import { BadRequest } from '../utils/errors';
+import { c } from '../utils/misc';
 
 const newApplication1: Partial<Application> = newApplication({
   userId: 'abc123',
@@ -125,68 +126,55 @@ describe('state manager', () => {
   });
 
   it('should change to sign & submit', () => {
-    const filledApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
-    filledApp.sections.terms.agreement.accepted = true;
-    filledApp.sections.terms.meta.status = 'COMPLETE';
+    const filledApp: Application = getReadyToSignApp();
+  });
 
-    filledApp.sections.applicant.info = getRandomInfo();
-    filledApp.sections.applicant.address = getAddress();
-    filledApp.sections.applicant.meta = {
-      status: 'COMPLETE',
-      errorsList: []
-    };
-
-    filledApp.sections.representative.address = getAddress();
-    filledApp.sections.representative.info = getRandomInfo();
-    filledApp.sections.representative.meta = {
-      status: 'COMPLETE',
-      errorsList: []
-    };
-
-    filledApp.sections.ITAgreements.agreements.forEach(ag => ag.accepted = true);
-    filledApp.sections.ITAgreements.meta = {
-      status: 'COMPLETE',
-      errorsList: []
-    };
-
-    filledApp.sections.dataAccessAgreement.agreements.forEach(ag => ag.accepted = true);
-    filledApp.sections.dataAccessAgreement.meta = {
-      status: 'COMPLETE',
-      errorsList: []
-    };
-
-    filledApp.sections.appendices.agreements.forEach(ag => ag.accepted = true);
-    filledApp.sections.appendices.meta = {
-      status: 'COMPLETE',
-      errorsList: []
-    };
-
-    filledApp.sections.projectInfo.aims = 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld';
-    filledApp.sections.projectInfo.background = 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld';
-    filledApp.sections.projectInfo.methodology = 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld';
-    filledApp.sections.projectInfo.title = 'title title title';
-    filledApp.sections.projectInfo.website = 'http://www.website.web';
-    filledApp.sections.projectInfo.publicationsURLs = ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs'];
-    filledApp.sections.projectInfo.meta = {
-      status: 'COMPLETE',
-      errorsList: []
-    };
-
-    const state = new ApplicationStateManager(filledApp);
-    const updatePart: Partial<UpdateApplication> = {
-      sections: {
-        ethicsLetter: {
-          declaredAsRequired: false
-        }
-      }
-    };
-
-    const result = state.updateApp(updatePart, false);
-    expect(result.state).to.eq('SIGN AND SUBMIT');
+  it('should change to review', () => {
+    const filledApp: Application = getAppInReview();
   });
 
 });
 
+export function getReadyToSignApp() {
+  const app: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-2341', appNumber: 1 }) as Application;
+  const updatePart: UpdateApplication['sections'] = _.pick(_.cloneDeep(app), 'sections').sections;
+  c(updatePart.terms).agreement.accepted = true;
+  c(updatePart.applicant).info = getRandomInfo();
+  c(updatePart.applicant).address = getAddress();
+  c(updatePart.representative).address = getAddress();
+  c(updatePart.representative).info = getRandomInfo();
+  c(updatePart.ITAgreements).agreements.forEach(ag => ag.accepted = true);
+  c(updatePart.dataAccessAgreement).agreements.forEach(ag => ag.accepted = true);
+  c(updatePart.appendices).agreements.forEach(ag => ag.accepted = true);
+  c(updatePart.ethicsLetter).declaredAsRequired = false;
+  updatePart.projectInfo = {
+    aims: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
+    background: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
+    methodology : 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
+    title: 'title title title',
+    website: 'http://www.website.web',
+    publicationsURLs: ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs']
+  };
+  const state = new ApplicationStateManager(app);
+  const newState = state.updateApp({
+    sections: updatePart
+  }, false);
+  expect(newState.state).to.eq('SIGN AND SUBMIT');
+  return newState;
+}
+
+export function getAppInReview() {
+  const app = getReadyToSignApp();
+  const state = new ApplicationStateManager(app);
+  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP');
+  const updatePart: Partial<UpdateApplication> = {
+    state: 'REVIEW'
+  };
+  const state2 = new ApplicationStateManager(appAfterSign);
+  const result = state2.updateApp(updatePart, false);
+  expect(result.state).to.eq('REVIEW');
+  return result;
+}
 
 function getAddress(): Address {
   return {
