@@ -14,6 +14,7 @@ import logger from '../logger';
 import renderReviewEmail from '../emails/review';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import renderSubmittedEmail from '../emails/submitted';
 
 export async function deleteDocument(appId: string,
                                     type: UploadDocumentType,
@@ -120,23 +121,38 @@ export async function updatePartial(appPart: Partial<Application>,
   const appDoc = await findApplication(c(appPart.appId), identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.updateApp(appPart, isReviewer);
-  await ApplicationModel.updateOne({ appId: result.appId }, result);
-  const stateChanged = appDocObj.state != result.state;
+  const updatedApp = stateManager.updateApp(appPart, isReviewer);
+  await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
+  const stateChanged = appDocObj.state != updatedApp.state;
   const config = await getAppConfig();
   if (stateChanged) {
     // if application state changed to REVIEW (ie submitted) send an email to Admin
-    if (result.state == 'REVIEW') {
-      const html = renderReviewEmail(result);
+    if (updatedApp.state == 'REVIEW') {
+      // send review email
+      const html = renderReviewEmail(updatedApp);
       await sendEmail(emailClient,
                       config.email.fromAddress,
                       config.email.fromName,
-                      [config.email.dacoAddress],
-                      'Application Submitted',
+                      new Set([config.email.dacoAddress]),
+                      `[${updatedApp.appId}] Application Submitted`,
                       html);
+
+      // send applicant email
+      const submittedEmailHtml = renderSubmittedEmail(updatedApp);
+      await sendEmail(emailClient,
+                      config.email.fromAddress,
+                      config.email.fromName,
+                      new Set([
+                        updatedApp.submitterEmail,
+                        updatedApp.sections.applicant.info.googleEmail,
+                        updatedApp.sections.applicant.info.institutionEmail
+                      ]),
+                      `[${updatedApp.appId}] We Received your Application`,
+                      submittedEmailHtml);
     }
+
   }
-  const deleted = checkDeletedDocuments(appDocObj, result);
+  const deleted = checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
   // this can be a result of applicantion getting updated :
   // - Changing selection of ethics letter from required to not required
@@ -145,7 +161,7 @@ export async function updatePartial(appPart: Partial<Application>,
   deleted.map(d => storageClient.delete(d)
     .catch(e => logger.error(`failed to delete document ${d}`, e))
   );
-  const updated = await findApplication(c(result.appId), identity);
+  const updated = await findApplication(c(updatedApp.appId), identity);
   const updatedObj =  updated.toObject();
   const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicantionForUser(isReviewer);
   return viewAbleApplication;
@@ -296,12 +312,13 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
 async function sendEmail(emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   fromEmail: string,
   fromName: string,
-  to: string[],
+  to: Set<string>,
   subject: string,
   html: string) {
+
   const info = await emailClient.sendMail({
     from: `"${fromName}" <${fromEmail}>`, // sender address
-    to: to.join(','), // list of receivers
+    to: Array.from(to).join(','), // list of receivers
     subject: subject, // Subject line
     html: html, // html body
   });
