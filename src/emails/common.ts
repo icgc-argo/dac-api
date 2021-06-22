@@ -1,3 +1,4 @@
+import moment from 'moment';
 import { Application } from '../domain/interface';
 
 const defaultTextStyle = {
@@ -21,23 +22,24 @@ function header(title: string) {
   return `
     <mj-head>
       <mj-title>${title}</mj-title>
-      <mj-font name="Work Sans" href="https://fonts.googleapis.com/css?family=Work Sans"></mj-font>
+      <mj-font name="Work Sans" href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600&display=swap"></mj-font>
       <mj-preview>Pre-header Text</mj-preview>
       <mj-attributes>
         <mj-all font-family="'Work Sans', Helvetica, Arial, sans-serif"></mj-all>
-        <mj-text font-weight="400" font-size="16px" color="#000000" line-height="24px" font-family="'Work Sans', Helvetica, Arial, sans-serif"></mj-text>
+        <mj-text font-weight="400" font-size="14px" color="#000000" line-height="23px" font-family="'Work Sans', Helvetica, Arial, sans-serif"></mj-text>
       </mj-attributes>
       <mj-style inline="inline">
         .body {
           min-width: 400px;
         }
         .body-section {
-          -webkit-box-shadow: 1px 4px 11px 0px rgba(0, 0, 0, 0.15);
-          -moz-box-shadow: 1px 4px 11px 0px rgba(0, 0, 0, 0.15);
-          box-shadow: 1px 4px 11px 0px rgba(0, 0, 0, 0.15);
+					border: solid 1px #dcdde1;
+        }
+        .card-title-container{
+        	border: 1px solid #0774D3;
         }
         .app-tbl-lable {
-          font-weight: bold;
+          font-weight: 600;
           width:130px;
           padding-top: 4px;
           padding-left: 10px;
@@ -81,8 +83,8 @@ function banner() {
   return `
   <mj-section full-width="full-width" background-color="#ffffff" padding-bottom="0">
     <mj-column width="100%">
-      <mj-image src="" alt="ICGC ARGO LOGO" align="center" width="150px" />
-      <mj-text color="#ffffff" font-weight="bold" align="center" text-transform="uppercase" font-size="12px" letter-spacing="1px" padding-top="30px" padding-bottom="30px">
+      <mj-image src="https://i.ibb.co/yFJnPWv/logo-icgc-daco.png" alt="ICGC ARGO LOGO" align="center" width="250px" height="36px" padding="0" />
+      <mj-text color="#ffffff" font-weight="" font-size="12px" align="center" text-transform="uppercase" font-size="12px" letter-spacing="0px" padding-top="10px" padding-bottom="22px">
         <a href="https://daco.icgc-argo.org/">ICGC DATA ACCESS COMPLIANCE OFFICE</a>
       </mj-text>
     </mj-column>
@@ -99,9 +101,9 @@ function card(subject: string, receiver: Receiver, message: string) {
 
 function cardHeader(title: string) {
   return `
-    <mj-section background-color="#0774D3">
-      <mj-column width="100%">
-        <mj-text color="#ffffff" font-weight="bold" align="center" font-size="20px" padding="0"  background-color="#0774D3">
+    <mj-section background-color="#0774D3" padding="10px 22px 13px" css-class="card-title-container">
+      <mj-column width="100%" padding="0">
+        <mj-text color="#ffffff" font-weight="bold" align="center" font-size="20px" padding="0">
           ${title}
         </mj-text>
       </mj-column>
@@ -150,10 +152,9 @@ export function appInfoBox(app: Application) {
                   font-size="16px"
                   color="#000000"
                   padding="10px 16px"
-                  line-height="24px"
-                  font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" >
+                  line-height="24px" >
                   <tr>
-                    <td valign="top" width="60px">
+                    <td valign="top" width="60px" style="padding-top: 5px">
                       <img src="https://i.ibb.co/XLzmWXB/icons-brand-controlled-data-3x.png" class="app-tbl-icon"/>
                     </td>
                     <td>
@@ -190,7 +191,7 @@ export function appInfoBox(app: Application) {
                             Submitted on:
                           </td>
                           <td class="app-tbl-val">
-                            ${app.submittedAtUtc}
+                            ${moment(app.submittedAtUtc).format('MMM D, YYYY [at] LT')}
                           </td>
                         </tr>
                       </table>
@@ -217,7 +218,7 @@ function closure() {
         }
         ${text(
           `Sincerely, <br />
-          The <a href="">ICGC DACO</a> Team`, { ...defaultTextStyle,  padding: '20px 0px 0px 0px' }
+          The <a href="https://daco.icgc-argo.org/">ICGC DACO</a> Team`, { ...defaultTextStyle,  padding: '20px 0px 0px 0px' }
           )
         }
       </mj-column>
@@ -227,27 +228,27 @@ function closure() {
 
 function footer() {
   return `
-    <mj-wrapper full-width="full-width">
-      <mj-section padding-top="0">
-        <mj-group>
-          <mj-column width="100%" padding-right="0">
-            <mj-text font-size="11px" align="center" line-height="16px" font-weight="bold">
-              <a class="footer-link" href="https://platform.icgc-argo.org/contact">Contact Us</a>&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://www.icgc-argo.org/page/72/introduction-and-goals-">Policies & Guidelines</a>&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://docs.icgc-argo.org/docs/data-access/data-access">Help Guides</a>&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://www.icgc-argo.org">Controlled Data Users</a>
-            </mj-text>
-            <mj-text font-size="11px" align="center" line-height="16px" font-weight="bold">
-              <a class="footer-link" href="https://www.icgc-argo.org/">ICGC ARGO Website</a>&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://platform.icgc-argo.org/">ARGO Data Platform</a>
-            </mj-text>
-          </mj-column>
-        </mj-group>
-      </mj-section>
-        <mj-section>
-        <mj-column width="100%" padding="0">
-          <mj-text color="#000000" font-size="11px" font-weight="bold" align="center">
-            © 2021 ICGC Data Access Compliance Office. All rights reserved.
+    <mj-wrapper full-width="full-width" padding="47px 0px 13px 0px">
+    <mj-section padding="0">
+      <mj-group>
+        <mj-column width="100%" padding-right="0">
+          <mj-text font-size="12px" align="center" line-height="16px" >
+            <a class="footer-link" href="https://platform.icgc-argo.org/contact">Contact Us</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://www.icgc-argo.org/page/72/introduction-and-goals-">Policies & Guidelines</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://docs.icgc-argo.org/docs/data-access/data-access">Help Guides</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://www.icgc-argo.org">Controlled Data Users</a>
+          </mj-text>
+          <mj-text font-size="12px" align="center" line-height="16px" padding-top="0" >
+            <a class="footer-link" href="https://www.icgc-argo.org/">ICGC ARGO Website</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://platform.icgc-argo.org/">ARGO Data Platform</a>
           </mj-text>
         </mj-column>
-      </mj-section>
-    </mj-wrapper>
+      </mj-group>
+    </mj-section>
+      <mj-section padding="0">
+      <mj-column width="100%" padding="0">
+        <mj-text color="#000000" font-size="12px" line-height="16px" padding="12px 0px" font-weight="" align="center">
+          © 2021 ICGC Data Access Compliance Office. All rights reserved.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-wrapper>
   `;
 }
 

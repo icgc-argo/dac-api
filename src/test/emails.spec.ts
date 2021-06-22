@@ -58,8 +58,7 @@ describe('emails', () => {
   describe('email rendering', () => {
     it.only('should render submission email', () => {
       const app = getAppInReview();
-      const bodyMjml = renderSubmitted(app);
-      console.log(bodyMjml);
+      const html = renderSubmitted(app);
     });
   });
 });

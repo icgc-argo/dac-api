@@ -133,7 +133,7 @@ export async function updatePartial(appPart: Partial<Application>,
       await sendEmail(emailClient,
                       config.email.fromAddress,
                       config.email.fromName,
-                      [config.email.dacoAddress],
+                      new Set([config.email.dacoAddress]),
                       `[${updatedApp.appId}] Application Submitted`,
                       html);
 
@@ -142,10 +142,11 @@ export async function updatePartial(appPart: Partial<Application>,
       await sendEmail(emailClient,
                       config.email.fromAddress,
                       config.email.fromName,
-                      [
+                      new Set([
+                        updatedApp.submitterEmail,
                         updatedApp.sections.applicant.info.googleEmail,
                         updatedApp.sections.applicant.info.institutionEmail
-                      ],
+                      ]),
                       `[${updatedApp.appId}] We Received your Application`,
                       submittedEmailHtml);
     }
@@ -311,13 +312,13 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
 async function sendEmail(emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   fromEmail: string,
   fromName: string,
-  to: string[],
+  to: Set<string>,
   subject: string,
   html: string) {
 
   const info = await emailClient.sendMail({
     from: `"${fromName}" <${fromEmail}>`, // sender address
-    to: to.join(','), // list of receivers
+    to: Array.from(to).join(','), // list of receivers
     subject: subject, // Subject line
     html: html, // html body
   });
