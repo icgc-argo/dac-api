@@ -54,7 +54,7 @@ const App = (config: AppConfig,
     const status = dbHealth.status == Status.OK ? 200 : 500;
     const resBody = {
       db: dbHealth,
-      version: `${process.env.VERSION || process.env.npm_package_version}`,
+      version: `${process.env.SVC_VERSION || process.env.npm_package_version}`,
     };
     return res.status(status).send(resBody);
   });
