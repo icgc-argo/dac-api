@@ -47,7 +47,7 @@ console.log('in server.ts');
     const migrated = await up(connection.db);
     migrated.forEach((fileName: string) => console.log('Migrated:', fileName));
   } catch (err) {
-    console.error('failed to do migration', err);
+    logger.error('failed to do migration', err);
     process.exit(-10);
     return;
   }
@@ -133,7 +133,7 @@ const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 errorTypes.map(type => {
   process.on(type as any, (e: Error) => {
     try {
-      console.log(`unhandled error: ${type}`);
+      logger.error(`unhandled error: ${type}`);
       console.error(e);
       mongoose.disconnect();
       process.exit(1001);

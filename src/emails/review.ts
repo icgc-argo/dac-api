@@ -15,6 +15,8 @@ const emailTemplte = `
 </mj-body>
 </mjml>
 `;
+
+
 export default function(data: Application) {
   const templateOutput = handlerBars.compile(emailTemplte)(data);
   const htmlOutput = mjml2html(templateOutput);

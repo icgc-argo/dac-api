@@ -97,8 +97,8 @@ paths:
             format: csv
             default: 'state:desc'
           description: 
-            can be any combination of these fields state, primaryAffiliation, displayName, googleEmail, updatedAtUtc, appId, expiresAtUtc (order matters)
-          example: "state:asc, primaryAffiliation:asc, displayName:asc, googleEmail:asc, updatedAtUtc:asc, appId:asc, expiresAtUtc:asc"
+            can be any combination of these fields state, primaryAffiliation, displayName, googleEmail, lastUpdatedAtUtc, appId, expiresAtUtc (order matters)
+          example: "state:asc, primaryAffiliation:asc, displayName:asc, googleEmail:asc, lastUpdatedAtUtc:asc, appId:asc, expiresAtUtc:asc"
       tags:
         - Application
       summary: Search applications
@@ -155,6 +155,32 @@ paths:
                   ttl:
                     type: number
 
+  /applications/{id}/assets/APP_PACKAGE:
+    parameters:
+      - name: type
+        required: true
+        in: path
+        schema: 
+          type: string
+          enum: [ 'APP_PACKAGE' ]
+      - name: id
+        required: true
+        in: path
+        schema: 
+          type: string
+    get:
+      tags:
+        - Application
+      summary: Download application package
+      responses:
+        '200':
+          description: zip archive includes uploaded signed pdf and any ethics letters associated with the application
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+                
 
   /applications/{id}/assets/{type}/assetId/{assetId}:
     parameters:
@@ -202,7 +228,7 @@ paths:
     post:
       tags:
         - Application
-      summary: Create a presigned url to upload a document related to this application 
+      summary: Create a presigned url to upload a document rted to this application 
       requestBody:
         content:
           multipart/form-data:
@@ -485,7 +511,7 @@ components:
           readOnly: true
           type: string
           format: data-time
-        updatedAtUtc:
+        lastUpdatedAtUtc:
           readOnly: true
           type: string
           format: data-time
@@ -541,7 +567,7 @@ components:
           readOnly: true
           type: string
           format: data-time
-        updatedAtUtc:
+        lastUpdatedAtUtc:
           readOnly: true
           type: string
           format: data-time
@@ -704,7 +730,7 @@ components:
                   type: string
                 signedDocName: 
                   type: string
-                signedAtUtc: 
+                uploadedAtUtc: 
                   type: string
                   format: date
                 meta:

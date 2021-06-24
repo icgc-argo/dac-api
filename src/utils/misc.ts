@@ -16,16 +16,11 @@ export const mergeKnown = (a: any, b: any) => {
 const _mergeKnown = (a: any, b: any) => {
   // if we are on an object node, traverse it
   Object.keys(a).forEach(k => {
-    console.log('merging ' + k);
     if (b[k] === undefined) {
-        console.log('not overriden');
         return;
     }
-    console.log('override [' + k + '] is found ');
-    console.log(`type a[k] (${a[k]}) = `, typeof a[k]);
     // tslint:disable-next-line:no-null-keyword
     if (a[k] == null || typeof a[k] !== 'object') {
-      console.log(' value for [' + k + '] is premitive ');
       a[k] = b[k];
       return;
     }
@@ -38,8 +33,6 @@ const _mergeKnown = (a: any, b: any) => {
     // a[k] is an object
     if (typeof a[k] == typeof b[k]) {
       _mergeKnown(a[k], b[k]);
-    } else {
-      console.warn('type doesn\'t match');
     }
   });
 };

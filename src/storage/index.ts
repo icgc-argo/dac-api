@@ -65,6 +65,23 @@ export class Storage {
     return id;
   }
 
+  async downloadAsStream(id: string) {
+    const url = await this.s3Client.getSignedUrlPromise('getObject', {
+      Bucket: this.bucket,
+      Key: id,
+      Expires: 300,
+    });
+
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+
+    if (response.status !== 200) {
+      throw new Error('Download from storage service failed');
+    }
+    return response.body;
+  }
+
   async delete(objectId: string) {
     const url = await this.s3Client.getSignedUrlPromise('deleteObject', {
       Bucket: this.bucket,

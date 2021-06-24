@@ -3,7 +3,6 @@ export type State =  'DRAFT' | 'SIGN AND SUBMIT' | 'REVIEW' | 'REVISIONS REQUEST
 export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS REQUESTED' | 'LOCKED' | 'DISABLED' | 'REVISIONS REQUESTED DISABLED' | 'REVISIONS MADE';
 
 export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP';
-
 interface Meta {
   status: SectionStatus;
   errorsList: SectionError[];
@@ -166,7 +165,7 @@ export interface Application {
     signature: {
       meta: Meta,
       signedAppDocObjId: string;
-      signedAtUtc?: Date;
+      uploadedAtUtc?: Date;
       signedDocName: string;
     }
   };
