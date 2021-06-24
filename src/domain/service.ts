@@ -232,7 +232,7 @@ export async function search(params: {
 
   const sortObj: any = {};
   params.sortBy.forEach(sb => {
-    sortObj[sb.field] = sb.direction == 'asc' ?  1 : -1 ;
+    sortObj[mapField(sb.field)] = sb.direction == 'asc' ?  1 : -1 ;
   });
 
   const count = await ApplicationModel.find(query).countDocuments();
@@ -264,7 +264,7 @@ export async function search(params: {
       state: app.state,
       ethics: {
         // tslint:disable-next-line:no-null-keyword
-        declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired || null
+        declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired
       },
       submittedAtUtc: app.submittedAtUtc,
       lastUpdatedAtUtc: app.lastUpdatedAtUtc
@@ -360,4 +360,19 @@ async function sendEmail(emailClient: nodemail.Transporter<SMTPTransport.SentMes
     subject: subject, // Subject line
     html: html, // html body
   });
+}
+
+function mapField(field: string) {
+  //  state, primaryAffiliation, displayName, googleEmail, ethicsRequired, lastUpdatedAtUtc, appId, expiresAtUtc
+  switch (field) {
+    case 'primaryAffiliation':
+    case 'googleEmail':
+    case 'displayName':
+      return `sections.applicant.info.${field}`;
+    case 'ethicsRequired':
+      return `sections.ethicsLetter.declaredAsRequired`;
+    default:
+      return field;
+  }
+
 }
