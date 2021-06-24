@@ -159,7 +159,6 @@ const createApplicationsRouter = (config: AppConfig,
         states,
         page,
         pageSize,
-        sort,
         sortBy
       };
       logger.info(`searching applications [query: ${JSON.stringify(params)}, user Id:${(req as IRequest).identity.userId}]`);
