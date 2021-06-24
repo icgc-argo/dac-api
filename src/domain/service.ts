@@ -1,7 +1,7 @@
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
 import { NotFound } from '../utils/errors';
-import { getAppConfig } from '../config';
+import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import _ from 'lodash';
@@ -21,7 +21,6 @@ export async function deleteDocument(appId: string,
                                     objectId: string,
                                     identity: Identity,
                                     storageClient: Storage) {
-
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -59,6 +58,39 @@ export async function uploadDocument(appId: string,
   const updated = await findApplication(c(result.appId), identity);
   const viewAbleApplication = new ApplicationStateManager(updated.toObject()).prepareApplicantionForUser(false);
   return viewAbleApplication;
+}
+
+export async function getApplicationAssetsAsStream(appId: string,
+                                                identity: Identity,
+                                                storageClient: Storage)  {
+
+  const appDoc = await findApplication(appId, identity);
+  const appDocObj = appDoc.toObject() as Application;
+
+  if (appDocObj.state !== 'REVIEW' && appDocObj.state !== 'APPROVED') {
+    throw new Error('Cannot download package in this state');
+  }
+
+  const docs = appDocObj.sections.ethicsLetter.approvalLetterDocs.map(e => ({
+    id: e.objectId,
+    name: e.name
+  }));
+
+  docs.push({
+    name: appDocObj.sections.signature.signedDocName,
+    id: appDocObj.sections.signature.signedAppDocObjId,
+  });
+
+  // get the assets as streams from the response bodies
+  const downloaded = docs.map(async (d) => {
+    const stream = await storageClient.downloadAsStream(d.id);
+    return {
+      ...d,
+      stream
+    };
+  });
+  const assets = await Promise.all(downloaded);
+  return assets;
 }
 
 export async function createCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
@@ -126,31 +158,7 @@ export async function updatePartial(appPart: Partial<Application>,
   const stateChanged = appDocObj.state != updatedApp.state;
   const config = await getAppConfig();
   if (stateChanged) {
-    // if application state changed to REVIEW (ie submitted) send an email to Admin
-    if (updatedApp.state == 'REVIEW') {
-      // send review email
-      const html = renderReviewEmail(updatedApp);
-      await sendEmail(emailClient,
-                      config.email.fromAddress,
-                      config.email.fromName,
-                      new Set([config.email.dacoAddress]),
-                      `[${updatedApp.appId}] Application Submitted`,
-                      html);
-
-      // send applicant email
-      const submittedEmailHtml = renderSubmittedEmail(updatedApp);
-      await sendEmail(emailClient,
-                      config.email.fromAddress,
-                      config.email.fromName,
-                      new Set([
-                        updatedApp.submitterEmail,
-                        updatedApp.sections.applicant.info.googleEmail,
-                        updatedApp.sections.applicant.info.institutionEmail
-                      ]),
-                      `[${updatedApp.appId}] We Received your Application`,
-                      submittedEmailHtml);
-    }
-
+    await onStateChange(updatedApp, emailClient, config);
   }
   const deleted = checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
@@ -165,6 +173,36 @@ export async function updatePartial(appPart: Partial<Application>,
   const updatedObj =  updated.toObject();
   const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicantionForUser(isReviewer);
   return viewAbleApplication;
+}
+
+async function onStateChange(updatedApp: Application,
+                            emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+                            config: AppConfig) {
+
+  // if application state changed to REVIEW (ie submitted) send an email to Admin
+  if (updatedApp.state == 'REVIEW') {
+    // send review email
+    const html = renderReviewEmail(updatedApp);
+    await sendEmail(emailClient,
+      config.email.fromAddress,
+      config.email.fromName,
+      new Set([config.email.dacoAddress]),
+      `[${updatedApp.appId}] Application Submitted`,
+      html);
+
+    // send applicant email
+    const submittedEmailHtml = renderSubmittedEmail(updatedApp);
+    await sendEmail(emailClient,
+      config.email.fromAddress,
+      config.email.fromName,
+      new Set([
+        updatedApp.submitterEmail,
+        updatedApp.sections.applicant.info.googleEmail,
+        updatedApp.sections.applicant.info.institutionEmail
+      ]),
+      `[${updatedApp.appId}] We Received your Application`,
+      submittedEmailHtml);
+  }
 }
 
 export async function search(params: {
@@ -294,14 +332,14 @@ async function hasReviewScope(identity: Identity) {
 function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const removedIds: string[] = [];
   const ethicsArrayBefore =
-    appDocObj.sections.ethicsLetter.approvalLetterDocs.sort((a, b) => a.objectId.localeCompare(b.objectId));
+    appDocObj.sections.ethicsLetter.approvalLetterDocs.sort((a, b) => a.objectId.localeCompare(b.objectId)).map(e => e.objectId);
   const ethicsArrayAfter =
-    result.sections.ethicsLetter.approvalLetterDocs.sort((a, b) => a.objectId.localeCompare(b.objectId));
+    result.sections.ethicsLetter.approvalLetterDocs.sort((a, b) => a.objectId.localeCompare(b.objectId)).map(e => e.objectId);
   const diff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
-  diff.map(v => v.objectId)
-    .forEach(o => removedIds.push(o));
+  diff.forEach(o => removedIds.push(o));
 
   if (appDocObj.sections.signature.signedAppDocObjId
+
       && appDocObj.sections.signature.signedAppDocObjId != result.sections.signature.signedAppDocObjId) {
     removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
   }

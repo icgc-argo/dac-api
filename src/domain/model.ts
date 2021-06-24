@@ -134,7 +134,7 @@ const ApplicationSchema = new mongoose.Schema({
         meta: Meta,
         signedAppDocObjId: { type: String, required: false },
         signedDocName: { type: String, required: false },
-        signedAtUtc: {type: Date, required: false },
+        uploadedAtUtc: {type: Date, required: false },
       }
     },
     updates: [ApplicationUpdate]

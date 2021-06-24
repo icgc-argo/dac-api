@@ -31,8 +31,6 @@ import { Storage } from './storage';
 import { countriesList } from './utils/constants';
 import { Transport, Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
-
-console.log('in App.ts');
 const App = (config: AppConfig,
              storageClient: Storage,
              emailClient: Transporter<SMTPTransport.SentMessageInfo>): express.Express => {
@@ -56,7 +54,7 @@ const App = (config: AppConfig,
     const status = dbHealth.status == Status.OK ? 200 : 500;
     const resBody = {
       db: dbHealth,
-      version: `${process.env.npm_package_version} - ${process.env.SVC_COMMIT_ID}`,
+      version: `${process.env.VERSION || process.env.npm_package_version}`,
     };
     return res.status(status).send(resBody);
   });

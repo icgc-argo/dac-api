@@ -127,7 +127,7 @@ export class ApplicationStateManager {
     if (type == 'SIGNED_APP') {
       if (current.state == 'SIGN AND SUBMIT') {
         current.sections.signature.signedAppDocObjId = id;
-        current.sections.signature.signedAtUtc = new Date();
+        current.sections.signature.uploadedAtUtc = new Date();
         current.sections.signature.signedDocName = name;
         current.sections.signature.meta.status = 'COMPLETE';
         return current;
@@ -518,7 +518,7 @@ function transitionToRevisionsRequested(current: Application, updatePart: Partia
 
 function resetSignedDocument(current: Application) {
   current.sections.signature.signedAppDocObjId = '';
-  current.sections.signature.signedAtUtc = undefined;
+  current.sections.signature.uploadedAtUtc = undefined;
   current.sections.signature.signedDocName = '';
 }
 
