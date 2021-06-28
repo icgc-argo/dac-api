@@ -173,7 +173,7 @@ export interface Application {
 }
 
 export type AppSections = keyof Application['sections'];
-export type RevisionSections = keyof Pick<Record<AppSections, RevisionRequest>, 'signature' | 'projectInfo' | 'applicant' | 'collaborators' | 'ethicsLetter'> | 'general';
+export type RevisionSections = keyof Pick<Record<AppSections, RevisionRequest>, 'signature' | 'projectInfo' | 'applicant' | 'representative' | 'collaborators' | 'ethicsLetter'> | 'general';
 export type RevisionRequestUpdate = Partial<Record<RevisionSections, RevisionRequest>>;
 export interface UpdateApplication {
   state?: State;
