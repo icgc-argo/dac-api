@@ -9,18 +9,19 @@ describe('emails', () => {
   it.skip('test render with handle bars', async () => {
     const emailTemplte = `
     <mjml>
-      <mj-body>
-          <mj-section>
-          <mj-column>
-            <mj-text>
-              {{#each range}}
-                - Hello {{n}}!\n
-              {{/each}}
-            </mj-text>
-          </mj-column>
-        </mj-section>
-      </mj-body>
-    </mjml>
+    <mj-head>
+      <mj-font name="Raleway" href="https://fonts.googleapis.com/css?family=Raleway" />
+    </mj-head>
+    <mj-body>
+      <mj-section>
+        <mj-column>
+          <mj-text font-family="Raleway, Arial">
+            Hello World!
+          </mj-text>
+        </mj-column>
+      </mj-section>
+    </mj-body>
+  </mjml>
     `;
 
     const templateOutput = handlerBars.compile(emailTemplte)({
@@ -46,7 +47,7 @@ describe('emails', () => {
 
     const info = await transporter.sendMail({
       from: '"Fred Foo 👻" <test@example.com>', // sender address
-      to: 'bar@example.com', // list of receivers
+      to: '@example.com', // list of receivers
       subject: 'Hello ✔', // Subject line
       text: 'Hello world?', // plain text body
       html: htmlOutput.html, // html body
