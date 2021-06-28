@@ -3,7 +3,7 @@ import { Address, Application, Collaborator, TERMS_AGREEMENT_NAME, UpdateApplica
 import { ApplicationStateManager, newApplication } from '../domain/state';
 import { expect } from 'chai';
 import _ from 'lodash';
-import { BadRequest } from '../utils/errors';
+import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 
 const newApplication1: Partial<Application> = newApplication({
@@ -60,34 +60,96 @@ describe('state manager', () => {
     expect(result.sections.applicant.info).to.include(updatePart.sections?.applicant?.info);
   });
 
-  it('should add collaborator', () => {
-    const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
-    const state = new ApplicationStateManager(emptyApp);
-    const collab: Collaborator = {
-      meta: {
-        errorsList: [],
-        status: 'COMPLETE'
-      },
-      info: {
-        firstName: 'Bashar',
-        lastName: 'Allabadi',
-        googleEmail: 'bashar@example.com',
-        primaryAffiliation: 'OICR',
-        institutionEmail: 'adsa@example.com',
-        middleName: '',
-        positionTitle: 'Manager',
-        suffix: '',
-        title: '',
-        displayName: '',
-        institutionWebsite: ''
-      },
-      type: 'personnel'
-    };
+  describe('collaborators', () => {
+    it('should add collaborator', () => {
+      const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
+      const state = new ApplicationStateManager(emptyApp);
+      const collab: Collaborator = {
+        meta: {
+          errorsList: [],
+          status: 'COMPLETE'
+        },
+        info: {
+          firstName: 'Bashar',
+          lastName: 'Allabadi',
+          googleEmail: 'bashar@example.com',
+          primaryAffiliation: 'OICR',
+          institutionEmail: 'adsa@example.com',
+          middleName: '',
+          positionTitle: 'Manager',
+          suffix: '',
+          title: '',
+          displayName: '',
+          institutionWebsite: ''
+        },
+        type: 'personnel'
+      };
 
-    const result = state.addCollaborator(collab);
-    expect(result.sections.collaborators.list[0]).to.include(collab);
-    expect(result.sections.collaborators.list[0].id).to.not.be.empty;
-    expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
+      const result = state.addCollaborator(collab);
+      expect(result.sections.collaborators.list[0]).to.include(collab);
+      expect(result.sections.collaborators.list[0].id).to.not.be.empty;
+      expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
+    });
+
+    it('should not add duplicate collaborator', () => {
+      const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
+      const state = new ApplicationStateManager(emptyApp);
+      const collab: Collaborator = {
+        meta: {
+          errorsList: [],
+          status: 'COMPLETE'
+        },
+        info: {
+          firstName: 'Bashar',
+          lastName: 'Allabadi',
+          googleEmail: 'bashar@example.com',
+          primaryAffiliation: 'OICR',
+          institutionEmail: 'adsa@example.com',
+          middleName: '',
+          positionTitle: 'Manager',
+          suffix: '',
+          title: '',
+          displayName: '',
+          institutionWebsite: ''
+        },
+        type: 'personnel'
+      };
+
+      const result = state.addCollaborator(collab);
+      expect(result.sections.collaborators.list[0]).to.include(collab);
+      expect(result.sections.collaborators.list[0].id).to.not.be.empty;
+      expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
+
+      const collab2: Collaborator = {
+        meta: {
+          errorsList: [],
+          status: 'COMPLETE'
+        },
+        info: {
+          firstName: 'Bashar1',
+          lastName: 'Allabadi2',
+          googleEmail: 'bashar@example.com',
+          primaryAffiliation: 'OICR',
+          institutionEmail: 'adsa11@example.com',
+          middleName: '',
+          positionTitle: 'Manager',
+          suffix: '',
+          title: '',
+          displayName: '',
+          institutionWebsite: ''
+        },
+        type: 'personnel'
+      };
+      try {
+        state.addCollaborator(collab);
+      } catch (err) {
+        if (err instanceof ConflictError) {
+          return true;
+        }
+      }
+      throw new Error('test failed expected an error');
+    });
+
   });
 
   it('should check collaborator primary affiliation', () => {
@@ -152,7 +214,7 @@ export function getReadyToSignApp() {
     background: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     methodology : 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     title: 'title title title',
-    website: 'http://www.website.web',
+    institutionWebsite: 'http://www.institutionWebsite.web',
     publicationsURLs: ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs']
   };
   const state = new ApplicationStateManager(app);

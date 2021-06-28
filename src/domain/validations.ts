@@ -131,7 +131,7 @@ export function validateProjectInfo(app: Application) {
   const errors: SectionError[] = [];
   const validations = [
     validateRequired(app.sections.projectInfo.title, 'title', errors),
-    validateUrl(app.sections.projectInfo.website, 'website', errors),
+    validateUrl(app.sections.projectInfo.institutionWebsite, 'institutionWebsite', errors),
     validateRequired(app.sections.projectInfo.background, 'background', errors),
     validateWordLength(app.sections.projectInfo.background, 200, 'background', errors),
     validateRequired(app.sections.projectInfo.aims, 'aims', errors),

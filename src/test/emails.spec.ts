@@ -1,5 +1,4 @@
 import mjml2html from 'mjml';
-import { Application } from '../domain/interface';
 import renderSubmitted from '../emails/submitted';
 import handlerBars from 'handlebars';
 
@@ -58,7 +57,8 @@ describe('emails', () => {
   describe('email rendering', () => {
     it.only('should render submission email', () => {
       const app = getAppInReview();
-      const html = renderSubmitted(app);
+      const email = renderSubmitted(app);
+      console.log(email.emailMjml);
     });
   });
 });

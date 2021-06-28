@@ -313,6 +313,8 @@ paths:
               $ref: '#/components/schemas/Collaborator'
 
       responses:
+        '409':
+          $ref: '#/components/responses/ConflictError'
         '201':
           description: Collaborator was created successfully 
           content:
@@ -356,6 +358,8 @@ paths:
               $ref: '#/components/schemas/Collaborator'
 
       responses:
+        '409':
+          $ref: '#/components/responses/ConflictError'
         '200':
           description: Collaborator updated
           content:
@@ -384,7 +388,20 @@ components:
       description: Access token has incorrect scopes
     NotFoundError:
       description: Requested resource was not found
-
+    ConflictError:
+      description: a Conflict while adding the collaborator
+      content: 
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: string
+                enum: [COLLABORATOR_EXISTS, COLLABORATOR_SAME_AS_APPLICANT]
+              error:
+                type: string
+              message:
+                type: string
   securitySchemes:
     bearerAuth:
       type: http
@@ -666,7 +683,7 @@ components:
                   type: string
                 title:
                   type: string
-                website:
+                institutionWebsite:
                   type: string
                 publicationsURLs:
                   type: array

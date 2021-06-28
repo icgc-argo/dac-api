@@ -41,6 +41,7 @@ export async function uploadDocument(appId: string,
                                     file: UploadedFile,
                                     identity: Identity,
                                     storageClient: Storage) {
+
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -191,7 +192,7 @@ async function onStateChange(updatedApp: Application,
       html);
 
     // send applicant email
-    const submittedEmailHtml = renderSubmittedEmail(updatedApp);
+    const submittedEmail = renderSubmittedEmail(updatedApp);
     await sendEmail(emailClient,
       config.email.fromAddress,
       config.email.fromName,
@@ -200,8 +201,7 @@ async function onStateChange(updatedApp: Application,
         updatedApp.sections.applicant.info.googleEmail,
         updatedApp.sections.applicant.info.institutionEmail
       ]),
-      `[${updatedApp.appId}] We Received your Application`,
-      submittedEmailHtml);
+      `[${updatedApp.appId}] We Received your Application`, submittedEmail.html);
   }
 }
 
