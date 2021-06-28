@@ -29,8 +29,9 @@ import createApplicationsRouter from './routes/applications';
 import fileUpload from 'express-fileupload';
 import { Storage } from './storage';
 import { countriesList } from './utils/constants';
-import { Transport, Transporter } from 'nodemailer';
+import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { BadRequest, ConflictError, NotFound } from './utils/errors';
 const App = (config: AppConfig,
              storageClient: Storage,
              emailClient: Transporter<SMTPTransport.SentMessageInfo>): express.Express => {
@@ -92,16 +93,25 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
     case err.name == 'Forbidden':
       status = 403;
       break;
-    case err.name == 'BadRequest':
+    case err instanceof BadRequest:
       status = 400;
       break;
-    case err.name == 'NotFound':
+    case err instanceof ConflictError:
+      status = 409;
+      break;
+    case err instanceof NotFound:
       status = 404;
       break;
     default:
       status = 500;
   }
-  res.status(status).send({ error: err.name, message: customizableMsg });
+
+  res.status(status).send({
+    error: err.name,
+    message: customizableMsg,
+    code: (err as any).code,
+    details: (err as any).details
+  });
   next(err);
 };
 

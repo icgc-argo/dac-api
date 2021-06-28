@@ -58,11 +58,8 @@ function header(title: string) {
           width: 50px;
          height: 50px;
         }
-        .text-link {
+        a {
           color: #523785;
-        }
-        .footer-link {
-          color: 523785;
         }
       </mj-style>
     </mj-head>
@@ -233,10 +230,10 @@ function footer() {
       <mj-group>
         <mj-column width="100%" padding-right="0">
           <mj-text font-size="12px" align="center" line-height="16px" >
-            <a class="footer-link" href="https://platform.icgc-argo.org/contact">Contact Us</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://www.icgc-argo.org/page/72/introduction-and-goals-">Policies & Guidelines</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://docs.icgc-argo.org/docs/data-access/data-access">Help Guides</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://www.icgc-argo.org">Controlled Data Users</a>
+            <a class="" href="https://platform.icgc-argo.org/contact">Contact Us</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://www.icgc-argo.org/page/72/introduction-and-goals-">Policies & Guidelines</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://docs.icgc-argo.org/docs/data-access/data-access">Help Guides</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://www.icgc-argo.org">Controlled Data Users</a>
           </mj-text>
           <mj-text font-size="12px" align="center" line-height="16px" padding-top="0" >
-            <a class="footer-link" href="https://www.icgc-argo.org/">ICGC ARGO Website</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="footer-link" href="https://platform.icgc-argo.org/">ARGO Data Platform</a>
+            <a class="" href="https://www.icgc-argo.org/">ICGC ARGO Website</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://platform.icgc-argo.org/">ARGO Data Platform</a>
           </mj-text>
         </mj-column>
       </mj-group>

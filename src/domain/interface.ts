@@ -135,7 +135,7 @@ export interface Application {
     projectInfo: {
       meta: Meta,
       title: string;
-      website: string;
+      institutionWebsite: string;
       background: string;
       aims: string;
       methodology: string;
@@ -198,7 +198,7 @@ export interface UpdateApplication {
     },
     projectInfo?: {
       title?: string;
-      website?: string;
+      institutionWebsite?: string;
       background?: string;
       aims?: string;
       methodology?: string;

@@ -1,8 +1,8 @@
 import { Router, Request, Response, RequestHandler } from 'express';
-
-
 import wrapAsync from '../utils/wrapAsync';
-import { create, createCollaborator, deleteApp, deleteCollaborator, getById, search, updateCollaborator, uploadDocument, updatePartial, deleteDocument, getApplicationAssetsAsStream } from '../domain/service';
+import { create, createCollaborator, deleteApp, deleteCollaborator,
+  getById, search, updateCollaborator, uploadDocument, updatePartial,
+  deleteDocument, getApplicationAssetsAsStream } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import { Identity } from '@overture-stack/ego-token-middleware';
@@ -54,7 +54,7 @@ const createApplicationsRouter = (config: AppConfig,
         zip.append(a.stream as Readable, {name:  a.name});
       });
 
-      const zipName = `${appId}_${moment().format('YYYYMMDDTHHmm')}.zip`;
+      const zipName = `${appId}_${moment().format('YYYYMMDD')}.zip`;
       res.attachment(zipName);
 
       // pipe the zip stream output to the response directly
