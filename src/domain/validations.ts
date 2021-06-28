@@ -110,9 +110,7 @@ export function validateDataAccessAgreement(app: Application) {
 }
 
 export function validateAgreementArray(ags: AgreementItem[]) {
-  const incomplete = ags.some(ag => {
-    ag.accepted !== true;
-  });
+  const incomplete = ags.some(ag => ag.accepted !== true);
   return !incomplete;
 }
 
@@ -197,7 +195,7 @@ function validateEmail(val: string, name: string, errors: SectionError[]) {
 }
 
 function validatePublications(publications: string[], errors: SectionError[]) {
-  const uniquePubs = _.uniq(publications);
+  const uniquePubs = _.uniq(publications.filter(v => !!v?.trim()));
   if (uniquePubs.length < 3) {
     errors.push({
       field: 'publications',

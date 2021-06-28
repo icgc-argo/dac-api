@@ -41,9 +41,8 @@ function header(title: string) {
         .app-tbl-lable {
           font-weight: 600;
           width:130px;
-          padding-top: 4px;
-          padding-left: 10px;
-          padding-bottom: 4px;
+          padding: 2px 0px 2px 10px;
+          line-height: 22px;
           font-size:14px;
           color: #000;
           min-width: 130px;

@@ -195,6 +195,47 @@ describe('state manager', () => {
     const filledApp: Application = getAppInReview();
   });
 
+  it.only('should request revision for section', () => {
+    const app: Application = getAppInReview();
+    const state = new ApplicationStateManager(app);
+    const updated = state.updateApp({
+      'state': 'REVISIONS REQUESTED',
+      'revisionRequest': {
+          'applicant': {
+              'requested': true,
+              'details': 'Please provide more accurate address'
+          },
+          'representative': {
+              'requested': true,
+              'details': 'asdasd'
+          },
+          'projectInfo': {
+              'requested': false,
+              'details': ''
+          },
+          'collaborators': {
+              'requested': false,
+              'details': ''
+          },
+          'ethicsLetter': {
+              'requested': true,
+              'details': 'Ethics approval letter is not signed'
+          },
+          'signature': {
+              'requested': true,
+              'details': 'signature need to be signed'
+          },
+          'general': {
+              'requested': true,
+              'details': 'Some generic comment'
+          }
+      }
+    }, true);
+
+    const userApp = state.prepareApplicantionForUser(false);
+    expect(userApp.sections.representative.meta.status).to.eq('REVISIONS REQUESTED');
+
+  });
 });
 
 export function getReadyToSignApp() {

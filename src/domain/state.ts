@@ -911,7 +911,7 @@ function getDataAccessAgreement() {
 }
 
 function calculateSectionStatus(app: Application, section: keyof Application['sections'], isReviewer: boolean): SectionStatus {
-  const reviewableSections: Array<keyof RevisionRequestUpdate> = ['applicant', 'collaborators', 'ethicsLetter', 'projectInfo', 'signature'];
+  const reviewableSections: Array<keyof RevisionRequestUpdate> = ['applicant', 'collaborators', 'ethicsLetter', 'projectInfo', 'signature', 'representative'];
   const reviewableSection = reviewableSections.includes(section as keyof RevisionRequestUpdate);
 
   if (shouldBeLockedByAtThisState(app.state, section, isReviewer)
