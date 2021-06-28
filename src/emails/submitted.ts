@@ -5,7 +5,7 @@ import { appInfoBox, compose, textParagraphSection } from './common';
 
 export default function(app: Application) {
   const info = app.sections.applicant.info;
-  const email = compose({
+  const emailMjml = compose({
     message: messageBody(app),
     receiver: {
       first: info.firstName,
@@ -15,12 +15,12 @@ export default function(app: Application) {
     }
   }, 'We have Received your Application');
 
-  const htmlOutput = mjml2html(email);
+  const htmlOutput = mjml2html(emailMjml);
   if (htmlOutput.errors.length > 0) {
     console.error(`template errors ${JSON.stringify(htmlOutput.errors)}`);
     throw new Error('failed to generate email');
   }
-  return htmlOutput.html;
+  return { html: htmlOutput.html, emailMjml };
 }
 
 function messageBody(app: Application) {

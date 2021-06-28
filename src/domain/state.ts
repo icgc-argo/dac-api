@@ -39,7 +39,7 @@ import {
   validateProjectInfo,
   validateRepresentativeSection
 } from './validations';
-import { BadRequest, NotFound } from '../utils/errors';
+import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 
 const allSections: Array<keyof Application['sections']> =
   ['ITAgreements', 'appendices', 'dataAccessAgreement', 'terms', 'applicant', 'collaborators', 'ethicsLetter', 'representative', 'projectInfo', 'signature'];
@@ -152,11 +152,11 @@ export class ApplicationStateManager {
 
   updateCollaborator(collaborator: Collaborator) {
     const current = this.currentApplication;
-
     // collaborators updating is only allowed in these three states
     if (canUpdateCollaborators(current)) {
       throw new Error('cannot update collaborators, only create or delete');
     }
+
     const { valid, errors } = validateCollaborator(collaborator, current);
     if (!valid) {
       throw new BadRequest({
@@ -173,6 +173,19 @@ export class ApplicationStateManager {
     }
     current.sections.collaborators.list =
       current.sections.collaborators.list.filter(c => c.id !== collaborator.id);
+
+    // before adding the collaborator check if any other collaborator has the same google email / institution email
+    if (current.sections.collaborators.list.some(c => c.info.googleEmail == collaborator.info.googleEmail
+      || c.info.institutionEmail === collaborator.info.institutionEmail)) {
+        throw new ConflictError('COLLABORATOR_EXISTS', 'This collaborator has already been added to your applictaion.');
+    }
+
+    // check if the collaborator is same as applicant
+    if (current.sections.applicant.info.googleEmail == collaborator.info.googleEmail
+      || current.sections.applicant.info.institutionEmail === collaborator.info.institutionEmail) {
+        throw new ConflictError('COLLABORATOR_SAME_AS_APPLICANT', 'The applicant does not need to be added as a collaborator.');
+    }
+
     current.sections.collaborators.list.push(updated);
     current.sections.collaborators.meta.status =
       current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
@@ -204,6 +217,19 @@ export class ApplicationStateManager {
     if (!!collaborator.info.firstName.trim() && !!collaborator.info.lastName.trim()) {
       collaborator.info.displayName = collaborator.info.firstName.trim() + ' ' + collaborator.info.lastName.trim();
     }
+
+    // check unique collaborator
+    if (current.sections.collaborators.list.some(c => c.info.googleEmail == collaborator.info.googleEmail
+      || c.info.institutionEmail === collaborator.info.institutionEmail)) {
+        throw new ConflictError('COLLABORATOR_EXISTS', 'This collaborator has already been added to your application');
+    }
+
+    // check if the collaborator is same as applicant
+    if (current.sections.applicant.info.googleEmail == collaborator.info.googleEmail
+      || current.sections.applicant.info.institutionEmail === collaborator.info.institutionEmail) {
+        throw new ConflictError('COLLABORATOR_SAME_AS_APPLICANT', 'The applicant does not need to be added as a collaborator.');
+    }
+
     current.sections.collaborators.list.push(collaborator);
     current.sections.collaborators.meta.status =
       current.sections.collaborators
@@ -361,7 +387,7 @@ export function newApplication(identity: Identity): Partial<Application> {
         background: '',
         methodology: '',
         aims: '',
-        website: '',
+        institutionWebsite: '',
         title: '',
         publicationsURLs: [],
         meta: { status: 'PRISTINE', errorsList: [] }
