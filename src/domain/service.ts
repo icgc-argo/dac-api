@@ -5,13 +5,13 @@ import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import _ from 'lodash';
-import { ApplicationStateManager, getSearchFieldValues, newApplication } from './state';
+import { ApplicationStateManager, getSearchFieldValues, newApplication, wasInRevisionRequestState } from './state';
 import { Application, ApplicationSummary, Collaborator, SearchResult, State, UploadDocumentType } from './interface';
 import { c } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
-import renderReviewEmail from '../emails/review';
+import renderReviewEmail from '../emails/review-new';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import renderSubmittedEmail from '../emails/submitted';
@@ -159,7 +159,7 @@ export async function updatePartial(appPart: Partial<Application>,
   const stateChanged = appDocObj.state != updatedApp.state;
   const config = await getAppConfig();
   if (stateChanged) {
-    await onStateChange(updatedApp, emailClient, config);
+    await onStateChange(updatedApp, appDocObj, emailClient, config);
   }
   const deleted = checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
@@ -177,31 +177,16 @@ export async function updatePartial(appPart: Partial<Application>,
 }
 
 async function onStateChange(updatedApp: Application,
+                            oldApplication: Application,
                             emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
                             config: AppConfig) {
 
   // if application state changed to REVIEW (ie submitted) send an email to Admin
   if (updatedApp.state == 'REVIEW') {
-    // send review email
-    const html = renderReviewEmail(updatedApp);
-    await sendEmail(emailClient,
-      config.email.fromAddress,
-      config.email.fromName,
-      new Set([config.email.dacoAddress]),
-      `[${updatedApp.appId}] Application Submitted`,
-      html);
+    await sendReviewEmail(oldApplication, updatedApp, config, emailClient);
 
     // send applicant email
-    const submittedEmail = renderSubmittedEmail(updatedApp);
-    await sendEmail(emailClient,
-      config.email.fromAddress,
-      config.email.fromName,
-      new Set([
-        updatedApp.submitterEmail,
-        updatedApp.sections.applicant.info.googleEmail,
-        updatedApp.sections.applicant.info.institutionEmail
-      ]),
-      `[${updatedApp.appId}] We Received your Application`, submittedEmail.html);
+    await sendSubmissionConfirmation(updatedApp, emailClient, config);
   }
 }
 
@@ -375,4 +360,46 @@ function mapField(field: string) {
       return field;
   }
 
+}
+
+
+async function sendSubmissionConfirmation(updatedApp: Application,
+                                          emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+                                          config: AppConfig) {
+  const submittedEmail = renderSubmittedEmail(updatedApp);
+  await sendEmail(emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    new Set([
+      updatedApp.submitterEmail,
+      updatedApp.sections.applicant.info.googleEmail,
+      updatedApp.sections.applicant.info.institutionEmail
+    ]),
+    `[${updatedApp.appId}] We Received your Application`, submittedEmail.html);
+}
+
+async function sendReviewEmail(oldApplication: Application,
+                               updatedApp: Application,
+                               config: AppConfig,
+                               emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
+
+  if (wasInRevisionRequestState(oldApplication)) {
+    console.log('implement revised app submitted email');
+  } else {
+    // send new app for review email
+    const reviewEmail = renderReviewEmail(updatedApp, {
+      firstName: config.email.reviewerFirstName,
+      lastName: config.email.reviewerLastName,
+    }, {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    });
+
+    await sendEmail(emailClient,
+      config.email.fromAddress,
+      config.email.fromName,
+      new Set([config.email.dacoAddress]),
+      `[${updatedApp.appId}] A New Application has been Submitted`,
+      reviewEmail.html);
+  }
 }

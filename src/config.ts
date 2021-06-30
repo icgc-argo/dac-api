@@ -36,10 +36,16 @@ export interface AppConfig {
     fromAddress: string;
     fromName: string;
     port: number;
+    reviewerFirstName: string;
+    reviewerLastName: string;
     auth: {
       user: string | undefined;
       password: string | undefined;
     }
+  };
+  ui: {
+    baseUrl: string;
+    sectionPath: string;
   };
   auth: {
     enabled: boolean;
@@ -119,6 +125,10 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       jwtKey: process.env.JWT_KEY || '',
       REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE'
     },
+    ui: {
+      baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org',
+      sectionPath: process.env.DACO_UI_APPLICATION_SECTION_PATH || '/applications/{id}/section={section}',
+    },
     storage: {
       endpoint: process.env.OBJECT_STORAGE_ENDPOINT || '',
       region: process.env.OBJECT_STORAGE_REGION || 'nova',
@@ -130,13 +140,15 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
     email: {
       host: c(process.env.EMAIL_HOST),
       port: Number(c(process.env.EMAIL_PORT)),
-      dacoAddress: c(process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org'),
-      fromName: c(process.env.EMAIL_FROM_NAME || 'DACO'),
-      fromAddress: c(process.env.EMAIL_FROM_ADDRESS || 'noreply-daco@icgc-argo.org'),
+      dacoAddress: process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org',
+      fromName: process.env.EMAIL_FROM_NAME || 'DACO',
+      fromAddress: process.env.EMAIL_FROM_ADDRESS || 'noreply-daco@icgc-argo.org',
       auth: {
         user: secrets.EMAIL_USER || process.env.EMAIL_USER,
         password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
-      }
+      },
+      reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'Ana',
+      reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'Bonilha',
     }
   };
   return config;
