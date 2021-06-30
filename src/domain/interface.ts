@@ -138,6 +138,7 @@ export interface Application {
       institutionWebsite: string;
       background: string;
       aims: string;
+      summary: string;
       methodology: string;
       publicationsURLs: string[]
     },
@@ -202,6 +203,7 @@ export interface UpdateApplication {
       background?: string;
       aims?: string;
       methodology?: string;
+      summary?: string;
       publicationsURLs?: string[]
     },
     ethicsLetter?: {

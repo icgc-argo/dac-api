@@ -254,6 +254,7 @@ export function getReadyToSignApp() {
     aims: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     background: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     methodology : 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
+    summary: 'aaa bb cc',
     title: 'title title title',
     institutionWebsite: 'http://www.institutionWebsite.web',
     publicationsURLs: ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs']

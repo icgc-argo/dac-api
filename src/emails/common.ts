@@ -185,7 +185,7 @@ export function appInfoBox(app: Application) {
 
                         <tr>
                           <td class="app-tbl-lable">
-                            Instituion:
+                            Institution:
                           </td>
                           <td class="app-tbl-val">
                             ${applicantInfo.primaryAffiliation}
