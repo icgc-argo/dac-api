@@ -127,7 +127,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
     },
     ui: {
       baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org',
-      sectionPath: process.env.DACO_UI_APPLICATION_SECTION_PATH || '/applications/{id}/section={section}',
+      sectionPath: process.env.DACO_UI_APPLICATION_SECTION_PATH || '/applications/{id}?section={section}',
     },
     storage: {
       endpoint: process.env.OBJECT_STORAGE_ENDPOINT || '',
