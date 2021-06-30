@@ -138,6 +138,7 @@ export interface Application {
       institutionWebsite: string;
       background: string;
       aims: string;
+      summary: string;
       methodology: string;
       publicationsURLs: string[]
     },

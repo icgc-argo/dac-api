@@ -389,6 +389,7 @@ export function newApplication(identity: Identity): Partial<Application> {
         aims: '',
         institutionWebsite: '',
         title: '',
+        summary: '',
         publicationsURLs: [],
         meta: { status: 'PRISTINE', errorsList: [] }
       },

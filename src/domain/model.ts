@@ -111,6 +111,7 @@ const ApplicationSchema = new mongoose.Schema({
         background: { type: String, required: false },
         aims: { type: String, required: false },
         methodology: { type: String, required: false },
+        summary: { type: String, required: false },
         publicationsURLs: { type: [String], required: false },
       },
       ethicsLetter: {
