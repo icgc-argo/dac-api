@@ -203,6 +203,7 @@ export interface UpdateApplication {
       background?: string;
       aims?: string;
       methodology?: string;
+      summary?: string;
       publicationsURLs?: string[]
     },
     ethicsLetter?: {
