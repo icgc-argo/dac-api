@@ -195,7 +195,7 @@ describe('state manager', () => {
     const filledApp: Application = getAppInReview();
   });
 
-  it.only('should request revision for section', () => {
+  it('should request revision for section', () => {
     const app: Application = getAppInReview();
     const state = new ApplicationStateManager(app);
     const updated = state.updateApp({

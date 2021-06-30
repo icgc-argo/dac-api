@@ -1,19 +1,29 @@
 import moment from 'moment';
 import { Application } from '../domain/interface';
 
+export type UILinksInfo = {
+  baseUrl: string,
+  pathTemplate: string,
+};
+
+export type ComposeArgs = {
+  receiver: Receiver;
+  message: string ;
+  includeClousre?: boolean;
+};
+
 const defaultTextStyle = {
   color: '#000000',
   'font-size': '14px',
   'padding': '0'
 };
-export function compose(cardData: {
-  receiver: Receiver,
-  message: string,
-}, title: string) {
+export function compose(cardData: ComposeArgs, title: string) {
   return `
     <mjml>
       ${header(title)}
-      ${body(title, cardData.receiver, cardData.message)}
+      ${body(title, cardData.receiver,
+        cardData.message,
+        cardData.includeClousre === undefined ? true : cardData.includeClousre)}
     </mjml>
   `;
 }
@@ -65,11 +75,11 @@ function header(title: string) {
   `;
 }
 
-function body(subject: string, receiver: Receiver, content: string ) {
+function body(subject: string, receiver: Receiver, content: string, withClosure: boolean ) {
   return `
     <mj-body background-color="#ffffff" width="600px" css-class="body">
       ${banner()}
-      ${card(subject, receiver, content)}
+      ${card(subject, receiver, content, withClosure)}
       ${footer()}
     </mj-body>
   `;
@@ -88,10 +98,10 @@ function banner() {
   `;
 }
 
-function card(subject: string, receiver: Receiver, message: string) {
+function card(subject: string, receiver: Receiver, message: string, withClosure: boolean) {
   return `
     ${cardHeader(subject)}
-    ${cardBody(receiver, message)}
+    ${cardBody(receiver, message, withClosure)}
   `;
 }
 
@@ -107,12 +117,12 @@ function cardHeader(title: string) {
   `;
 }
 
-function cardBody(receiver: Receiver, message: string) {
+function cardBody(receiver: Receiver, message: string, withClosure: boolean) {
   return `
     <mj-wrapper padding="30px 32px 52px 32px" css-class="body-section">
       ${greeting(receiver)}
       ${message}
-      ${closure()}
+      ${ withClosure ? closure() : ''}
     </mj-wrapper>
   `;
 }
@@ -286,6 +296,7 @@ export function actionGetStarted(text: string, buttonText: string, buttonLink: s
                 font-style="normal"
                 href="${buttonLink}"
                 border-radius="0px"
+                width="220px"
                 inner-padding="16px 24px"
                 padding="0px 0px 0px 0px">
         ${buttonText}

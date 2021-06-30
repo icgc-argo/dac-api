@@ -1,5 +1,6 @@
 import mjml2html from 'mjml';
 import renderSubmitted from '../emails/submitted';
+import renderNewReview from '../emails/review-new';
 import handlerBars from 'handlebars';
 
 import nodemail from 'nodemailer';
@@ -8,20 +9,20 @@ describe('emails', () => {
   // manual test not to be automated
   it.skip('test render with handle bars', async () => {
     const emailTemplte = `
-    <mjml>
-    <mj-head>
-      <mj-font name="Raleway" href="https://fonts.googleapis.com/css?family=Raleway" />
-    </mj-head>
-    <mj-body>
-      <mj-section>
-        <mj-column>
-          <mj-text font-family="Raleway, Arial">
-            Hello World!
-          </mj-text>
-        </mj-column>
-      </mj-section>
-    </mj-body>
-  </mjml>
+      <mjml>
+        <mj-head>
+          <mj-font name="Raleway" href="https://fonts.googleapis.com/css?family=Raleway" />
+        </mj-head>
+        <mj-body>
+          <mj-section>
+            <mj-column>
+              <mj-text font-family="Raleway, Arial">
+                Hello World!
+              </mj-text>
+            </mj-column>
+          </mj-section>
+        </mj-body>
+      </mjml>
     `;
 
     const templateOutput = handlerBars.compile(emailTemplte)({
@@ -56,9 +57,18 @@ describe('emails', () => {
   });
 
   describe('email rendering', () => {
-    it.only('should render submission email', () => {
+    it('should render submission email', () => {
       const app = getAppInReview();
       const email = renderSubmitted(app);
+      console.log(email.emailMjml);
+    });
+
+    it('should render reviewer email', () => {
+      const app = getAppInReview();
+      const email = renderNewReview(app, {lastName: 'Dough', firstName: 'Pizza' } , {
+        baseUrl: 'http://daco.icgc-argo.org',
+        pathTemplate: '/applications/{id}?section={section}'
+      });
       console.log(email.emailMjml);
     });
   });

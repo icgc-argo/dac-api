@@ -630,12 +630,12 @@ function updateAppStateForSignAndSubmit(current: Application, updatePart: Partia
   return current;
 }
 
-function wasInRevisionRequestState(current: Application) {
-  const revisionsRequested = Object.keys(current.revisionRequest)
+export function wasInRevisionRequestState(app: Application) {
+  const revisionsRequested = Object.keys(app.revisionRequest)
     .map(k => k as keyof Application['revisionRequest'])
     .filter(k => k !== 'general')
     .some(k => {
-      return current.revisionRequest[k].requested;
+      return app.revisionRequest[k].requested;
     });
 
   return revisionsRequested;
