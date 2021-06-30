@@ -63,7 +63,7 @@ describe('emails', () => {
       console.log(email.emailMjml);
     });
 
-    it.only('should render reviewer email', () => {
+    it('should render reviewer email', () => {
       const app = getAppInReview();
       const email = renderNewReview(app, {lastName: 'Dough', firstName: 'Pizza' } , {
         baseUrl: 'http://daco.icgc-argo.org',
