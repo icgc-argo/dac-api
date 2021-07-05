@@ -141,14 +141,14 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       host: c(process.env.EMAIL_HOST),
       port: Number(c(process.env.EMAIL_PORT)),
       dacoAddress: process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org',
-      fromName: process.env.EMAIL_FROM_NAME || 'DACO',
-      fromAddress: process.env.EMAIL_FROM_ADDRESS || 'noreply-daco@icgc-argo.org',
+      fromName: process.env.EMAIL_FROM_NAME || 'ICGC DACO',
+      fromAddress: process.env.EMAIL_FROM_ADDRESS || 'no-reply-daco@icgc-argo.org',
       auth: {
         user: secrets.EMAIL_USER || process.env.EMAIL_USER,
         password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
       },
-      reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'Ana',
-      reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'Bonilha',
+      reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
+      reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',
     }
   };
   return config;

@@ -1,4 +1,5 @@
 import moment from 'moment';
+import { c } from '../utils/misc';
 import { Application } from '../domain/interface';
 
 export type UILinksInfo = {
@@ -10,20 +11,27 @@ export type ComposeArgs = {
   receiver: Receiver;
   message: string ;
   includeClousre?: boolean;
+  closureData?: ClosureData;
 };
 
+export type ClosureData = { guideText: string; guideLink: string; };
 const defaultTextStyle = {
   color: '#000000',
   'font-size': '14px',
   'padding': '0'
 };
-export function compose(cardData: ComposeArgs, title: string) {
+
+export function compose(cardData: ComposeArgs, subject: string) {
   return `
     <mjml>
-      ${header(title)}
-      ${body(title, cardData.receiver,
-        cardData.message,
-        cardData.includeClousre === undefined ? true : cardData.includeClousre)}
+      ${header(subject)}
+      ${body({
+          subject,
+          receiver: cardData.receiver,
+          message: cardData.message,
+          withClosure: cardData.includeClousre === undefined ? true : cardData.includeClousre,
+          closureData: cardData.closureData
+        })}
     </mjml>
   `;
 }
@@ -75,11 +83,12 @@ function header(title: string) {
   `;
 }
 
-function body(subject: string, receiver: Receiver, content: string, withClosure: boolean ) {
+function body(props: {subject: string, receiver: Receiver, message: string, withClosure: boolean, closureData?: ClosureData}) {
+  const {subject, receiver, message, withClosure, closureData} = props;
   return `
     <mj-body background-color="#ffffff" width="600px" css-class="body">
       ${banner()}
-      ${card(subject, receiver, content, withClosure)}
+      ${card({subject, receiver, message, withClosure, closureData})}
       ${footer()}
     </mj-body>
   `;
@@ -98,10 +107,11 @@ function banner() {
   `;
 }
 
-function card(subject: string, receiver: Receiver, message: string, withClosure: boolean) {
+function card(props: {subject: string, receiver: Receiver, message: string, withClosure: boolean, closureData?: ClosureData}) {
+  const { subject, receiver, message, withClosure, closureData } = props;
   return `
     ${cardHeader(subject)}
-    ${cardBody(receiver, message, withClosure)}
+    ${cardBody({receiver, message, withClosure, closureData})}
   `;
 }
 
@@ -117,12 +127,13 @@ function cardHeader(title: string) {
   `;
 }
 
-function cardBody(receiver: Receiver, message: string, withClosure: boolean) {
+function cardBody(props: {receiver: Receiver, message: string, withClosure: boolean, closureData?: ClosureData}) {
+  const { receiver, message, withClosure, closureData} = props;
   return `
     <mj-wrapper padding="30px 32px 52px 32px" css-class="body-section">
       ${greeting(receiver)}
       ${message}
-      ${ withClosure ? closure() : ''}
+      ${ withClosure ? closure(c(closureData)) : ''}
     </mj-wrapper>
   `;
 }
@@ -209,12 +220,13 @@ export function appInfoBox(app: Application) {
   `;
 }
 
-function closure() {
+function closure(props: {guideLink: string, guideText: string}) {
+  const { guideLink, guideText } = props;
   return `
     <mj-section padding="0">
       <mj-column padding="0">
         ${text(
-          `If you have any questions, please consult the <a href="https://docs.icgc-argo.org/docs/data-access/data-access">Help Guides for Accessing Controlled Data</a> or <a href="https://platform.icgc-argo.org/contact">contact the ICGC DACO team</a>.`
+          `If you have any questions, please consult the <a href=${guideLink}>${guideText}</a> or <a href="https://platform.icgc-argo.org/contact">contact the ICGC DACO team</a>.`
           , { ...defaultTextStyle,  padding: '20px 0px 0px 0px' })
         }
         ${text(
