@@ -1,9 +1,10 @@
 import mjml2html from 'mjml';
+import { AppConfig } from '../config';
 import { Application } from '../domain/interface';
 import { appInfoBox, compose, textParagraphSection } from './common';
 
 
-export default function(app: Application) {
+export default function(app: Application, linksConfigs: AppConfig['email']['links']) {
   const info = app.sections.applicant.info;
   const emailMjml = compose({
     message: messageBody(app),
@@ -12,6 +13,10 @@ export default function(app: Application) {
       last: info.lastName,
       suffix: info.suffix,
       title: info.title,
+    },
+    closureData: {
+      guideLink: linksConfigs.reviewGuide,
+      guideText: 'Help Guides for ICGC DACO Review'
     }
   }, 'We have Received your Application');
 
