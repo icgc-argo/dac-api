@@ -43,7 +43,7 @@ export function validateRepresentativeSection(app: Application) {
     addressResult = validateAddress(app.sections.representative.address, errors);
   }
   const validations = [
-    validatePersonalInfo(app.sections.representative.info, errors),
+    validatePersonalInfo(app.sections.representative.info, errors, false),
     validatePrimaryAffiliationMatching(app.sections.representative.info.primaryAffiliation, app.sections.applicant.info.primaryAffiliation, errors)
   ];
 
@@ -134,6 +134,8 @@ export function validateProjectInfo(app: Application) {
     validateWordLength(app.sections.projectInfo.background, 200, 'background', errors),
     validateRequired(app.sections.projectInfo.aims, 'aims', errors),
     validateWordLength(app.sections.projectInfo.aims, 200, 'aims', errors),
+    validateRequired(app.sections.projectInfo.summary, 'summary', errors),
+    validateWordLength(app.sections.projectInfo.summary, 200, 'summary', errors),
     validateRequired(app.sections.projectInfo.methodology, 'methodology', errors),
     validateWordLength(app.sections.projectInfo.methodology, 200, 'methodology', errors),
     validatePublications(app.sections.projectInfo.publicationsURLs, errors),
@@ -229,11 +231,11 @@ function countWords(str: string) {
   return str.split(' ').length;
 }
 
-function validatePersonalInfo(info: PersonalInfo, errors: SectionError[]) {
+function validatePersonalInfo(info: PersonalInfo, errors: SectionError[], validateGoogleEmailRequired: boolean = true) {
   const validations = [
     validateRequired(info.firstName, 'firstName', errors),
     validateRequired(info.lastName, 'lastName', errors),
-    validateRequired(info.googleEmail, 'googleEmail', errors),
+    validateGoogleEmailRequired ? validateRequired(info.googleEmail, 'googleEmail', errors) : true,
     validateEmail(info.googleEmail, 'googleEmail', errors),
     validateRequired(info.institutionEmail, 'institutionEmail', errors),
     validateEmail(info.institutionEmail, 'institutionEmail', errors),
