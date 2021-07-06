@@ -677,6 +677,8 @@ components:
                   $ref: '#/components/schemas/Meta'
                 background:
                   type: string
+                summary:
+                  type: string
                 methodology: 
                   type: string
                 aims:

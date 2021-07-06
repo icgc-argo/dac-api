@@ -286,7 +286,8 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicantionForUser(isAdminOrReviewerResult);
+  const viewAbleApplication = new ApplicationStateManager(copy)
+    .prepareApplicantionForUser(isAdminOrReviewerResult);
   return viewAbleApplication;
 }
 
@@ -359,7 +360,6 @@ function mapField(field: string) {
     default:
       return field;
   }
-
 }
 
 

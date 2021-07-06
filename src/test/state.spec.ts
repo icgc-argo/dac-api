@@ -245,7 +245,7 @@ export function getReadyToSignApp() {
   c(updatePart.applicant).info = getRandomInfo();
   c(updatePart.applicant).address = getAddress();
   c(updatePart.representative).address = getAddress();
-  c(updatePart.representative).info = getRandomInfo();
+  c(updatePart.representative).info = _.omit(getRandomInfo(), 'googleEmail');
   c(updatePart.ITAgreements).agreements.forEach(ag => ag.accepted = true);
   c(updatePart.dataAccessAgreement).agreements.forEach(ag => ag.accepted = true);
   c(updatePart.appendices).agreements.forEach(ag => ag.accepted = true);
