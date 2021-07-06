@@ -431,7 +431,7 @@ components:
       properties:
         positionTitle:
           type: string
-        institutionWebsite:
+        website:
           type: string
         primaryAffiliation:
           type: string
@@ -685,7 +685,7 @@ components:
                   type: string
                 title:
                   type: string
-                institutionWebsite:
+                website:
                   type: string
                 publicationsURLs:
                   type: array

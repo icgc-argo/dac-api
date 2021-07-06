@@ -27,7 +27,7 @@ export interface PersonalInfo {
   primaryAffiliation: string;
   institutionEmail: string;
   googleEmail: string;
-  institutionWebsite: string;
+  website: string;
   positionTitle: string;
 }
 
@@ -135,7 +135,7 @@ export interface Application {
     projectInfo: {
       meta: Meta,
       title: string;
-      institutionWebsite: string;
+      website: string;
       background: string;
       aims: string;
       summary: string;
@@ -199,7 +199,7 @@ export interface UpdateApplication {
     },
     projectInfo?: {
       title?: string;
-      institutionWebsite?: string;
+      website?: string;
       background?: string;
       aims?: string;
       methodology?: string;

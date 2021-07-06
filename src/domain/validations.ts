@@ -129,7 +129,7 @@ export function validateProjectInfo(app: Application) {
   const errors: SectionError[] = [];
   const validations = [
     validateRequired(app.sections.projectInfo.title, 'title', errors),
-    validateUrl(app.sections.projectInfo.institutionWebsite, 'institutionWebsite', errors),
+    validateUrl(app.sections.projectInfo.website, 'website', errors),
     validateRequired(app.sections.projectInfo.background, 'background', errors),
     validateWordLength(app.sections.projectInfo.background, 200, 'background', errors),
     validateRequired(app.sections.projectInfo.aims, 'aims', errors),
@@ -160,7 +160,7 @@ function validatePrimaryAffiliationMatching(val: string, referenceVal: string, e
   return false;
 }
 
-function validateUrl(val: string, name: string, errors: SectionError[]) {
+function validateUrl(val: string | undefined, name: string, errors: SectionError[]) {
   if (!val) {
     return true;
   }
@@ -241,7 +241,7 @@ function validatePersonalInfo(info: PersonalInfo, errors: SectionError[], valida
     validateEmail(info.institutionEmail, 'institutionEmail', errors),
     validateRequired(info.primaryAffiliation, 'primaryAffiliation', errors),
     validateRequired(info.positionTitle, 'positionTitle', errors),
-    validateUrl(info.institutionWebsite, 'institutionWebsite', errors),
+    validateUrl(info.website, 'website', errors),
   ];
 
   return !validations.some(x => x == false);
