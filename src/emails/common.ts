@@ -15,6 +15,7 @@ export type ComposeArgs = {
 };
 
 export type ClosureData = { guideText: string; guideLink: string; };
+
 const defaultTextStyle = {
   color: '#000000',
   'font-size': '14px',
@@ -128,7 +129,7 @@ function cardHeader(title: string) {
 }
 
 function cardBody(props: {receiver: Receiver, message: string, withClosure: boolean, closureData?: ClosureData}) {
-  const { receiver, message, withClosure, closureData} = props;
+  const { receiver, message, withClosure, closureData } = props;
   return `
     <mj-wrapper padding="30px 32px 52px 32px" css-class="body-section">
       ${greeting(receiver)}

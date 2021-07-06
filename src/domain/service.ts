@@ -366,7 +366,8 @@ function mapField(field: string) {
 async function sendSubmissionConfirmation(updatedApp: Application,
                                           emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
                                           config: AppConfig) {
-  const submittedEmail = renderSubmittedEmail(updatedApp);
+
+  const submittedEmail = renderSubmittedEmail(updatedApp, config.email.links);
   await sendEmail(emailClient,
     config.email.fromAddress,
     config.email.fromName,

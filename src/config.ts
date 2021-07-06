@@ -41,6 +41,9 @@ export interface AppConfig {
     auth: {
       user: string | undefined;
       password: string | undefined;
+    },
+    links: {
+      reviewGuide: string;
     }
   };
   ui: {
@@ -146,6 +149,9 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       auth: {
         user: secrets.EMAIL_USER || process.env.EMAIL_USER,
         password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
+      },
+      links: {
+        reviewGuide: process.env.EMAIL_REVIEW_GUIDE_URL || 'https://daco.icgc-argo.org/guides/review',
       },
       reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',

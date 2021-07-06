@@ -5,7 +5,9 @@ describe('emails', () => {
   describe('email rendering', () => {
     it('should render submission email', () => {
       const app = getAppInReview();
-      const email = renderSubmitted(app);
+      const email = renderSubmitted(app, {
+        reviewGuide: 'https://test.example.com'
+      });
       console.log(email.emailMjml);
     });
 
@@ -17,5 +19,6 @@ describe('emails', () => {
       });
       console.log(email.emailMjml);
     });
+
   });
 });
