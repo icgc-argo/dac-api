@@ -932,9 +932,13 @@ function calculateSectionStatus(app: Application, section: keyof Application['se
     && (app.state == 'REVISIONS REQUESTED' || wasInRevisionRequestState(app))
     && !isReviewer) {
     // mark sections that don't have revision requests as locked
-    // for example if applicant section is ok we lock it.
+    // for example if applicant section is OK we lock it.
+    // an edge case is if the applicant changes primary affiliation of applicant and the
+    // representative/collaborators now become invalid although they were complete
+    // in that case we unlock them and mark as incomplete (decision on slack)
     if (section !== 'signature'
-      && app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true) {
+      && app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true
+      && app.sections[section].meta.status == 'COMPLETE') {
       return 'LOCKED';
     }
 
