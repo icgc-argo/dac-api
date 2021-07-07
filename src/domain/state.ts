@@ -98,6 +98,9 @@ export class ApplicationStateManager {
       this.currentApplication.sections[s].meta.status =
         calculateSectionStatus( this.currentApplication, s, isReviewer);
     });
+    if (this.currentApplication.sections.representative.addressSameAsApplicant) {
+      this.currentApplication.sections.representative.address = undefined;
+    }
     return this.currentApplication;
   }
 
@@ -768,6 +771,13 @@ function updateTerms(updatePart: Partial<UpdateApplication>, current: Applicatio
 
 function updateRepresentative(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.representative) {
+    // we don't want to update address from representative if we are using same applicant address
+    // this is an edge case if there is an API misuse
+    if (updatePart.sections.representative.addressSameAsApplicant !== false
+      || current.sections.representative.addressSameAsApplicant === true) {
+      delete updatePart.sections.representative.address;
+    }
+
     current.sections.representative = mergeKnown(current.sections.representative, updatePart.sections.representative);
     const info = current.sections.representative.info;
     if (!!info.firstName.trim() && !!info.lastName.trim()) {
@@ -922,9 +932,13 @@ function calculateSectionStatus(app: Application, section: keyof Application['se
     && (app.state == 'REVISIONS REQUESTED' || wasInRevisionRequestState(app))
     && !isReviewer) {
     // mark sections that don't have revision requests as locked
-    // for example if applicant section is ok we lock it.
+    // for example if applicant section is OK we lock it.
+    // an edge case is if the applicant changes primary affiliation of applicant and the
+    // representative/collaborators now become invalid although they were complete
+    // in that case we unlock them and mark as incomplete (decision on slack)
     if (section !== 'signature'
-      && app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true) {
+      && app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true
+      && app.sections[section].meta.status == 'COMPLETE') {
       return 'LOCKED';
     }
 

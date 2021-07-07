@@ -1,6 +1,6 @@
 import _ from 'lodash';
 
-export function c<T>(val: T | undefined): T {
+export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
     throw new Error('value is not defined');
   }
