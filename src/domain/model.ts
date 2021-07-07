@@ -21,7 +21,7 @@ const PersonalInfo = new mongoose.Schema({
   primaryAffiliation: { type: String, required: false },
   institutionEmail: { type: String, required: false },
   googleEmail: { type: String, required: false },
-  institutionWebsite: { type: String, required: false },
+  website: { type: String, required: false },
   positionTitle: { type: String, required: false }
 }, { _id: false });
 
@@ -107,7 +107,7 @@ const ApplicationSchema = new mongoose.Schema({
       projectInfo: {
         meta: Meta,
         title: { type: String, required: false },
-        institutionWebsite: { type: String, required: false },
+        website: { type: String, required: false },
         background: { type: String, required: false },
         aims: { type: String, required: false },
         methodology: { type: String, required: false },

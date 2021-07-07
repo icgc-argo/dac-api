@@ -80,7 +80,7 @@ describe('state manager', () => {
           suffix: '',
           title: '',
           displayName: '',
-          institutionWebsite: ''
+          website: ''
         },
         type: 'personnel'
       };
@@ -110,7 +110,7 @@ describe('state manager', () => {
           suffix: '',
           title: '',
           displayName: '',
-          institutionWebsite: ''
+          website: ''
         },
         type: 'personnel'
       };
@@ -136,7 +136,7 @@ describe('state manager', () => {
           suffix: '',
           title: '',
           displayName: '',
-          institutionWebsite: ''
+          website: '',
         },
         type: 'personnel'
       };
@@ -172,7 +172,7 @@ describe('state manager', () => {
         suffix: '',
         title: '',
         displayName: '',
-        institutionWebsite: ''
+        website: '',
       },
       type: 'personnel'
     };
@@ -256,7 +256,7 @@ export function getReadyToSignApp() {
     methodology : 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     summary: 'aaa bb cc',
     title: 'title title title',
-    institutionWebsite: 'http://www.institutionWebsite.web',
+    website: 'http://www.institutionWebsite.web',
     publicationsURLs: ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs']
   };
   const state = new ApplicationStateManager(app);
