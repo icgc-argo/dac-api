@@ -1,8 +1,9 @@
 import { BadRequest } from '../utils/errors';
-import { Address, AgreementItem, Application, Collaborator, PersonalInfo, SectionError } from './interface';
+import { Address, AgreementItem, Application, Collaborator, PersonalInfo, SectionError, SectionStatus } from './interface';
 import validator from 'validate.js';
 import _ from 'lodash';
 import { countriesList } from '../utils/constants';
+import { c } from '../utils/misc';
 
 export function validateId(id: string) {
   if (!id) {
@@ -40,14 +41,25 @@ export function validateRepresentativeSection(app: Application) {
   const errors: SectionError[] = [];
   let addressResult = true;
   if (!app.sections.representative.addressSameAsApplicant) {
-    addressResult = validateAddress(app.sections.representative.address, errors);
+    addressResult = validateAddress(c(app.sections.representative.address), errors);
   }
   const validations = [
     validatePersonalInfo(app.sections.representative.info, errors, false),
     validatePrimaryAffiliationMatching(app.sections.representative.info.primaryAffiliation, app.sections.applicant.info.primaryAffiliation, errors)
   ];
 
-  app.sections.representative.meta.status = addressResult && !validations.some(x => x == false) ? 'COMPLETE' : 'INCOMPLETE';
+  const revRequested = app.revisionRequest.representative.requested;
+  let targetState: SectionStatus = 'COMPLETE';
+  // if the section has revisions requested flag, then the state could be REVISIONS REQUESTED or COMPLETE
+  // if the state is REVISION REQUESTED we want the application to stay on that state and not go to complete
+  // this scenario happens because changes in the applicant section triggers validation because of primaryAffiliation dependency
+  const shouldKeepCurrentStatus = app.sections.representative.meta.status !== 'INCOMPLETE';
+
+  if (revRequested && shouldKeepCurrentStatus) {
+    targetState = app.sections.representative.meta.status;
+  }
+  app.sections.representative.meta.status =
+    addressResult && !validations.some(x => x == false) ? targetState : 'INCOMPLETE';
   app.sections.representative.meta.errorsList = errors;
 }
 

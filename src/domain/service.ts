@@ -6,7 +6,7 @@ import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import _ from 'lodash';
 import { ApplicationStateManager, getSearchFieldValues, newApplication, wasInRevisionRequestState } from './state';
-import { Application, ApplicationSummary, Collaborator, SearchResult, State, UploadDocumentType } from './interface';
+import { Application, ApplicationSummary, Collaborator, SearchResult, State, UpdateApplication, UploadDocumentType } from './interface';
 import { c } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
@@ -145,13 +145,14 @@ export async function create(identity: Identity) {
   return copy;
 }
 
-export async function updatePartial(appPart: Partial<Application>,
+export async function updatePartial(appId: string,
+                                    appPart: Partial<UpdateApplication>,
                                     identity: Identity,
                                     storageClient: Storage,
                                     emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
 
   const isReviewer = await hasReviewScope(identity);
-  const appDoc = await findApplication(c(appPart.appId), identity);
+  const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
   const updatedApp = stateManager.updateApp(appPart, isReviewer);

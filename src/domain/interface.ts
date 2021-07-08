@@ -126,7 +126,7 @@ export interface Application {
       meta: Meta,
       info: PersonalInfo,
       addressSameAsApplicant: boolean;
-      address: Address
+      address: Address | undefined
     },
     collaborators: {
       meta: Meta,

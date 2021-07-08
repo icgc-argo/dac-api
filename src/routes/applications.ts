@@ -6,7 +6,7 @@ import { create, createCollaborator, deleteApp, deleteCollaborator,
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import { Identity } from '@overture-stack/ego-token-middleware';
-import { Application } from '../domain/interface';
+import { Application, UpdateApplication } from '../domain/interface';
 import { AppConfig } from '../config';
 import _ from 'lodash';
 import { Storage } from '../storage';
@@ -200,10 +200,9 @@ const createApplicationsRouter = (config: AppConfig,
     wrapAsync(async (req: Request, res: Response) => {
       const id = req.params.id;
       const validatedId = validateId(id);
-      const app = req.body as Application;
-      app.appId = id;
+      const app = req.body as Partial<UpdateApplication>;
       logger.info(`updating application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`);
-      const updated = await updatePartial(app, (req as IRequest).identity, storageClient, emailClient);
+      const updated = await updatePartial(id, app, (req as IRequest).identity, storageClient, emailClient);
       return res.status(200).send(updated);
     }),
   );
