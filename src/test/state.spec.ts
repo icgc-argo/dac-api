@@ -60,6 +60,42 @@ describe('state manager', () => {
     expect(result.sections.applicant.info).to.include(updatePart.sections?.applicant?.info);
   });
 
+  it('should update representative info', () => {
+    const app: Application = getReadyToSignApp();
+    expect(app.sections.representative.address?.country).to.eq('Canada');
+    const state = new ApplicationStateManager(app);
+    const updatePart: Partial<UpdateApplication> = {
+      sections: {
+        representative: {
+          address: {
+            country: 'Palestine'
+          }
+        }
+      }
+    };
+
+    state.updateApp(updatePart, false);
+    expect(state.currentApplication.sections.representative.address?.country).to.eq('Palestine');
+
+    const updatePart2: Partial<UpdateApplication> = {
+      sections: {
+        representative: {
+          addressSameAsApplicant: true
+        }
+      }
+    };
+
+    state.updateApp(updatePart2, false);
+    expect(state.currentApplication.sections.representative.address).to.include({
+      building: '',
+      cityAndProvince: '',
+      country: '',
+      postalCode: '',
+      streetAddress: ''
+    } as Address);
+  });
+
+
   describe('collaborators', () => {
     it('should add collaborator', () => {
       const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;

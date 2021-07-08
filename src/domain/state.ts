@@ -87,7 +87,7 @@ const stateToLockedSectionsMap: Record<State, Record<'REVIEWER' | 'APPLICANT', A
   }
 };
 export class ApplicationStateManager {
-  private readonly currentApplication: Application;
+  public readonly currentApplication: Application;
 
   constructor(application: Application) {
     this.currentApplication = _.cloneDeep(application);
@@ -154,7 +154,7 @@ export class ApplicationStateManager {
   updateCollaborator(collaborator: Collaborator) {
     const current = this.currentApplication;
     // collaborators updating is only allowed in these three states
-    if (canUpdateCollaborators(current)) {
+    if (!canUpdateCollaborators(current)) {
       throw new Error('cannot update collaborators, only create or delete');
     }
 
@@ -285,9 +285,9 @@ export class ApplicationStateManager {
 
 
 function canUpdateCollaborators(current: Application) {
-  return current.state != 'DRAFT'
-    && current.state != 'SIGN AND SUBMIT'
-    && (current.state != 'REVISIONS REQUESTED' && current.revisionRequest.collaborators.requested);
+  return current.state == 'DRAFT'
+    || current.state == 'SIGN AND SUBMIT'
+    || (current.state == 'REVISIONS REQUESTED' && current.revisionRequest.collaborators.requested);
 }
 
 function deleteEthicsLetterDocument(current: Application, objectId: string) {
@@ -494,7 +494,7 @@ function uploadEthicsLetter(current: Application, id: string, name: string) {
   } else if (current.state == 'REVISIONS REQUESTED') {
     return updateAppStateForRetrunedApplication(current, updatePart, true);
   } else if (current.state == 'APPROVED') {
-    return updateAppStateForApprovedApplication(current, updatePart, false);
+    return updateAppStateForApprovedApplication(current, updatePart, false, true);
   } else {
     throw new Error('cannot update ethics letter at this state');
   }
@@ -649,11 +649,16 @@ function isReadyForReview(application: Application) {
   return application.sections.signature.meta.status === 'COMPLETE';
 }
 
-// TODO handle possible changes after approval (close)
 function updateAppStateForApprovedApplication(currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
-  isReviewer: boolean) {
-  return currentApplication;
+  isReviewer: boolean,
+  updateDocs?: boolean) {
+
+  if (currentApplication.sections.ethicsLetter.declaredAsRequired
+      && updateDocs) {
+    delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
+    updateEthics(updatePart, currentApplication, updateDocs);
+  }
 }
 
 function updateAppStateForRetrunedApplication(current: Application,
@@ -775,9 +780,16 @@ function updateRepresentative(updatePart: Partial<UpdateApplication>, current: A
   if (updatePart.sections?.representative) {
     // we don't want to update address from representative if we are using same applicant address
     // this is an edge case if there is an API misuse
-    if (updatePart.sections.representative.addressSameAsApplicant !== false
-      || current.sections.representative.addressSameAsApplicant === true) {
-      delete updatePart.sections.representative.address;
+    if (updatePart.sections.representative.addressSameAsApplicant === true
+        || (current.sections.representative.addressSameAsApplicant === true
+          && updatePart.sections.representative.addressSameAsApplicant !== false)) {
+      updatePart.sections.representative.address = {
+        building: '',
+        cityAndProvince: '',
+        country: '',
+        postalCode: '',
+        streetAddress: ''
+      };
     }
 
     current.sections.representative = mergeKnown(current.sections.representative, updatePart.sections.representative);
@@ -926,11 +938,12 @@ function calculateSectionStatus(app: Application, section: keyof Application['se
   const reviewableSection = reviewableSections.includes(section as keyof RevisionRequestUpdate);
 
   if (shouldBeLockedByAtThisState(app.state, section, isReviewer)
-    || (!reviewableSection && wasInRevisionRequestState(app))) {
+      || (!reviewableSection && wasInRevisionRequestState(app))) {
       return 'LOCKED';
+  }
   // an extra logic is needed for sections that are usually editable but no revisions required
   // for them in a returned application Or they have revisions
-  } else if (reviewableSection
+  else if (reviewableSection
     && (app.state == 'REVISIONS REQUESTED' || wasInRevisionRequestState(app))
     && !isReviewer) {
     // mark sections that don't have revision requests as locked
@@ -951,7 +964,18 @@ function calculateSectionStatus(app: Application, section: keyof Application['se
       return 'REVISIONS MADE';
     }
   }
+  // for collaborators and ethics letters section, applicants may keep adding letters, and add/remove collaborators
+  // even after approval, we need to indicate that using a section state 'AMMENDABLE'
+  else if (app.state == 'APPROVED' && ['ethicsLetter', 'collaborators'].includes(section)) {
+    if (section == 'ethicsLetter') {
+      return app.sections.ethicsLetter.declaredAsRequired ? 'AMMENDABLE' :  'LOCKED';
+    }
+    if (section == 'collaborators') {
+      return 'AMMENDABLE';
+    }
+  }
 
+  // none of the above return the section status as is
   return app.sections[section].meta.status;
 }
 
