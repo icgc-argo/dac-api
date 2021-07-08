@@ -169,8 +169,8 @@ export class ApplicationStateManager {
       throw new NotFound('No collaborator with this id');
     }
     const updated = mergeKnown(existing, collaborator);
-    if (!!updated.firstName.trim() && !!updated.lastName.trim()) {
-      updated.info.displayName = updated.firstName.trim() + ' ' + updated.lastName.trim();
+    if (!!updated.info.firstName.trim() && !!updated.info.lastName.trim()) {
+      updated.info.displayName = updated.info.firstName.trim() + ' ' + updated.info.lastName.trim();
     }
     current.sections.collaborators.list =
       current.sections.collaborators.list.filter(c => c.id !== collaborator.id);
@@ -187,6 +187,8 @@ export class ApplicationStateManager {
         throw new ConflictError('COLLABORATOR_SAME_AS_APPLICANT', 'The applicant does not need to be added as a collaborator.');
     }
 
+    updated.meta.status = 'COMPLETE';
+    updated.meta.errorsList = [];
     current.sections.collaborators.list.push(updated);
     current.sections.collaborators.meta.status =
       current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
@@ -290,7 +292,7 @@ function canUpdateCollaborators(current: Application) {
 
 function deleteEthicsLetterDocument(current: Application, objectId: string) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
-    throw new Error('Must decalre ethics letter as requried first');
+    throw new Error('Must declare ethics letter as required first');
   }
 
   if (!current.sections.ethicsLetter.approvalLetterDocs.some(x => x.objectId == objectId)) {

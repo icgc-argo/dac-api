@@ -7,11 +7,11 @@ export function c<T>(val: T | undefined | null): T {
   return val;
 }
 
-export const mergeKnown = (a: any, b: any) => {
+export function mergeKnown<T>(a: T, b: any) {
   const t = _.cloneDeep(a);
   _mergeKnown(t, b);
   return t;
-};
+}
 
 const _mergeKnown = (a: any, b: any) => {
   // if we are on an object node, traverse it
