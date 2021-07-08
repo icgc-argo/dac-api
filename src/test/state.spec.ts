@@ -60,6 +60,42 @@ describe('state manager', () => {
     expect(result.sections.applicant.info).to.include(updatePart.sections?.applicant?.info);
   });
 
+  it('should update representative info', () => {
+    const app: Application = getReadyToSignApp();
+    expect(app.sections.representative.address?.country).to.eq('Canada');
+    const state = new ApplicationStateManager(app);
+    const updatePart: Partial<UpdateApplication> = {
+      sections: {
+        representative: {
+          address: {
+            country: 'Palestine'
+          }
+        }
+      }
+    };
+
+    state.updateApp(updatePart, false);
+    expect(state.currentApplication.sections.representative.address?.country).to.eq('Palestine');
+
+    const updatePart2: Partial<UpdateApplication> = {
+      sections: {
+        representative: {
+          addressSameAsApplicant: true
+        }
+      }
+    };
+
+    state.updateApp(updatePart2, false);
+    expect(state.currentApplication.sections.representative.address).to.include({
+      building: '',
+      cityAndProvince: '',
+      country: '',
+      postalCode: '',
+      streetAddress: ''
+    } as Address);
+  });
+
+
   describe('collaborators', () => {
     it('should add collaborator', () => {
       const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
@@ -153,9 +189,9 @@ describe('state manager', () => {
   });
 
   it('should check collaborator primary affiliation', () => {
-    const emptyApp: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
-    emptyApp.sections.applicant.info.primaryAffiliation = 'ACME';
-    const state = new ApplicationStateManager(emptyApp);
+    const app: Application = _.cloneDeep({ ...newApplication1, appId: 'DACO-1', appNumber: 1 }) as Application;
+    app.sections.applicant.info.primaryAffiliation = 'ACME';
+    const state = new ApplicationStateManager(app);
     const collab: Collaborator = {
       meta: {
         errorsList: [],
@@ -185,7 +221,35 @@ describe('state manager', () => {
         'message': 'Primary Affiliation must be the same as the Applicant'
       });
     }
+
+    // add with correct PA
+    collab.info.primaryAffiliation = 'ACME';
+    const app2 = state.addCollaborator(collab);
+    app2.sections.collaborators.list[0].id = 'collab-1';
+    expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
+
+    // change applicant PA and observe collaborator goes to incomplete
+    const state2 = new ApplicationStateManager(app2);
+    const app3 = state2.updateApp({
+      sections: {
+        applicant: {
+          info: {
+            primaryAffiliation: 'OICR'
+          }
+        }
+      }
+    }, false);
+    expect(app3.sections.collaborators.list[0].meta.status).to.eq('INCOMPLETE');
+
+    // fix the collaborator to match applicant PA again
+    collab.id = 'collab-1';
+    collab.info.primaryAffiliation = 'OICR';
+    const state3 = new ApplicationStateManager(app3);
+    const app4 = state3.updateCollaborator(collab);
+    expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
   });
+
+
 
   it('should change to sign & submit', () => {
     const filledApp: Application = getReadyToSignApp();
