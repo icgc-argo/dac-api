@@ -18,25 +18,6 @@ export function validateId(id: string) {
   }
 }
 
-export function validateCollaboratorsSection(app: Application) {
-  const validations = app.sections.collaborators.list.map(c => {
-    const { valid, errors } = validateCollaborator(c, app);
-    if (valid) {
-      c.meta.status = 'COMPLETE';
-      c.meta.errorsList = [];
-      return true;
-    }
-    c.meta.status = 'INCOMPLETE';
-    c.meta.errorsList = errors;
-    return false;
-  });
-
-  // if any collaborator is invalid mark the section as incomplete
-  if (validations.some(x => x == false)) {
-    app.sections.collaborators.meta.status = 'INCOMPLETE';
-  }
-}
-
 export function validateRepresentativeSection(app: Application) {
   const errors: SectionError[] = [];
   let addressResult = true;
@@ -48,19 +29,8 @@ export function validateRepresentativeSection(app: Application) {
     validatePrimaryAffiliationMatching(app.sections.representative.info.primaryAffiliation, app.sections.applicant.info.primaryAffiliation, errors)
   ];
 
-  const revRequested = app.revisionRequest.representative.requested;
-  let targetState: SectionStatus = 'COMPLETE';
-  // if the section has revisions requested flag, then the state could be REVISIONS REQUESTED or COMPLETE
-  // if the state is REVISION REQUESTED we want the application to stay on that state and not go to complete
-  // this scenario happens because changes in the applicant section triggers validation because of primaryAffiliation dependency
-  const shouldKeepCurrentStatus = app.sections.representative.meta.status !== 'INCOMPLETE';
-
-  if (revRequested && shouldKeepCurrentStatus) {
-    targetState = app.sections.representative.meta.status;
-  }
-  app.sections.representative.meta.status =
-    addressResult && !validations.some(x => x == false) ? targetState : 'INCOMPLETE';
-  app.sections.representative.meta.errorsList = errors;
+  const isValid = addressResult && !validations.some(x => x === false);
+  return {isValid, errors};
 }
 
 export function validateApplicantSection(app: Application) {
@@ -157,7 +127,7 @@ export function validateProjectInfo(app: Application) {
   app.sections.projectInfo.meta.errorsList = errors;
 }
 
-function validatePrimaryAffiliationMatching(val: string, referenceVal: string, errors: SectionError[]) {
+export function validatePrimaryAffiliationMatching(val: string, referenceVal: string, errors: SectionError[]) {
   if (!referenceVal) {
     return true;
   }

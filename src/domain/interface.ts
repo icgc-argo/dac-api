@@ -4,6 +4,7 @@ export type SectionStatus = 'PRISTINE' | 'COMPLETE' | 'INCOMPLETE' | 'REVISIONS 
 
 export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP';
 interface Meta {
+  updated?: boolean;
   status: SectionStatus;
   errorsList: SectionError[];
 }

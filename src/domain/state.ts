@@ -23,17 +23,17 @@ import {
   DAA_CORRECT_APPLICATION_CONTENT,
   DAA_AGREE_TO_TERMS, UpdateApplication,
   AgreementItem, Collaborator, State,
-  SectionStatus, UploadDocumentType, RevisionRequestUpdate
+  SectionStatus, UploadDocumentType, RevisionRequestUpdate, SectionError
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
   validateAppendices,
   validateApplicantSection,
   validateCollaborator,
-  validateCollaboratorsSection,
   validateDataAccessAgreement,
   validateEthicsLetterSection,
   validateITAgreement,
+  validatePrimaryAffiliationMatching,
   validateProjectInfo,
   validateRepresentativeSection
 } from './validations';
@@ -96,7 +96,7 @@ export class ApplicationStateManager {
   prepareApplicantionForUser(isReviewer: boolean) {
     allSections.forEach(s => {
       this.currentApplication.sections[s].meta.status =
-        calculateSectionStatus( this.currentApplication, s, isReviewer);
+        calculateViewableSectionStatus( this.currentApplication, s, isReviewer);
     });
     if (this.currentApplication.sections.representative.addressSameAsApplicant) {
       this.currentApplication.sections.representative.address = undefined;
@@ -190,9 +190,8 @@ export class ApplicationStateManager {
     updated.meta.status = 'COMPLETE';
     updated.meta.errorsList = [];
     current.sections.collaborators.list.push(updated);
-    current.sections.collaborators.meta.status =
-      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
-
+    current.sections.collaborators.meta.updated = true;
+    updateCollaboratorsSectionState(current);
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     }
@@ -211,6 +210,7 @@ export class ApplicationStateManager {
     if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
       throw new Error('Operation not allowed');
     }
+
     collaborator.id = new Date().getTime().toString();
     collaborator.meta = {
       errorsList: [],
@@ -234,11 +234,18 @@ export class ApplicationStateManager {
     }
 
     current.sections.collaborators.list.push(collaborator);
-    current.sections.collaborators.meta.status =
-      current.sections.collaborators
-        .list
-        .some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
-
+    // since this section can be invalidated by primary affiliation change in applicant
+    // we store this flag to indicate whether it was modified or not, so we can return it
+    // to a correct state when it becomes valid again
+    // example:
+    // application is in REVISIONS REQUESTED and Collaborators.status = 'REVISIONS REQUESTED'
+    // applicant modifes primary affiliation in Applicant section.
+    // collaborators section becomes 'INCOMPLETE'
+    // applicant reverts change of primary affiliation in applicant section
+    // collaborators section goes back to REVISIONS REQUESTED if updated = false, and goes to REVISIONS MADE if updated = true
+    // same logic applies for representative and any cross section dependency that may be implemented later.
+    current.sections.collaborators.meta.updated = true;
+    updateCollaboratorsSectionState(current);
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     }
@@ -500,11 +507,6 @@ function uploadEthicsLetter(current: Application, id: string, name: string) {
   }
 }
 
-function lockSections(application: Application, sectionNames: Array<keyof Application['sections']>) {
-  sectionNames.forEach(s => {
-    application.sections[s].meta.status = 'LOCKED';
-  });
-}
 function updateAppStateForReviewApplication(current: Application, updatePart: Partial<UpdateApplication>) {
 
   // if the admin has chosen a custom expiry date and asked to save
@@ -616,6 +618,7 @@ function updateAppStateForSignAndSubmit(current: Application, updatePart: Partia
       current.submittedAtUtc = new Date();
       // reset revision request section
       current.revisionRequest = emptyRevisionRequest();
+      resetSectionUpdatedFlag(current);
     }
     return current;
   }
@@ -632,6 +635,12 @@ function updateAppStateForSignAndSubmit(current: Application, updatePart: Partia
   }
 
   return current;
+}
+
+function resetSectionUpdatedFlag(current: Application) {
+  Object.keys(current.sections).forEach((s: string) => {
+    delete current.sections[s as keyof Application['sections']].meta.updated;
+  });
 }
 
 export function wasInRevisionRequestState(app: Application) {
@@ -797,8 +806,42 @@ function updateRepresentative(updatePart: Partial<UpdateApplication>, current: A
     if (!!info.firstName.trim() && !!info.lastName.trim()) {
       current.sections.representative.info.displayName = info.firstName.trim() + ' ' + info.lastName.trim();
     }
-    validateRepresentativeSection(current);
+    const currentState = current.sections.representative.meta.status;
+    current.sections.representative.meta.updated = true;
+    updateRepresentitaveSectionState(current);
   }
+}
+
+function updateRepresentitaveSectionState(app: Application) {
+  const {isValid, errors} = validateRepresentativeSection(app);
+  app.sections.representative.meta.errorsList = errors;
+  const revRequested = app.revisionRequest.representative.requested;
+  const wasUpdated = app.sections.representative.meta.updated;
+  const newState: SectionStatus = transitionSectionState(wasUpdated, isValid, revRequested);
+  app.sections.representative.meta.status = newState;
+}
+
+function transitionSectionState(wasUpdated: boolean | undefined, isValid: boolean, revRequested: boolean) {
+  let newState: SectionStatus;
+  if (wasUpdated) {
+    newState = isValid ? 'COMPLETE' : 'INCOMPLETE';
+  } else {
+    if (revRequested) {
+      newState = isValid ? 'REVISIONS REQUESTED' : 'INCOMPLETE';
+    } else {
+      newState = isValid ? 'COMPLETE' : 'INCOMPLETE';
+    }
+  }
+  return newState;
+}
+
+function updateCollaboratorsSectionState(app: Application) {
+  const isValid = !app.sections.collaborators.list
+    .some(c => c.meta.status != 'COMPLETE');
+  const newState: SectionStatus =
+    transitionSectionState(app.sections.collaborators.meta.updated,
+      isValid, app.revisionRequest.collaborators.requested);
+  app.sections.collaborators.meta.status = newState;
 }
 
 function updateApplicantSection(updatePart: Partial<UpdateApplication>, current: Application) {
@@ -813,14 +856,34 @@ function updateApplicantSection(updatePart: Partial<UpdateApplication>, current:
     // trigger a validation for representative section since there is a dependency on primary affiliation
     // only if there is data there already
     if (current.sections.representative.meta.status !== 'PRISTINE') {
-      validateRepresentativeSection(current);
+      updateRepresentitaveSectionState(current);
     }
 
     // trigger a validation for collaborators section since there is a dependency on primary affiliation
     // only if there is data there already
     if (current.sections.collaborators.meta.status !== 'PRISTINE') {
       validateCollaboratorsSection(current);
+      updateCollaboratorsSectionState(current);
     }
+  }
+}
+
+function validateCollaboratorsSection(app: Application) {
+  const validations = app.sections.collaborators.list.map(c => {
+    const { valid, errors } = validateCollaborator(c, app);
+    if (valid) {
+      c.meta.status = 'COMPLETE';
+      c.meta.errorsList = [];
+      return true;
+    }
+    c.meta.status = 'INCOMPLETE';
+    c.meta.errorsList = errors;
+    return false;
+  });
+
+  // if any collaborator is invalid mark the section as incomplete
+  if (validations.some(x => x == false)) {
+    app.sections.collaborators.meta.status = 'INCOMPLETE';
   }
 }
 
@@ -933,7 +996,7 @@ function getDataAccessAgreement() {
   ];
 }
 
-function calculateSectionStatus(app: Application, section: keyof Application['sections'], isReviewer: boolean): SectionStatus {
+function calculateViewableSectionStatus(app: Application, section: keyof Application['sections'], isReviewer: boolean): SectionStatus {
   const reviewableSections: Array<keyof RevisionRequestUpdate> = ['applicant', 'collaborators', 'ethicsLetter', 'projectInfo', 'signature', 'representative'];
   const reviewableSection = reviewableSections.includes(section as keyof RevisionRequestUpdate);
 
