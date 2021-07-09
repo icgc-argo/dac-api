@@ -5,6 +5,7 @@ import { Application } from './interface';
 mongoose.set('debug', true);
 const Meta = new mongoose.Schema({
   status: { type: String, required: false },
+  updated: {type: Boolean, required: false },
   errorsList: [{
     field: { type: String, required: false },
     message: { type: String, required: false }
