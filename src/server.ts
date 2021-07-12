@@ -23,10 +23,10 @@ import logger from './logger';
 import { Server } from 'http';
 import AWS from 'aws-sdk';
 import { database, up } from 'migrate-mongo';
-import { Storage } from './storage';
 import nodemailer from 'nodemailer';
 let server: Server;
 console.log('in server.ts');
+import { Storage } from './storage';
 (async () => {
   const appConfig = await getAppConfig();
 

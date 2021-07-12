@@ -344,6 +344,35 @@ export function getAppInReview() {
   return result;
 }
 
+
+export function getAppInRevisionRequested() {
+  const app = getAppInReview();
+  const state = new ApplicationStateManager(app);
+  const update: Partial<UpdateApplication> = {
+    revisionRequest: {
+      applicant: {
+        details: `hello hello, did you brush you teeth ? <br/>
+                  did you wash your hands <br/>
+                  did you comb your hair <br/>
+                  hello hello`,
+        requested: true
+      },
+      projectInfo: {
+        details: 'hello... is it me you lookin for',
+        requested: true,
+      },
+      general: {
+        details: 'General Kenobi... hello there, a surprise for sure, but a welcomed one. let\'s see how it renders',
+        requested: true
+      }
+    },
+    state: 'REVISIONS REQUESTED'
+  };
+  const result = state.updateApp(update, true);
+  expect(result.state).to.eq('REVISIONS REQUESTED');
+  return result;
+}
+
 function getAddress(): Address {
   return {
     'building': 'MARS',

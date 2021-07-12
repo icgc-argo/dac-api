@@ -15,6 +15,7 @@ import renderReviewEmail from '../emails/review-new';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import renderSubmittedEmail from '../emails/submitted';
+import renderRevisionsEmail from '../emails/revisions-requested';
 
 export async function deleteDocument(appId: string,
                                     type: UploadDocumentType,
@@ -188,6 +189,10 @@ async function onStateChange(updatedApp: Application,
 
     // send applicant email
     await sendSubmissionConfirmation(updatedApp, emailClient, config);
+  }
+
+  if (updatedApp.state == 'REVISIONS REQUESTED') {
+    await sendRevisionsRequestEmail(updatedApp, emailClient, config);
   }
 }
 
@@ -368,16 +373,23 @@ async function sendSubmissionConfirmation(updatedApp: Application,
                                           emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
                                           config: AppConfig) {
 
-  const submittedEmail = renderSubmittedEmail(updatedApp, config.email.links);
+  const submittedEmail = await renderSubmittedEmail(updatedApp, config.email.links);
   await sendEmail(emailClient,
     config.email.fromAddress,
     config.email.fromName,
-    new Set([
-      updatedApp.submitterEmail,
-      updatedApp.sections.applicant.info.googleEmail,
-      updatedApp.sections.applicant.info.institutionEmail
-    ]),
-    `[${updatedApp.appId}] We Received your Application`, submittedEmail.html);
+    getApplicantEmails(updatedApp),
+    `[${updatedApp.appId}] Your Application has been Reopened for Revisions`, submittedEmail.html);
+}
+
+async function sendRevisionsRequestEmail(app: Application,
+                                         emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+                                         config: AppConfig) {
+  const submittedEmail = await renderRevisionsEmail(app, config);
+  await sendEmail(emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(app),
+    `[${app.appId}] We Received your Application`, submittedEmail.html);
 }
 
 async function sendReviewEmail(oldApplication: Application,
@@ -385,23 +397,45 @@ async function sendReviewEmail(oldApplication: Application,
                                config: AppConfig,
                                emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
 
+  let emailContent: string;
+  let title: string;
   if (wasInRevisionRequestState(oldApplication)) {
-    console.log('implement revised app submitted email');
-  } else {
     // send new app for review email
-    const reviewEmail = renderReviewEmail(updatedApp, {
+    const reviewEmail = await renderReviewEmail(updatedApp, {
       firstName: config.email.reviewerFirstName,
       lastName: config.email.reviewerLastName,
     }, {
       baseUrl: config.ui.baseUrl,
       pathTemplate: config.ui.sectionPath,
     });
-
-    await sendEmail(emailClient,
-      config.email.fromAddress,
-      config.email.fromName,
-      new Set([config.email.dacoAddress]),
-      `[${updatedApp.appId}] A New Application has been Submitted`,
-      reviewEmail.html);
+    emailContent = reviewEmail.html;
+    title = `[${updatedApp.appId}] A Revised Application has been Submitted`;
+  } else {
+    // send new app for review email
+    const reviewEmail = await renderReviewEmail(updatedApp, {
+      firstName: config.email.reviewerFirstName,
+      lastName: config.email.reviewerLastName,
+    }, {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    });
+    emailContent = reviewEmail.html;
+    title = `[${updatedApp.appId}] A New Application has been Submitted`;
   }
+
+  await sendEmail(emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    new Set([config.email.dacoAddress]),
+    title,
+    emailContent);
+}
+
+
+function getApplicantEmails(app: Application) {
+  return new Set([
+    app.submitterEmail,
+    app.sections.applicant.info.googleEmail,
+    app.sections.applicant.info.institutionEmail
+  ]);
 }

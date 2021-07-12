@@ -8,7 +8,7 @@ interface Meta {
   status: SectionStatus;
   errorsList: SectionError[];
 }
-interface RevisionRequest {
+export interface RevisionRequest {
   details: string;
   requested: boolean;
 }
