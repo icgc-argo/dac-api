@@ -1,6 +1,6 @@
 {
   "name": "dac-api",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "description": "",
   "scripts": {
     "start": "npm run serve",
@@ -10,8 +10,8 @@
     "tslint": "tslint -c tslint.json -p tsconfig.json",
     "build": "npm run build-ts && npm run resources && npm run tslint",
     "debug": "npm run build && sleep 3 && npm run watch-debug",
-    "watch-debug": "ts-node-dev --inspect --respawn -- ./src/server.ts",
-    "test": "mocha -r ts-node/register src/test/**/*.spec.ts",
+    "watch-debug": "nodemon --delay 1000ms --inspect --watch 'src/**/*.ts' --exec node -r ts-node/register ./src/server.ts",
+    "test": "mocha --exit -r ts-node/register src/test/**/*.spec.ts",
     "migrate-up": "migrate-mongo up",
     "migrate-down": "migrate-mongo down",
     "migrate-status": "migrate-mongo status"
@@ -112,7 +112,7 @@
     "morgan": "^1.10.0",
     "node-fetch": "^2.6.1",
     "node-vault": "^0.9.21",
-    "node-worker-threads-pool": "^1.4.3",
+    "node-worker-threads-pool": "^1.5.0",
     "nodemailer": "^6.6.1",
     "promise-tools": "^2.1.0",
     "response-time": "^2.3.2",

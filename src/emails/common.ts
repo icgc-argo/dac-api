@@ -1,6 +1,7 @@
 import moment from 'moment';
 import { c } from '../utils/misc';
 import { Application } from '../domain/interface';
+import mjml2html, { MJMLParseResults } from 'mjml-core';
 
 export type UILinksInfo = {
   baseUrl: string,
@@ -79,10 +80,23 @@ function header(title: string) {
         a {
           color: #523785;
         }
+        .revisions-tbl-header {
+          height: 34px;
+          padding: 8px 10px;
+          border: solid 1px #dcdde1;
+        	font-weight: 600;
+        }
+        .revisions-tbl-cell {
+        	height: 34px;
+          padding: 12px 12px;
+        	vertical-align: top;
+          border: solid 1px #dcdde1;
+        }
       </mj-style>
     </mj-head>
   `;
 }
+
 
 function body(props: {subject: string, receiver: Receiver, message: string, withClosure: boolean, closureData?: ClosureData}) {
   const {subject, receiver, message, withClosure, closureData} = props;

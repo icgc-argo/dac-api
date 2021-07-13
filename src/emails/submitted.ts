@@ -2,9 +2,10 @@ import mjml2html from 'mjml';
 import { AppConfig } from '../config';
 import { Application } from '../domain/interface';
 import { appInfoBox, compose, textParagraphSection } from './common';
+import { compileMjmlInPromise } from './mjml';
 
 
-export default function(app: Application, linksConfigs: AppConfig['email']['links']) {
+export default async function(app: Application, linksConfigs: AppConfig['email']['links']) {
   const info = app.sections.applicant.info;
   const emailMjml = compose({
     message: messageBody(app),
@@ -20,7 +21,7 @@ export default function(app: Application, linksConfigs: AppConfig['email']['link
     }
   }, 'We have Received your Application');
 
-  const htmlOutput = mjml2html(emailMjml);
+  const htmlOutput = await compileMjmlInPromise(emailMjml);
   if (htmlOutput.errors.length > 0) {
     console.error(`template errors ${JSON.stringify(htmlOutput.errors)}`);
     throw new Error('failed to generate email');
