@@ -23,7 +23,7 @@ describe('emails', () => {
       console.log(email.emailMjml);
     });
 
-    it.only('should render revisions requested email', async () => {
+    it('should render revisions requested email', async () => {
       const app = getAppInRevisionRequested();
       const email = await renderRevisionsEmail(app, {
         email: {
