@@ -378,7 +378,7 @@ async function sendSubmissionConfirmation(updatedApp: Application,
     config.email.fromAddress,
     config.email.fromName,
     getApplicantEmails(updatedApp),
-    `[${updatedApp.appId}] Your Application has been Reopened for Revisions`, submittedEmail.html);
+    `[${updatedApp.appId}] We Received your Application`, submittedEmail.html);
 }
 
 async function sendRevisionsRequestEmail(app: Application,
@@ -389,7 +389,7 @@ async function sendRevisionsRequestEmail(app: Application,
     config.email.fromAddress,
     config.email.fromName,
     getApplicantEmails(app),
-    `[${app.appId}] We Received your Application`, submittedEmail.html);
+    `[${app.appId}] Your Application has been Reopened for Revisions`, submittedEmail.html);
 }
 
 async function sendReviewEmail(oldApplication: Application,
