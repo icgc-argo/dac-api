@@ -12,6 +12,7 @@ import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
 import renderReviewEmail from '../emails/review-new';
+import renderReviewRevisedEmail from '../emails/review-revised';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import renderSubmittedEmail from '../emails/submitted';
@@ -401,7 +402,7 @@ async function sendReviewEmail(oldApplication: Application,
   let title: string;
   if (wasInRevisionRequestState(oldApplication)) {
     // send new app for review email
-    const reviewEmail = await renderReviewEmail(updatedApp, {
+    const reviewEmail = await renderReviewRevisedEmail(updatedApp, {
       firstName: config.email.reviewerFirstName,
       lastName: config.email.reviewerLastName,
     }, {
