@@ -9,7 +9,6 @@ export default async function(app: Application,
                           lastName: string;
                         },
                         uiLinksInfo: UILinksInfo) {
-  const info = app.sections.applicant.info;
   const emailMjml = compose({
     message: messageBody(app, uiLinksInfo),
     receiver: {
@@ -31,7 +30,7 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo) {
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
   return  `
-    ${textParagraphSection(`An application has been revised and submitted for your review.`, { padding: '0px 0px 2px 0px' })}
+    ${textParagraphSection(`An application has been revised and submitted for your review.`, { padding: '0px 0px 5px 0px' })}
     ${appInfoBox(app)}
     ${actionGetStarted(`Get Started:`, `REVIEW THE APPLICATION`, link)}
   `;

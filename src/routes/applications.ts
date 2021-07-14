@@ -83,7 +83,10 @@ const createApplicationsRouter = (config: AppConfig,
       const appId = validateId(req.params.id);
       const type = validateType(req.params.type) as 'ETHICS' | 'SIGNED_APP';
       logger.info(`upload app file [app: ${appId}, type: ${type}, file: ${uploadedFile.name}, user Id:${(req as IRequest).identity.userId}]`);
-      const app = await uploadDocument(appId, type, uploadedFile, (req as IRequest).identity, storageClient);
+      const app = await uploadDocument(appId,
+        type, uploadedFile, (req as IRequest).identity,
+        storageClient,
+        emailClient);
       return res.status(201).send(app);
    })
   );
@@ -107,7 +110,7 @@ const createApplicationsRouter = (config: AppConfig,
       // todo validate structure
       const collaborator = req.body;
       logger.info(`creating new collaborator [app: ${id}, user Id:${(req as IRequest).identity.userId}]`);
-      const app = await createCollaborator(validatedId, collaborator, (req as IRequest).identity);
+      const app = await createCollaborator(validatedId, collaborator, (req as IRequest).identity, emailClient);
       return res.status(200).send(app);
     }),
   );

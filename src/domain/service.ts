@@ -13,6 +13,8 @@ import { Storage } from '../storage';
 import logger from '../logger';
 import renderReviewEmail from '../emails/review-new';
 import renderReviewRevisedEmail from '../emails/review-revised';
+import renderEthicsLetterEmail from '../emails/ethics-letter';
+import renderCollaboratorAdded from '../emails/collaborator-added';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import renderSubmittedEmail from '../emails/submitted';
@@ -42,7 +44,8 @@ export async function uploadDocument(appId: string,
                                     type: UploadDocumentType,
                                     file: UploadedFile,
                                     identity: Identity,
-                                    storageClient: Storage) {
+                                    storageClient: Storage,
+                                    emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
 
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
@@ -59,6 +62,14 @@ export async function uploadDocument(appId: string,
   const result = stateManager.addDocument(id, file.name, type);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
+
+  if (updated.state == 'APPROVED') {
+    if (type == 'ETHICS') {
+      const config = await getAppConfig();
+      sendEthicsLetterSubmitted(updated, config, emailClient);
+    }
+  }
+
   const viewAbleApplication = new ApplicationStateManager(updated.toObject()).prepareApplicantionForUser(false);
   return viewAbleApplication;
 }
@@ -96,7 +107,10 @@ export async function getApplicationAssetsAsStream(appId: string,
   return assets;
 }
 
-export async function createCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
+export async function createCollaborator(appId: string,
+                                         collaborator: Collaborator,
+                                        identity: Identity,
+                                        emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -106,6 +120,10 @@ export async function createCollaborator(appId: string, collaborator: Collaborat
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.addCollaborator(collaborator);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
+  if (result.state == 'APPROVED') {
+    const config = await getAppConfig();
+    sendCollaboratorEmail(result, config, emailClient);
+  }
   return result.sections.collaborators.list[result.sections.collaborators.list.length - 1];
 }
 
@@ -369,7 +387,6 @@ function mapField(field: string) {
   }
 }
 
-
 async function sendSubmissionConfirmation(updatedApp: Application,
                                           emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
                                           config: AppConfig) {
@@ -385,12 +402,65 @@ async function sendSubmissionConfirmation(updatedApp: Application,
 async function sendRevisionsRequestEmail(app: Application,
                                          emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
                                          config: AppConfig) {
+
   const submittedEmail = await renderRevisionsEmail(app, config);
   await sendEmail(emailClient,
     config.email.fromAddress,
     config.email.fromName,
     getApplicantEmails(app),
     `[${app.appId}] Your Application has been Reopened for Revisions`, submittedEmail.html);
+}
+
+async function sendCollaboratorEmail(updatedApp: Application,
+                                    config: AppConfig,
+                                    emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
+
+  const collaborators = updatedApp.sections.collaborators.list;
+  const reviewEmail = await renderCollaboratorAdded(updatedApp, {
+    firstName: config.email.reviewerFirstName,
+    lastName: config.email.reviewerLastName,
+   }, {
+     info: collaborators[collaborators.length - 1].info,
+     addedOn: new Date()
+   }, {
+    baseUrl: config.ui.baseUrl,
+    pathTemplate: config.ui.sectionPath,
+  });
+  const emailContent = reviewEmail.html;
+  const title = `A New Collaborator has been Added`;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    new Set([config.email.dacoAddress]),
+    subject,
+    emailContent);
+}
+async function sendEthicsLetterSubmitted(updatedApp: Application,
+                                        config: AppConfig,
+                                        emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
+
+  const ethicLetters = updatedApp.sections.ethicsLetter.approvalLetterDocs;
+  const reviewEmail = await renderEthicsLetterEmail(updatedApp, {
+    firstName: config.email.reviewerFirstName,
+    lastName: config.email.reviewerLastName,
+   }, {
+     addedOn: ethicLetters[ethicLetters.length - 1].uploadedAtUtc
+   }, {
+    baseUrl: config.ui.baseUrl,
+    pathTemplate: config.ui.sectionPath,
+  });
+  const emailContent = reviewEmail.html;
+  const title = `A New Ethics Letter has been Added`;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    new Set([config.email.dacoAddress]),
+    subject,
+    emailContent);
 }
 
 async function sendReviewEmail(oldApplication: Application,
