@@ -1,6 +1,6 @@
 import moment from 'moment';
 import { c } from '../utils/misc';
-import { Application } from '../domain/interface';
+import { Application, PersonalInfo } from '../domain/interface';
 import mjml2html, { MJMLParseResults } from 'mjml-core';
 
 export type UILinksInfo = {
@@ -174,9 +174,32 @@ function greeting(args: Receiver) {
 
 export function appInfoBox(app: Application) {
   const applicantInfo = app.sections.applicant.info;
-  const applicantName =
-    `${applicantInfo.title ? applicantInfo.title + ' ' : '' }${applicantInfo.firstName} ${applicantInfo.lastName}${applicantInfo.suffix ? ' ' + applicantInfo.suffix : ''}`;
+  const applicantName = getApplicantName(app.sections.applicant.info);
+  return infoBox(app, [{
+    label: 'Application #',
+    value: app.appId
+  }, {
+    label: 'Applicant',
+    value: applicantName
+  }, {
+    label: 'Institution',
+    value: applicantInfo.primaryAffiliation,
+  }, {
+    label: 'Submitted on',
+    value: formatDate(app.submittedAtUtc),
+  }]);
+}
 
+export function formatDate(d: Date) {
+  return moment(d).utc().format('MMM D, YYYY [at] LT');
+}
+
+export function getApplicantName(info: PersonalInfo) {
+  const applicantName =
+    `${info.title ? info.title + ' ' : '' }${info.firstName} ${info.lastName}${info.suffix ? ' ' + info.suffix : ''}`;
+  return applicantName;
+}
+export function infoBox(app: Application, data: {label: string, value: string}[]) {
   return `
     <mj-section padding="0px 0px 20px 0px">
       <mj-column border="1px #dcdde1 solid" padding="0" >
@@ -191,41 +214,20 @@ export function appInfoBox(app: Application) {
                     </td>
                     <td>
                       <table width="100%">
-                        <tr>
-                          <td class="app-tbl-lable">
-                            Application #:
-                          </td>
-                          <td class="app-tbl-val">
-                            ${app.appId}
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td class="app-tbl-lable">
-                            Applicant:
-                          </td>
-                          <td class="app-tbl-val">
-                            ${applicantName}
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td class="app-tbl-lable">
-                            Institution:
-                          </td>
-                          <td class="app-tbl-val">
-                            ${applicantInfo.primaryAffiliation}
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td class="app-tbl-lable">
-                            Submitted on:
-                          </td>
-                          <td class="app-tbl-val">
-                            ${moment(app.submittedAtUtc).format('MMM D, YYYY [at] LT')}
-                          </td>
-                        </tr>
+                        ${
+                          data.map(d => {
+                            return `
+                            <tr>
+                              <td class="app-tbl-lable">
+                                ${d.label}:
+                              </td>
+                              <td class="app-tbl-val">
+                                ${d.value}
+                              </td>
+                            </tr>
+                            `;
+                          }).join(`\n`)
+                        }
                       </table>
                     </td>
                   </tr>
@@ -234,6 +236,8 @@ export function appInfoBox(app: Application) {
     </mj-section>
   `;
 }
+
+
 
 function closure(props: {guideLink: string, guideText: string}) {
   const { guideLink, guideText } = props;
@@ -318,12 +322,12 @@ export function actionGetStarted(text: string, buttonText: string, buttonLink: s
       <mj-button background-color="#7F55CC"
                 text-transform="uppercase"
                 color="#ffffff"
-                font-size="12px"
+                font-size="13px"
                 font-weight="bold"
                 font-style="normal"
                 href="${buttonLink}"
                 border-radius="0px"
-                width="220px"
+                width="250px"
                 inner-padding="16px 24px"
                 padding="0px 0px 0px 0px">
         ${buttonText}
