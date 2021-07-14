@@ -17,7 +17,7 @@ export default async function(app: Application,
       last: reviewerInfo.lastName,
     },
     includeClousre: false,
-  }, 'A New Application has been Submitted');
+  }, 'A Revised Application has been Submitted');
 
   const htmlOutput = await compileMjmlInPromise(emailMjml);
   if (htmlOutput.errors.length > 0) {
@@ -31,7 +31,7 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo) {
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
   return  `
-    ${textParagraphSection(`A new application has been submitted for your review.`, { padding: '0px 0px 2px 0px' })}
+    ${textParagraphSection(`An application has been revised and submitted for your review.`, { padding: '0px 0px 2px 0px' })}
     ${appInfoBox(app)}
     ${actionGetStarted(`Get Started:`, `REVIEW THE APPLICATION`, link)}
   `;
