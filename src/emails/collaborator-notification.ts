@@ -1,11 +1,14 @@
 import { AppConfig } from '../config';
-import { Application } from '../domain/interface';
-import { appInfoBox, compose, textParagraphSection } from './common';
+import { Application, PersonalInfo } from '../domain/interface';
+import { appInfoBox, approvalDetailsBox, compose, textParagraphSection } from './common';
 import { compileMjmlInPromise } from './mjml';
 
 
-export default async function(app: Application, linksConfigs: AppConfig['email']['links']) {
-  const info = app.sections.applicant.info;
+export default async function(app: Application, collaborator: {
+  info: PersonalInfo,
+  addedOn: Date,
+}, linksConfigs: AppConfig['email']['links']) {
+  const info = collaborator.info;
   const emailMjml = compose({
     message: messageBody(app),
     receiver: {
@@ -31,7 +34,8 @@ export default async function(app: Application, linksConfigs: AppConfig['email']
 function messageBody(app: Application) {
   return  `
     ${textParagraphSection(`You have been granted access to ICGC Controlled Data, as requested by the Principal Investigator of your project on the following application.<strong>Kindly note, it may take up to 24 hours for authorization to take effect.</strong>`, { padding: '0px 0px 20px 0px' })}
-    ${appInfoBox(app)}
+    ${appInfoBox(app, 'Approved on', false)}
+    ${approvalDetailsBox(app)}
     ${textParagraphSection(`Please note that access to ICGC Controlled Data remains conditional upon respecting the terms and conditions of the <a href="#"> Data Access Agreement</a>, particularly regarding (but not limited to) the publication moratorium and re-identification of research participants.`, { padding: '0px 0px 20px 0px' })}
     ${textParagraphSection(`The length of the access period is one year starting from the date of approval. At the end of the 2-year period, your Principal Investigator can renew your access.`, { padding: '0px 0px 20px 0px' })}
     ${textParagraphSection(`Next Steps:`, {  padding: '0px 0px 2px 0px', 'font-weight': 'bold'  })}
