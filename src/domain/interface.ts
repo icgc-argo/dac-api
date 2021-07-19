@@ -152,10 +152,6 @@ export interface Application {
         name: string;
       }[];
     },
-    ITAgreements: {
-      meta: Meta,
-      agreements: AgreementItem[],
-    },
     dataAccessAgreement: {
       meta: Meta,
       agreements: AgreementItem[],
@@ -214,9 +210,6 @@ export interface UpdateApplication {
         objectId: string;
         uploadedAtUtc: Date
       }[];
-    },
-    ITAgreements?: {
-      agreements: AgreementItem[],
     },
     dataAccessAgreement?: {
       agreements: AgreementItem[],
