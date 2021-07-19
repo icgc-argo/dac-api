@@ -564,7 +564,7 @@ function transitionToApproved(current: Application, updatePart: Partial<UpdateAp
   current.state = 'APPROVED';
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
-    current.expiresAtUtc = moment().add(1, 'year').toDate();
+    current.expiresAtUtc = moment().add(2, 'year').toDate();
   }
   return current;
 }
@@ -770,6 +770,9 @@ function updateEthics(updatePart: Partial<UpdateApplication>, current: Applicati
 function updateProjectInfo(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.projectInfo) {
     current.sections.projectInfo = mergeKnown(current.sections.projectInfo, updatePart.sections.projectInfo);
+    // remove duplicated /  falsy values
+    const uniquePubs = _.uniq(current.sections.projectInfo.publicationsURLs.filter(v => !!v?.trim()));
+    current.sections.projectInfo.publicationsURLs = uniquePubs;
     validateProjectInfo(current);
   }
 }
