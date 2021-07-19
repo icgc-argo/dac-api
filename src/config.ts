@@ -45,6 +45,7 @@ export interface AppConfig {
     links: {
       reviewGuide: string;
       applyingForAccess: string;
+      dataAccessGuide: string;
     }
   };
   ui: {
@@ -154,6 +155,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       links: {
         reviewGuide: process.env.EMAIL_REVIEW_GUIDE_URL || 'https://daco.icgc-argo.org/guides/review',
         applyingForAccess: process.env.EMAIL_APPLYING_FOR_ACCESS_GUIDE_URL || 'https://docs.icgc-argo.org/docs/data-access/data-access',
+        dataAccessGuide: process.env.EMAIL_DATA_ACCESS_GUIDE_URL || 'https://docs.icgc-argo.org/docs/data-access/data-download',
       },
       reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',

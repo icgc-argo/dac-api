@@ -1,7 +1,6 @@
 import moment from 'moment';
 import { c } from '../utils/misc';
 import { Application, PersonalInfo } from '../domain/interface';
-import mjml2html, { MJMLParseResults } from 'mjml-core';
 
 export type UILinksInfo = {
   baseUrl: string,
