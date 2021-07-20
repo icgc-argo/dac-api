@@ -43,8 +43,8 @@ describe('emails', () => {
       console.log(email.emailMjml);
     });
 
-    it.only('should render collaborator notification email', async () => {
-      const app = getReadyToSignApp();
+    it('should render collaborator notification email', async () => {
+      const app = getApprovedApplication();
       const collab: Collaborator = {
         meta: {
           errorsList: [],

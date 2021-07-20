@@ -562,6 +562,7 @@ function transitionToRejected(current: Application, updatePart: Partial<UpdateAp
 
 function transitionToApproved(current: Application, updatePart: Partial<UpdateApplication>) {
   current.state = 'APPROVED';
+  current.approvedAtUtc = new Date();
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
     current.expiresAtUtc = moment().add(1, 'year').toDate();
