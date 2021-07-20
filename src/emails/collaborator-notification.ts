@@ -1,3 +1,4 @@
+import { ICGC_25K_URL, ICGC_ARGO_URL, ICGC_ARGO_PLATFORM_URL } from '../utils/constants';
 import { AppConfig } from '../config';
 import { Application, Collaborator, PersonalInfo } from '../domain/interface';
 import { appInfoBox, approvalDetailsBox, compose, textParagraphSection } from './common';
@@ -53,15 +54,15 @@ function bulletPoints() {
             You can access ICGC Controlled Data in the following data portals:
             <ul style="padding:0 0 0 15">
               <li style="list-style-type: disc">
-                <a href="https://platform.icgc-argo.org/">ICGC ARGO Data Platform</a>
+                <a href=${ICGC_ARGO_PLATFORM_URL}>ICGC ARGO Data Platform</a>
               </li>
               <li style="list-style-type: disc">
-                <a href="https://dcc.icgc.org/"> ICGC 25K Data Portal</a>
+                <a href=${ICGC_25K_URL}> ICGC 25K Data Portal</a>
               </li>
             </ul>
           </li>
           <li style="padding-left: 10px">
-            Visit <a href="https://www.icgc-argo.org">icgc-argo.org</a> for updated news about the ICGC ARGO project.
+            Visit <a href=${ICGC_ARGO_URL}>icgc-argo.org</a> for updated news about the ICGC ARGO project.
           </li>
         </ol>
       </mj-raw>
