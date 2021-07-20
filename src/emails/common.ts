@@ -156,7 +156,7 @@ type Receiver = {
   title?: string,
   first: string,
   last: string,
-  suffix?: string
+  suffix?: string,
 };
 
 function greeting(args: Receiver) {

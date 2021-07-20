@@ -20,6 +20,7 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import renderSubmittedEmail from '../emails/submitted';
 import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
+import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 
 export async function deleteDocument(appId: string,
                                     type: UploadDocumentType,
@@ -109,7 +110,7 @@ export async function getApplicationAssetsAsStream(appId: string,
 }
 
 export async function createCollaborator(appId: string,
-                                         collaborator: Collaborator,
+                                        collaborator: Collaborator,
                                         identity: Identity,
                                         emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
@@ -123,7 +124,9 @@ export async function createCollaborator(appId: string,
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
     const config = await getAppConfig();
-    sendCollaboratorEmail(result, config, emailClient);
+    sendCollaboratorAddedEmail(result, config, emailClient);
+    // send notification email to new collaborator if application already approved
+    sendCollaboratorApprovedEmail(result, collaborator, config, emailClient);
   }
   return result.sections.collaborators.list[result.sections.collaborators.list.length - 1];
 }
@@ -215,8 +218,11 @@ async function onStateChange(updatedApp: Application,
     await sendRevisionsRequestEmail(updatedApp, emailClient, config);
   }
 
-  if (updatedApp.state == 'APPROVED') {
+  if (updatedApp.state === 'APPROVED') {
     await sendApplicationApprovedEmail(updatedApp, config, emailClient);
+    Promise.allSettled(updatedApp.sections.collaborators.list.map(async (collab) => {
+      await sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient);
+    })).catch(err => logger.error(err));
   }
 }
 
@@ -429,7 +435,7 @@ async function sendApplicationApprovedEmail(updatedApp: Application,
 
 
 }
-async function sendCollaboratorEmail(updatedApp: Application,
+async function sendCollaboratorAddedEmail(updatedApp: Application,
                                     config: AppConfig,
                                     emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
 
@@ -455,6 +461,26 @@ async function sendCollaboratorEmail(updatedApp: Application,
     subject,
     emailContent);
 }
+
+async function sendCollaboratorApprovedEmail(
+  updatedApp: Application,
+  collaborator: Collaborator,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>
+) {
+  const collaboratorApprovedEmail = await renderCollaboratorNotificationEmail(updatedApp, collaborator, config.email.links);
+  const emailContent = collaboratorApprovedEmail.html;
+  const title = `You have been Granted Access`;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    new Set([collaborator.info.googleEmail, collaborator.info.institutionEmail]),
+    subject,
+    emailContent);
+}
+
 async function sendEthicsLetterSubmitted(updatedApp: Application,
                                         config: AppConfig,
                                         emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
