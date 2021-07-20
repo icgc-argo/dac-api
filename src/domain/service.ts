@@ -218,9 +218,9 @@ async function onStateChange(updatedApp: Application,
   }
 
   if (updatedApp.state === 'APPROVED') {
-    Promise.all(updatedApp.sections.collaborators.list.map(async (collab) => {
+    Promise.allSettled(updatedApp.sections.collaborators.list.map(async (collab) => {
       await sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient);
-    }));
+    })).catch(err => logger.error(err));
   }
 }
 
