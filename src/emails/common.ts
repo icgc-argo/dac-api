@@ -156,7 +156,7 @@ type Receiver = {
   title?: string,
   first: string,
   last: string,
-  suffix?: string
+  suffix?: string,
 };
 
 function greeting(args: Receiver) {
@@ -237,13 +237,13 @@ export function infoBox(app: Application, data: {label: string, value: string}[]
   `;
 }
 
-export function approvalDetailsBox(app: Application, isCollaborator: boolean = false) {
+export function approvalDetailsBox(app: Application, recipient: PersonalInfo) {
   const data = [{
     label: 'Title of Project',
     value: app.sections.projectInfo.title
   }, {
     label: 'Access Email',
-    value: 'a_sample_email@example.com',
+    value: recipient.googleEmail,
   }, {
     label: 'Access Expiry Date',
     value: formatDate(app.expiresAtUtc),
