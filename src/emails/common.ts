@@ -1,7 +1,6 @@
 import moment from 'moment';
 import { c } from '../utils/misc';
 import { Application, PersonalInfo } from '../domain/interface';
-import mjml2html, { MJMLParseResults } from 'mjml-core';
 
 export type UILinksInfo = {
   baseUrl: string,
@@ -60,7 +59,7 @@ function header(title: string) {
         }
         .app-tbl-lable {
           font-weight: 600;
-          width:130px;
+          width: 145px;
           padding: 2px 0px 2px 10px;
           line-height: 22px;
           font-size:14px;
@@ -157,7 +156,7 @@ type Receiver = {
   title?: string,
   first: string,
   last: string,
-  suffix?: string
+  suffix?: string,
 };
 
 function greeting(args: Receiver) {
@@ -172,22 +171,23 @@ function greeting(args: Receiver) {
   `;
 }
 
-export function appInfoBox(app: Application) {
+export function appInfoBox(app: Application, dateText?: string, dateValue?: Date, isLastChild: boolean = true) {
   const applicantInfo = app.sections.applicant.info;
   const applicantName = getApplicantName(app.sections.applicant.info);
   return infoBox(app, [{
-    label: 'Application #',
-    value: app.appId
-  }, {
-    label: 'Applicant',
-    value: applicantName
-  }, {
-    label: 'Institution',
-    value: applicantInfo.primaryAffiliation,
-  }, {
-    label: 'Submitted on',
-    value: formatDate(app.submittedAtUtc),
-  }]);
+      label: 'Application #',
+      value: app.appId
+    }, {
+      label: 'Applicant',
+      value: applicantName
+    }, {
+      label: 'Institution',
+      value: applicantInfo.primaryAffiliation,
+    }, {
+      label: dateText || 'Submitted on',
+      value: formatDate(dateValue || app.submittedAtUtc),
+    },
+  ], isLastChild);
 }
 
 export function formatDate(d: Date) {
@@ -199,9 +199,10 @@ export function getApplicantName(info: PersonalInfo) {
     `${info.title ? info.title + ' ' : '' }${info.firstName} ${info.lastName}${info.suffix ? ' ' + info.suffix : ''}`;
   return applicantName;
 }
-export function infoBox(app: Application, data: {label: string, value: string}[]) {
+
+export function infoBox(app: Application, data: {label: string, value: string}[], isLastChild: boolean = true) {
   return `
-    <mj-section padding="0px 0px 20px 0px">
+    <mj-section padding="0px 0px ${isLastChild ? '20px' : '0px'} 0px">
       <mj-column border="1px #dcdde1 solid" padding="0" >
         <mj-table font-weight="400"
                   font-size="16px"
@@ -237,7 +238,53 @@ export function infoBox(app: Application, data: {label: string, value: string}[]
   `;
 }
 
+export function approvalDetailsBox(app: Application, accessEmail: string) {
+  const data = [{
+    label: 'Title of Project',
+    value: app.sections.projectInfo.title
+  }, {
+    label: 'Access Email',
+    value: accessEmail,
+  }, {
+    label: 'Access Expiry Date',
+    value: formatDate(app.expiresAtUtc),
+  }];
 
+  return `
+  <mj-section padding="0px 0px 20px 0px">
+      <mj-column border="1px #dcdde1 solid" border-top="0px" padding="0" >
+      <mj-text font-size="14px" padding="10px 0px 5px 85px">The following are your access details:</mj-text>
+        <mj-table font-weight="400"
+                  font-size="16px"
+                  color="#000000"
+                  padding="0px 16px 10px"
+                  line-height="24px" >
+                  <tr>
+                  <td valign="top" width="60px" style="padding-top: 5px">
+                    </td>
+                    <td>
+                      <table width="100%">
+                        ${
+                          data.map(d => {
+                            return `
+                            <tr>
+                              <td class="app-tbl-lable">
+                                ${d.label}:
+                              </td>
+                              <td class="app-tbl-val">
+                                ${d.value}
+                              </td>
+                            </tr>
+                            `;
+                          }).join(`\n`)
+                        }
+                      </table>
+                    </td>
+                  </tr>
+        </mj-table>
+      </mj-column>
+    </mj-section>`;
+}
 
 function closure(props: {guideLink: string, guideText: string}) {
   const { guideLink, guideText } = props;
@@ -245,7 +292,7 @@ function closure(props: {guideLink: string, guideText: string}) {
     <mj-section padding="0">
       <mj-column padding="0">
         ${text(
-          `If you have any questions, please consult the <a href=${guideLink}>${guideText}</a> or <a href="https://platform.icgc-argo.org/contact">contact the ICGC DACO team</a>.`
+          `If you have any questions, please consult the <a href="${guideLink}">${guideText}</a> or <a href="https://platform.icgc-argo.org/contact">contact the ICGC DACO team</a>.`
           , { ...defaultTextStyle,  padding: '20px 0px 0px 0px' })
         }
         ${text(
