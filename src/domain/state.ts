@@ -564,8 +564,9 @@ function transitionToApproved(current: Application, updatePart: Partial<UpdateAp
   current.state = 'APPROVED';
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
-    current.expiresAtUtc = moment().add(1, 'year').toDate();
+    current.expiresAtUtc = moment().add(2, 'year').toDate();
   }
+  current.approvedAtUtc = new Date();
   return current;
 }
 

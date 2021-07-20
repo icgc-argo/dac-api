@@ -2,7 +2,9 @@ import renderSubmitted from '../emails/submitted';
 import renderNewReview from '../emails/review-new';
 import renderRevisionsEmail from '../emails/revisions-requested';
 import renderCollaboratorNotifEmail from '../emails/collaborator-notification';
-import { getAppInReview, getAppInRevisionRequested } from './state.spec';
+import renderApprovedEmail from '../emails/application-approved';
+
+import { getAppInReview, getAppInRevisionRequested, getApprovedApplication } from './state.spec';
 describe('emails', () => {
   describe('email rendering', () => {
     it('should render submission email', async () => {
@@ -41,9 +43,19 @@ describe('emails', () => {
       console.log(email.emailMjml);
     });
 
-    it.only('should render collaborator notification email', async () => {
-      const app = getAppInRevisionRequested();
-      const email = await renderCollaboratorNotifEmail(app, {
+    // it('should render collaborator notification email', async () => {
+    //   const app = getAppInRevisionRequested();
+    //   const email = await renderCollaboratorNotifEmail(app, {
+    //     dataAccessGuide: 'https://www.google.com',
+    //     reviewGuide: '',
+    //     applyingForAccess: '',
+    //   });
+    //   console.log(email.emailMjml);
+    // });
+
+    it('should render approved email', async () => {
+      const app = getApprovedApplication();
+      const email = await renderApprovedEmail(app, {
         dataAccessGuide: 'https://www.google.com',
         reviewGuide: '',
         applyingForAccess: '',

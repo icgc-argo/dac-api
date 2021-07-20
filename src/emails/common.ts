@@ -171,22 +171,23 @@ function greeting(args: Receiver) {
   `;
 }
 
-export function appInfoBox(app: Application, dateText?: string, isLastChild: boolean = true) {
+export function appInfoBox(app: Application, dateText?: string, dateValue?: Date, isLastChild: boolean = true) {
   const applicantInfo = app.sections.applicant.info;
   const applicantName = getApplicantName(app.sections.applicant.info);
   return infoBox(app, [{
-    label: 'Application #',
-    value: app.appId
-  }, {
-    label: 'Applicant',
-    value: applicantName
-  }, {
-    label: 'Institution',
-    value: applicantInfo.primaryAffiliation,
-  }, {
-    label: dateText || 'Submitted on',
-    value: formatDate(app.submittedAtUtc),
-  },], isLastChild);
+      label: 'Application #',
+      value: app.appId
+    }, {
+      label: 'Applicant',
+      value: applicantName
+    }, {
+      label: 'Institution',
+      value: applicantInfo.primaryAffiliation,
+    }, {
+      label: dateText || 'Submitted on',
+      value: formatDate(dateValue || app.submittedAtUtc),
+    },
+  ], isLastChild);
 }
 
 export function formatDate(d: Date) {
@@ -237,17 +238,17 @@ export function infoBox(app: Application, data: {label: string, value: string}[]
   `;
 }
 
-export function approvalDetailsBox(app: Application, isCollaborator: boolean = false) {
+export function approvalDetailsBox(app: Application, accessEmail: string) {
   const data = [{
     label: 'Title of Project',
     value: app.sections.projectInfo.title
   }, {
     label: 'Access Email',
-    value: 'a_sample_email@example.com',
+    value: accessEmail,
   }, {
     label: 'Access Expiry Date',
     value: formatDate(app.expiresAtUtc),
-  }]
+  }];
 
   return `
   <mj-section padding="0px 0px 20px 0px">
@@ -282,7 +283,7 @@ export function approvalDetailsBox(app: Application, isCollaborator: boolean = f
                   </tr>
         </mj-table>
       </mj-column>
-    </mj-section>`
+    </mj-section>`;
 }
 
 function closure(props: {guideLink: string, guideText: string}) {
@@ -291,7 +292,7 @@ function closure(props: {guideLink: string, guideText: string}) {
     <mj-section padding="0">
       <mj-column padding="0">
         ${text(
-          `If you have any questions, please consult the <a href=${guideLink}>${guideText}</a> or <a href="https://platform.icgc-argo.org/contact">contact the ICGC DACO team</a>.`
+          `If you have any questions, please consult the <a href="${guideLink}">${guideText}</a> or <a href="https://platform.icgc-argo.org/contact">contact the ICGC DACO team</a>.`
           , { ...defaultTextStyle,  padding: '20px 0px 0px 0px' })
         }
         ${text(

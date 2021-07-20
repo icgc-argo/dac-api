@@ -19,6 +19,7 @@ import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import renderSubmittedEmail from '../emails/submitted';
 import renderRevisionsEmail from '../emails/revisions-requested';
+import renderApprovedEmail from '../emails/application-approved';
 
 export async function deleteDocument(appId: string,
                                     type: UploadDocumentType,
@@ -212,6 +213,10 @@ async function onStateChange(updatedApp: Application,
 
   if (updatedApp.state == 'REVISIONS REQUESTED') {
     await sendRevisionsRequestEmail(updatedApp, emailClient, config);
+  }
+
+  if (updatedApp.state == 'APPROVED') {
+    await sendApplicationApprovedEmail(updatedApp, config, emailClient);
   }
 }
 
@@ -411,6 +416,19 @@ async function sendRevisionsRequestEmail(app: Application,
     `[${app.appId}] Your Application has been Reopened for Revisions`, submittedEmail.html);
 }
 
+async function sendApplicationApprovedEmail(updatedApp: Application,
+                                            config: AppConfig,
+                                            emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
+
+  const email = await renderApprovedEmail(updatedApp, config.email.links);
+  await sendEmail(emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    `[${updatedApp.appId}] Your Application has been Approved`, email.html);
+
+
+}
 async function sendCollaboratorEmail(updatedApp: Application,
                                     config: AppConfig,
                                     emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
