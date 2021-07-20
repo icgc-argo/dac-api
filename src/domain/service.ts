@@ -125,7 +125,7 @@ export async function createCollaborator(appId: string,
     const config = await getAppConfig();
     sendCollaboratorAddedEmail(result, config, emailClient);
     // send notification email to new collaborator if application already approved
-    sendCollaboratorApprovedEmail(result, collaborator, config, emailClient)
+    sendCollaboratorApprovedEmail(result, collaborator, config, emailClient);
   }
   return result.sections.collaborators.list[result.sections.collaborators.list.length - 1];
 }
@@ -219,8 +219,8 @@ async function onStateChange(updatedApp: Application,
 
   if (updatedApp.state === 'APPROVED') {
     Promise.all(updatedApp.sections.collaborators.list.map(async (collab) => {
-      await sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient)
-    }))
+      await sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient);
+    }));
   }
 }
 
@@ -453,7 +453,7 @@ async function sendCollaboratorApprovedEmail(
   config: AppConfig,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>
 ) {
-  const collaboratorApprovedEmail = await renderCollaboratorNotificationEmail(updatedApp, collaborator, config.email.links)
+  const collaboratorApprovedEmail = await renderCollaboratorNotificationEmail(updatedApp, collaborator, config.email.links);
   const emailContent = collaboratorApprovedEmail.html;
   const title = `You have been Granted Access`;
   const subject = `[${updatedApp.appId}] ${title}`;

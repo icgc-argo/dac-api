@@ -186,7 +186,7 @@ export function appInfoBox(app: Application, dateText?: string, isLastChild: boo
   }, {
     label: dateText || 'Submitted on',
     value: formatDate(app.submittedAtUtc),
-  },], isLastChild);
+  }, ], isLastChild);
 }
 
 export function formatDate(d: Date) {
@@ -247,7 +247,7 @@ export function approvalDetailsBox(app: Application, recipient: PersonalInfo) {
   }, {
     label: 'Access Expiry Date',
     value: formatDate(app.expiresAtUtc),
-  }]
+  }];
 
   return `
   <mj-section padding="0px 0px 20px 0px">
@@ -282,7 +282,7 @@ export function approvalDetailsBox(app: Application, recipient: PersonalInfo) {
                   </tr>
         </mj-table>
       </mj-column>
-    </mj-section>`
+    </mj-section>`;
 }
 
 function closure(props: {guideLink: string, guideText: string}) {
