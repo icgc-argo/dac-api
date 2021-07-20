@@ -567,7 +567,6 @@ function transitionToApproved(current: Application, updatePart: Partial<UpdateAp
   if (!current.expiresAtUtc) {
     current.expiresAtUtc = moment().add(2, 'year').toDate();
   }
-  current.approvedAtUtc = new Date();
   return current;
 }
 
