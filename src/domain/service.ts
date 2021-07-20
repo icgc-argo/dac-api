@@ -220,8 +220,9 @@ async function onStateChange(updatedApp: Application,
 
   if (updatedApp.state === 'APPROVED') {
     await sendApplicationApprovedEmail(updatedApp, config, emailClient);
-    Promise.allSettled(updatedApp.sections.collaborators.list.map(async (collab) => {
-      await sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient);
+    Promise.all(updatedApp.sections.collaborators.list.map((collab) => {
+      sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient)
+        .catch(err => logger.error(`failed to send email to collaborator ${collab.id}: ${err}`));
     })).catch(err => logger.error(err));
   }
 }
