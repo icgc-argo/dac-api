@@ -69,4 +69,4 @@ function bulletPoints() {
     </mj-column>
   </mj-section>
   `;
-};
+}
