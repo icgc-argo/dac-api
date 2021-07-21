@@ -1,14 +1,18 @@
 import renderSubmitted from '../emails/submitted';
 import renderNewReview from '../emails/review-new';
 import renderRevisionsEmail from '../emails/revisions-requested';
+import renderApprovedEmail from '../emails/application-approved';
+import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
+import { getAppInReview, getAppInRevisionRequested, getApprovedApplication, getReadyToSignApp } from './state.spec';
+import { Collaborator } from '../domain/interface';
 
-import { getAppInReview, getAppInRevisionRequested } from './state.spec';
 describe('emails', () => {
   describe('email rendering', () => {
     it('should render submission email', async () => {
       const app = getAppInReview();
       const email = await renderSubmitted(app, {
         applyingForAccess: '',
+        dataAccessGuide: '',
         reviewGuide: 'https://test.example.com'
       });
       console.log(email.emailMjml);
@@ -37,6 +41,46 @@ describe('emails', () => {
           sectionPath: '/applications/{id}?section={section}'
         }
       } as any);
+      console.log(email.emailMjml);
+    });
+
+    it('should render approved email', async () => {
+      const app = getApprovedApplication();
+      const email = await renderApprovedEmail(app, {
+        dataAccessGuide: 'https://www.google.com',
+        reviewGuide: '',
+        applyingForAccess: '',
+      });
+      console.log(email.emailMjml);
+    });
+
+    it('should render collaborator notification email', async () => {
+      const app = getApprovedApplication();
+      const collab: Collaborator = {
+        meta: {
+          errorsList: [],
+          status: 'COMPLETE'
+        },
+        info: {
+          firstName: 'Bashar',
+          lastName: 'Allabadi',
+          googleEmail: 'bashar@example.com',
+          primaryAffiliation: 'OICR',
+          institutionEmail: 'adsa@example.com',
+          middleName: '',
+          positionTitle: 'Manager',
+          suffix: '',
+          title: '',
+          displayName: '',
+          website: ''
+        },
+        type: 'personnel'
+      };
+      const email = await renderCollaboratorNotificationEmail(app, collab, {
+        dataAccessGuide: 'https://www.google.com',
+        reviewGuide: '',
+        applyingForAccess: '',
+      });
       console.log(email.emailMjml);
     });
   });

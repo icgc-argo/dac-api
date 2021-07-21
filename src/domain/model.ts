@@ -120,10 +120,6 @@ const ApplicationSchema = new mongoose.Schema({
         declaredAsRequired: { type: Boolean, required: false },
         approvalLetterDocs: [EthicsLetterDocument],
       },
-      ITAgreements: {
-        meta: Meta,
-        agreements: [AgreementItem],
-      },
       dataAccessAgreement: {
         meta: Meta,
         agreements: [AgreementItem],

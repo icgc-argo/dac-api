@@ -310,7 +310,6 @@ export function getReadyToSignApp() {
   c(updatePart.applicant).address = getAddress();
   c(updatePart.representative).address = getAddress();
   c(updatePart.representative).info = _.omit(getRandomInfo(), 'googleEmail');
-  c(updatePart.ITAgreements).agreements.forEach(ag => ag.accepted = true);
   c(updatePart.dataAccessAgreement).agreements.forEach(ag => ag.accepted = true);
   c(updatePart.appendices).agreements.forEach(ag => ag.accepted = true);
   c(updatePart.ethicsLetter).declaredAsRequired = false;
@@ -344,6 +343,17 @@ export function getAppInReview() {
   return result;
 }
 
+export function getApprovedApplication() {
+  const app = getAppInReview();
+  const state = new ApplicationStateManager(app);
+  const updatePart: Partial<UpdateApplication> = {
+    state: 'APPROVED'
+  };
+  const result = state.updateApp(updatePart, true);
+  expect(result.state).to.eq('APPROVED');
+  expect(result.approvedAtUtc).to.not.eq(undefined);
+  return result;
+}
 
 export function getAppInRevisionRequested() {
   const app = getAppInReview();

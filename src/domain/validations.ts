@@ -41,15 +41,6 @@ export function validateApplicantSection(app: Application) {
   app.sections.applicant.meta.errorsList = applicantErrors;
 }
 
-export function validateITAgreement(app: Application) {
-  const result = validateAgreementArray(app.sections.ITAgreements.agreements);
-  if (!result) {
-    app.sections.ITAgreements.meta.status = 'INCOMPLETE';
-    return;
-  }
-  app.sections.ITAgreements.meta.status = 'COMPLETE';
-}
-
 export function validateAppendices(app: Application) {
   const result = validateAgreementArray(app.sections.appendices.agreements);
   if (!result) {
@@ -179,8 +170,7 @@ function validateEmail(val: string, name: string, errors: SectionError[]) {
 }
 
 function validatePublications(publications: string[], errors: SectionError[]) {
-  const uniquePubs = _.uniq(publications.filter(v => !!v?.trim()));
-  if (uniquePubs.length < 3) {
+  if (publications.length < 3) {
     errors.push({
       field: 'publications',
       message: 'you need at least 3 unique publications URLs'
@@ -188,7 +178,7 @@ function validatePublications(publications: string[], errors: SectionError[]) {
     return false;
   }
 
-  const validations = uniquePubs.map((p: string, index: number) => {
+  const validations = publications.map((p: string, index: number) => {
     return validateUrl(p, `publications.${index}`, errors);
   });
 
