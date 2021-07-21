@@ -32,7 +32,6 @@ import {
   validateCollaborator,
   validateDataAccessAgreement,
   validateEthicsLetterSection,
-  validateITAgreement,
   validatePrimaryAffiliationMatching,
   validateProjectInfo,
   validateRepresentativeSection
@@ -40,7 +39,7 @@ import {
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 
 const allSections: Array<keyof Application['sections']> =
-  ['ITAgreements', 'appendices', 'dataAccessAgreement', 'terms', 'applicant', 'collaborators', 'ethicsLetter', 'representative', 'projectInfo', 'signature'];
+  ['appendices', 'dataAccessAgreement', 'terms', 'applicant', 'collaborators', 'ethicsLetter', 'representative', 'projectInfo', 'signature'];
 
 /**
  * Array contains mapping that will govern which sections should be marked as locked
@@ -54,11 +53,11 @@ const stateToLockedSectionsMap: Record<State, Record<'REVIEWER' | 'APPLICANT', A
     REVIEWER: allSections,
   },
   APPROVED: {
-    APPLICANT: ['ITAgreements', 'appendices', 'dataAccessAgreement', 'terms', 'applicant', 'representative', 'projectInfo', 'signature'],
+    APPLICANT: ['appendices', 'dataAccessAgreement', 'terms', 'applicant', 'representative', 'projectInfo', 'signature'],
     REVIEWER: allSections,
   },
   'REVISIONS REQUESTED': {
-    APPLICANT: ['ITAgreements', 'appendices', 'dataAccessAgreement', 'terms'],
+    APPLICANT: ['appendices', 'dataAccessAgreement', 'terms'],
     REVIEWER: allSections,
   },
   'SIGN AND SUBMIT': {
@@ -350,10 +349,6 @@ export function newApplication(identity: Identity): Partial<Application> {
       collaborators: {
         meta: { status: 'PRISTINE', errorsList: [] },
         list: [],
-      },
-      ITAgreements: {
-        meta: { status: 'PRISTINE', errorsList: [] },
-        agreements: getITAgreements()
       },
       appendices: {
         meta: { status: 'PRISTINE', errorsList: [] },
@@ -697,7 +692,6 @@ function updateAppStateForDraftApplication(current: Application,
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
   updateEthics(updatePart, current, updateDocs);
-  updateITAgreements(updatePart, current);
   updateDataAccessAgreements(updatePart, current);
   updateAppendices(updatePart, current);
 
@@ -742,13 +736,6 @@ function updateDataAccessAgreements(updatePart: Partial<UpdateApplication>, curr
   if (updatePart.sections?.dataAccessAgreement?.agreements) {
     mergeAgreementArray(current.sections.dataAccessAgreement.agreements, updatePart.sections.dataAccessAgreement.agreements);
     validateDataAccessAgreement(current);
-  }
-}
-
-function updateITAgreements(updatePart: Partial<UpdateApplication>, current: Application) {
-  if (updatePart.sections?.ITAgreements?.agreements) {
-    mergeAgreementArray(current.sections.ITAgreements.agreements, updatePart.sections.ITAgreements.agreements);
-    validateITAgreement(current);
   }
 }
 
@@ -908,46 +895,11 @@ function isReadyToSignAndSubmit(app: Application) {
     && sections.representative.meta.status == 'COMPLETE'
     && sections.projectInfo.meta.status == 'COMPLETE'
     && sections.ethicsLetter.meta.status == 'COMPLETE'
-    && sections.ITAgreements.meta.status == 'COMPLETE'
     && sections.dataAccessAgreement.meta.status == 'COMPLETE'
     && sections.appendices.meta.status == 'COMPLETE'
     // only check that collaborators section is not incomplete (which can happend)
     && sections.collaborators.meta.status !== 'INCOMPLETE';
   return requiredSectionsComplete;
-}
-
-
-function getITAgreements() {
-  return [
-    {
-      name: IT_AGREEMENT_SOFTWARE_UPDATES,
-      accepted: false,
-    },
-    {
-      name: IT_AGREEMENT_PROTECT_DATA,
-      accepted: false,
-    },
-    {
-      name: IT_AGREEMENT_MONITOR_ACCESS,
-      accepted: false,
-    },
-    {
-      name: IT_AGREEMENT_DESTROY_COPIES,
-      accepted: false,
-    },
-    {
-      name: IT_AGREEMENT_ONBOARD_TRAINING,
-      accepted: false,
-    },
-    {
-      name: IT_AGREEMENT_PROVIDE_INSTITUTIONAL_POLICIES,
-      accepted: false,
-    },
-    {
-      name: IT_AGREEMENT_CONTACT_DACO_FRAUD,
-      accepted: false,
-    }
-  ];
 }
 
 function getAppendixAgreements() {
@@ -989,6 +941,34 @@ function getAppendixAgreements() {
 
 function getDataAccessAgreement() {
   return [
+    {
+      name: IT_AGREEMENT_SOFTWARE_UPDATES,
+      accepted: false,
+    },
+    {
+      name: IT_AGREEMENT_PROTECT_DATA,
+      accepted: false,
+    },
+    {
+      name: IT_AGREEMENT_MONITOR_ACCESS,
+      accepted: false,
+    },
+    {
+      name: IT_AGREEMENT_DESTROY_COPIES,
+      accepted: false,
+    },
+    {
+      name: IT_AGREEMENT_ONBOARD_TRAINING,
+      accepted: false,
+    },
+    {
+      name: IT_AGREEMENT_PROVIDE_INSTITUTIONAL_POLICIES,
+      accepted: false,
+    },
+    {
+      name: IT_AGREEMENT_CONTACT_DACO_FRAUD,
+      accepted: false,
+    },
     {
       name: DAA_CORRECT_APPLICATION_CONTENT,
       accepted: false,

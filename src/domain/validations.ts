@@ -41,15 +41,6 @@ export function validateApplicantSection(app: Application) {
   app.sections.applicant.meta.errorsList = applicantErrors;
 }
 
-export function validateITAgreement(app: Application) {
-  const result = validateAgreementArray(app.sections.ITAgreements.agreements);
-  if (!result) {
-    app.sections.ITAgreements.meta.status = 'INCOMPLETE';
-    return;
-  }
-  app.sections.ITAgreements.meta.status = 'COMPLETE';
-}
-
 export function validateAppendices(app: Application) {
   const result = validateAgreementArray(app.sections.appendices.agreements);
   if (!result) {
