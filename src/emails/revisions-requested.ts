@@ -91,7 +91,7 @@ function renderGeneralCommentsRow(app: Application) {
 }
 
 function revisionSectionRow(section: keyof Application['revisionRequest'], revision: RevisionRequest) {
-  return `
+return `
               <tr>
                 <td class='revisions-tbl-cell' style='font-weight:600'>
                   ${getSectionName(section)}
@@ -113,9 +113,12 @@ function getSectionName(section: keyof Application['revisionRequest']) {
       return 'C. Collaborators';
     case 'projectInfo':
       return 'D. Project Information';
+    case 'ethicsLetter':
+        return 'E. Ethics';
     case 'signature':
       return 'Signature';
     case 'general':
       return 'General Comments';
+
   }
 }
