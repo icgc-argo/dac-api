@@ -367,6 +367,10 @@ export function getAppInRevisionRequested() {
                   hello hello`,
         requested: true
       },
+      ethicsLetter: {
+        details: `Problem problem`,
+        requested: true
+      },
       projectInfo: {
         details: 'hello... is it me you lookin for',
         requested: true,
