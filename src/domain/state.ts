@@ -507,7 +507,7 @@ function uploadEthicsLetter(current: Application, id: string, name: string) {
     updateAppStateForReturnedApplication(current, updatePart, true);
   } else if (current.state == 'APPROVED') {
     updateAppStateForApprovedApplication(current, updatePart, false, true);
-  } else if(current.state == 'SIGN AND SUBMIT') {
+  } else if (current.state == 'SIGN AND SUBMIT') {
     updateAppStateForSignAndSubmit(current, updatePart, true);
   } else {
     throw new Error('cannot update ethics letter at this state');
