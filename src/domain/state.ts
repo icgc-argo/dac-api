@@ -85,6 +85,8 @@ const stateToLockedSectionsMap: Record<State, Record<'REVIEWER' | 'APPLICANT', A
     REVIEWER: []
   }
 };
+
+
 export class ApplicationStateManager {
   public readonly currentApplication: Application;
 
@@ -147,6 +149,8 @@ export class ApplicationStateManager {
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     }
+
+    onAppUpdate(current);
     return current;
   }
 
@@ -194,6 +198,8 @@ export class ApplicationStateManager {
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     }
+
+    onAppUpdate(current);
     return current;
   }
 
@@ -248,6 +254,8 @@ export class ApplicationStateManager {
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     }
+
+    onAppUpdate(current);
     return current;
   }
 
@@ -259,7 +267,7 @@ export class ApplicationStateManager {
         break;
 
       case 'REVISIONS REQUESTED':
-        updateAppStateForRetrunedApplication(current, updatePart);
+        updateAppStateForReturnedApplication(current, updatePart);
         break;
 
       case 'REVIEW':
@@ -283,8 +291,7 @@ export class ApplicationStateManager {
     }
 
     // save / error
-    current.lastUpdatedAtUtc = new Date();
-    current.searchValues = getSearchFieldValues(current);
+    onAppUpdate(current);
     return current;
   }
 }
@@ -316,12 +323,15 @@ function deleteEthicsLetterDocument(current: Application, objectId: string) {
 
   if (current.state == 'DRAFT') {
     updateAppStateForDraftApplication(current, updatePart, true);
-  } else if (current.state == 'REVISIONS REQUESTED'
-    && current.sections.ethicsLetter.meta.status == 'REVISIONS REQUESTED') {
-    updateAppStateForRetrunedApplication(current, updatePart, true);
+  } else if (current.state == 'REVISIONS REQUESTED') {
+    updateAppStateForReturnedApplication(current, updatePart, true);
+  } else if (current.state == 'SIGN AND SUBMIT') {
+    updateAppStateForSignAndSubmit(current, updatePart, true);
   } else {
     throw new Error('Cannot delete ethics letter in this application state');
   }
+
+  onAppUpdate(current);
   return current;
 }
 
@@ -476,7 +486,7 @@ export function emptyRevisionRequest() {
 
 function uploadEthicsLetter(current: Application, id: string, name: string) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
-    throw new Error('Must decalre ethics letter as requried first');
+    throw new Error('Must declare ethics letter as required first');
   }
   const updatePart: Partial<UpdateApplication> = {
     sections: {
@@ -492,14 +502,19 @@ function uploadEthicsLetter(current: Application, id: string, name: string) {
   };
 
   if (current.state == 'DRAFT') {
-    return updateAppStateForDraftApplication(current, updatePart, true);
+    updateAppStateForDraftApplication(current, updatePart, true);
   } else if (current.state == 'REVISIONS REQUESTED') {
-    return updateAppStateForRetrunedApplication(current, updatePart, true);
+    updateAppStateForReturnedApplication(current, updatePart, true);
   } else if (current.state == 'APPROVED') {
-    return updateAppStateForApprovedApplication(current, updatePart, false, true);
+    updateAppStateForApprovedApplication(current, updatePart, false, true);
+  } else if(current.state == 'SIGN AND SUBMIT') {
+    updateAppStateForSignAndSubmit(current, updatePart, true);
   } else {
     throw new Error('cannot update ethics letter at this state');
   }
+  onAppUpdate(current);
+
+  return current;
 }
 
 function updateAppStateForReviewApplication(current: Application, updatePart: Partial<UpdateApplication>) {
@@ -567,12 +582,12 @@ function transitionToApproved(current: Application, updatePart: Partial<UpdateAp
 
 function validateRevisionRequest(revisionRequest: RevisionRequestUpdate) {
 
-  const atleastOneRequeted = Object.keys(revisionRequest)
+  const atleastOneRequested = Object.keys(revisionRequest)
     .map(k => k as keyof RevisionRequestUpdate)
     .filter(k => k != 'general')
     .some(k => revisionRequest[k]?.requested);
 
-  if (!atleastOneRequeted) {
+  if (!atleastOneRequested) {
     throw new BadRequest('At least one specific section should be requested for revision');
   }
 
@@ -605,7 +620,7 @@ function markSectionsForReview(current: Application) {
   }
 }
 
-function updateAppStateForSignAndSubmit(current: Application, updatePart: Partial<UpdateApplication>) {
+function updateAppStateForSignAndSubmit(current: Application, updatePart: Partial<UpdateApplication>, updateDocs?: boolean) {
   // applicant wants to submit the app
   if (updatePart.state == 'REVIEW') {
     const ready = isReadyForReview(current);
@@ -625,9 +640,9 @@ function updateAppStateForSignAndSubmit(current: Application, updatePart: Partia
 
   // applicant went back and updated completed sections (we treat that as an update in draft state)
   if (wasInRevisionRequestState(current)) {
-    updateAppStateForRetrunedApplication(current, updatePart);
+    updateAppStateForReturnedApplication(current, updatePart, updateDocs);
   } else {
-    updateAppStateForDraftApplication(current, updatePart);
+    updateAppStateForDraftApplication(current, updatePart, updateDocs);
   }
 
   return current;
@@ -666,13 +681,21 @@ function updateAppStateForApprovedApplication(currentApplication: Application,
   }
 }
 
-function updateAppStateForRetrunedApplication(current: Application,
+function updateAppStateForReturnedApplication(current: Application,
   updatePart: Partial<UpdateApplication>,
   updateDocs?: boolean) {
-  updateApplicantSection(updatePart, current);
-  updateRepresentative(updatePart, current);
-  updateProjectInfo(updatePart, current);
-  updateEthics(updatePart, current, updateDocs);
+    if (current.revisionRequest.applicant.requested) {
+      updateApplicantSection(updatePart, current);
+    }
+    if (current.revisionRequest.representative.requested) {
+      updateRepresentative(updatePart, current);
+    }
+    if (current.revisionRequest.projectInfo.requested) {
+      updateProjectInfo(updatePart, current);
+    }
+    if (current.revisionRequest.ethicsLetter.requested) {
+      updateEthics(updatePart, current, updateDocs);
+    }
 
   const signatureSectionStatus = current.revisionRequest.signature.requested ?
     'REVISIONS REQUESTED' : 'PRISTINE';
@@ -1028,4 +1051,9 @@ function calculateViewableSectionStatus(app: Application, section: keyof Applica
 
 function shouldBeLockedByAtThisState(state: State, section: keyof Application['sections'], isReviewer: boolean) {
   return stateToLockedSectionsMap[state][isReviewer ? 'REVIEWER' : 'APPLICANT'].includes(section);
+}
+
+function onAppUpdate(current: Application) {
+  current.lastUpdatedAtUtc = new Date();
+  current.searchValues = getSearchFieldValues(current);
 }
