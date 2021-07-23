@@ -148,6 +148,8 @@ export class ApplicationStateManager {
 
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
+    } else if (current.state == 'REVISIONS REQUESTED') {
+      updateAppStateForReturnedApplication(current, {});
     }
 
     onAppUpdate(current);
@@ -197,6 +199,8 @@ export class ApplicationStateManager {
     updateCollaboratorsSectionState(current);
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
+    } else if (current.state == 'REVISIONS REQUESTED') {
+      updateAppStateForReturnedApplication(current, {});
     }
 
     onAppUpdate(current);
@@ -253,6 +257,9 @@ export class ApplicationStateManager {
     updateCollaboratorsSectionState(current);
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
+    } else if (current.state == 'REVISIONS REQUESTED') {
+      // trigger transition in application state and sign and submit check
+      updateAppStateForReturnedApplication(current, {});
     }
 
     onAppUpdate(current);
@@ -920,8 +927,10 @@ function isReadyToSignAndSubmit(app: Application) {
     && sections.ethicsLetter.meta.status == 'COMPLETE'
     && sections.dataAccessAgreement.meta.status == 'COMPLETE'
     && sections.appendices.meta.status == 'COMPLETE'
-    // only check that collaborators section is not incomplete (which can happend)
-    && sections.collaborators.meta.status !== 'INCOMPLETE';
+    // only check that collaborators section is not incomplete or not in revisions requested (which can happen)
+    && (sections.collaborators.meta.status !== 'INCOMPLETE'
+      && sections.collaborators.meta.status !== 'REVISIONS REQUESTED');
+
   return requiredSectionsComplete;
 }
 
