@@ -79,6 +79,7 @@ export interface ApplicationSummary {
   applicant: {
     info: PersonalInfo,
   };
+  collaborators?: PersonalInfo[];
 }
 
 
@@ -222,6 +223,8 @@ export interface UpdateApplication {
     }
   };
 }
+
+export type FileFormat = 'daco-file-format';
 
 export const TERMS_AGREEMENT_NAME = 'introduction_agree_to_terms';
 export const IT_AGREEMENT_SOFTWARE_UPDATES = 'it_agreement_software_updates';

@@ -4,9 +4,23 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
-import _ from 'lodash';
-import { ApplicationStateManager, getSearchFieldValues, newApplication, wasInRevisionRequestState } from './state';
-import { Application, ApplicationSummary, Collaborator, SearchResult, State, UpdateApplication, UploadDocumentType } from './interface';
+import _, { includes } from 'lodash';
+import {
+  ApplicationStateManager,
+  getSearchFieldValues,
+  newApplication,
+  wasInRevisionRequestState,
+} from './state';
+import {
+  Application,
+  ApplicationSummary,
+  Collaborator,
+  FileFormat,
+  SearchResult,
+  State,
+  UpdateApplication,
+  UploadDocumentType,
+} from './interface';
 import { c } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
@@ -22,11 +36,13 @@ import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 
-export async function deleteDocument(appId: string,
-                                    type: UploadDocumentType,
-                                    objectId: string,
-                                    identity: Identity,
-                                    storageClient: Storage) {
+export async function deleteDocument(
+  appId: string,
+  type: UploadDocumentType,
+  objectId: string,
+  identity: Identity,
+  storageClient: Storage,
+) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -38,17 +54,20 @@ export async function deleteDocument(appId: string,
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
-  const viewAbleApplication = new ApplicationStateManager(updated.toObject()).prepareApplicantionForUser(false);
+  const viewAbleApplication = new ApplicationStateManager(
+    updated.toObject(),
+  ).prepareApplicantionForUser(false);
   return viewAbleApplication;
 }
 
-export async function uploadDocument(appId: string,
-                                    type: UploadDocumentType,
-                                    file: UploadedFile,
-                                    identity: Identity,
-                                    storageClient: Storage,
-                                    emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
-
+export async function uploadDocument(
+  appId: string,
+  type: UploadDocumentType,
+  file: UploadedFile,
+  identity: Identity,
+  storageClient: Storage,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -72,14 +91,17 @@ export async function uploadDocument(appId: string,
     }
   }
 
-  const viewAbleApplication = new ApplicationStateManager(updated.toObject()).prepareApplicantionForUser(false);
+  const viewAbleApplication = new ApplicationStateManager(
+    updated.toObject(),
+  ).prepareApplicantionForUser(false);
   return viewAbleApplication;
 }
 
-export async function getApplicationAssetsAsStream(appId: string,
-                                                identity: Identity,
-                                                storageClient: Storage)  {
-
+export async function getApplicationAssetsAsStream(
+  appId: string,
+  identity: Identity,
+  storageClient: Storage,
+) {
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
 
@@ -87,9 +109,9 @@ export async function getApplicationAssetsAsStream(appId: string,
     throw new Error('Cannot download package in this state');
   }
 
-  const docs = appDocObj.sections.ethicsLetter.approvalLetterDocs.map(e => ({
+  const docs = appDocObj.sections.ethicsLetter.approvalLetterDocs.map((e) => ({
     id: e.objectId,
-    name: e.name
+    name: e.name,
   }));
 
   docs.push({
@@ -102,17 +124,19 @@ export async function getApplicationAssetsAsStream(appId: string,
     const stream = await storageClient.downloadAsStream(d.id);
     return {
       ...d,
-      stream
+      stream,
     };
   });
   const assets = await Promise.all(downloaded);
   return assets;
 }
 
-export async function createCollaborator(appId: string,
-                                        collaborator: Collaborator,
-                                        identity: Identity,
-                                        emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
+export async function createCollaborator(
+  appId: string,
+  collaborator: Collaborator,
+  identity: Identity,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -131,7 +155,11 @@ export async function createCollaborator(appId: string,
   return result.sections.collaborators.list[result.sections.collaborators.list.length - 1];
 }
 
-export async function updateCollaborator(appId: string, collaborator: Collaborator, identity: Identity) {
+export async function updateCollaborator(
+  appId: string,
+  collaborator: Collaborator,
+  identity: Identity,
+) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -143,7 +171,11 @@ export async function updateCollaborator(appId: string, collaborator: Collaborat
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 }
 
-export async function deleteCollaborator(appId: string, collaboratorId: string, identity: Identity) {
+export async function deleteCollaborator(
+  appId: string,
+  collaboratorId: string,
+  identity: Identity,
+) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -169,12 +201,13 @@ export async function create(identity: Identity) {
   return copy;
 }
 
-export async function updatePartial(appId: string,
-                                    appPart: Partial<UpdateApplication>,
-                                    identity: Identity,
-                                    storageClient: Storage,
-                                    emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
-
+export async function updatePartial(
+  appId: string,
+  appPart: Partial<UpdateApplication>,
+  identity: Identity,
+  storageClient: Storage,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   const isReviewer = await hasReviewScope(identity);
   const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
@@ -192,20 +225,23 @@ export async function updatePartial(appId: string,
   // - Changing selection of ethics letter from required to not required
   // - Admin requests revisions (signed app has to be uploaded again)
   // - Applicant changes a completed section when the application is in state sign & submit
-  deleted.map(d => storageClient.delete(d)
-    .catch(e => logger.error(`failed to delete document ${d}`, e))
+  deleted.map((d) =>
+    storageClient.delete(d).catch((e) => logger.error(`failed to delete document ${d}`, e)),
   );
   const updated = await findApplication(c(updatedApp.appId), identity);
-  const updatedObj =  updated.toObject();
-  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicantionForUser(isReviewer);
+  const updatedObj = updated.toObject();
+  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicantionForUser(
+    isReviewer,
+  );
   return viewAbleApplication;
 }
 
-async function onStateChange(updatedApp: Application,
-                            oldApplication: Application,
-                            emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
-                            config: AppConfig) {
-
+async function onStateChange(
+  updatedApp: Application,
+  oldApplication: Application,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+) {
   // if application state changed to REVIEW (ie submitted) send an email to Admin
   if (updatedApp.state == 'REVIEW') {
     await sendReviewEmail(oldApplication, updatedApp, config, emailClient);
@@ -220,43 +256,55 @@ async function onStateChange(updatedApp: Application,
 
   if (updatedApp.state === 'APPROVED') {
     await sendApplicationApprovedEmail(updatedApp, config, emailClient);
-    Promise.all(updatedApp.sections.collaborators.list.map((collab) => {
-      sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient)
-        .catch(err => logger.error(`failed to send email to collaborator ${collab.id}: ${err}`));
-    })).catch(err => logger.error(err));
+    Promise.all(
+      updatedApp.sections.collaborators.list.map((collab) => {
+        sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
+          logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
+        );
+      }),
+    ).catch((err) => logger.error(err));
   }
 }
 
-export async function search(params: {
-                              query: string,
-                              states: string[],
-                              page: number,
-                              pageSize: number,
-                              sortBy: { field: string, direction: string }[],
-                            }, identity: Identity): Promise<SearchResult> {
-
+export async function search(
+  params: {
+    query: string;
+    states: State[];
+    page: number;
+    pageSize: number;
+    sortBy: { field: string; direction: string }[];
+    includeCollaborators?: boolean;
+    useCursor?: boolean;
+  },
+  identity: Identity,
+): Promise<any> {
+  // ): Promise<SearchResult> {
+  // check identity has admin privilege, DACO-REVIEW.WRITE (user or ego application)
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
     query.submitterId = identity.userId;
   }
 
+  // user collaborators param
   if (params.states.length > 0) {
     query.state = {
-      $in: params.states as State[]
+      $in: params.states as State[],
     };
   }
 
   if (!!params.query) {
     query.$or = [];
-    query.$or.push({searchValues: new RegExp(params.query, 'gi')});
+    query.$or.push({ searchValues: new RegExp(params.query, 'gi') });
   }
 
+  // add default sort by appId
   const sortObj: any = {};
-  params.sortBy.forEach(sb => {
-    sortObj[mapField(sb.field)] = sb.direction == 'asc' ?  1 : -1 ;
+  params.sortBy.forEach((sb) => {
+    sortObj[mapField(sb.field)] = sb.direction == 'asc' ? 1 : -1;
   });
 
+  // separate query to get total docs
   const count = await ApplicationModel.find(query).countDocuments();
   if (count == 0) {
     return {
@@ -265,54 +313,87 @@ export async function search(params: {
         pagesCount: 0,
         index: params.page,
       },
-      items: []
+      items: [],
     };
   }
 
-  const apps = await ApplicationModel.find(query)
-    .skip( params.page > 0 ? ( ( params.page ) * params.pageSize ) : 0)
-    .limit( params.pageSize )
-    .sort( sortObj )
-    .exec();
+  let apps;
+  if (params.useCursor) {
+    let fooNum = 0;
+    const docs: any[] = [];
+    apps = await ApplicationModel.find(query)
+      .skip(params.page > 0 ? params.page * params.pageSize : 0)
+      // .limit(params.pageSize)
+      .sort(sortObj)
+      .cursor()
+      .on('data', (doc: any) => {
+        docs.push(doc);
+        fooNum += 1;
+      })
+      .on('end', () => {
+        console.log('Done!', docs.length);
+        return docs;
+      });
+    // .on('data', (doc) => {
+    //   console.log(doc);
+    // })
+    // .on('end', () => {
+    //   console.log('Done!');
+    // });
+    // return apps;
+  } else {
+    apps = await ApplicationModel.find(query)
+      .skip(params.page > 0 ? params.page * params.pageSize : 0)
+      .limit(params.pageSize)
+      .sort(sortObj)
+      .exec();
+  }
 
-  const copy = apps.map((app: ApplicationDocument) => ({
-      appId: `${app.appId}`,
-      applicant: { info: app.sections.applicant.info },
-      submitterId: app.submitterId,
-      approvedAtUtc: app.approvedAtUtc,
-      closedAtUtc: app.closedAtUtc,
-      closedBy: app.closedBy,
-      expiresAtUtc: app.expiresAtUtc,
-      state: app.state,
-      ethics: {
-        // tslint:disable-next-line:no-null-keyword
-        declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired
-      },
-      submittedAtUtc: app.submittedAtUtc,
-      lastUpdatedAtUtc: app.lastUpdatedAtUtc
-    } as ApplicationSummary)
+  // applicant + collaborators get access
+  const copy = apps.map(
+    (app: ApplicationDocument) =>
+      ({
+        appId: `${app.appId}`,
+        applicant: { info: app.sections.applicant.info },
+        submitterId: app.submitterId,
+        approvedAtUtc: app.approvedAtUtc,
+        closedAtUtc: app.closedAtUtc,
+        closedBy: app.closedBy,
+        expiresAtUtc: app.expiresAtUtc,
+        state: app.state,
+        ethics: {
+          // tslint:disable-next-line:no-null-keyword
+          declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired,
+        },
+        submittedAtUtc: app.submittedAtUtc,
+        lastUpdatedAtUtc: app.lastUpdatedAtUtc,
+        // collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info)
+        ...(params.includeCollaborators && {
+          collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
+        }),
+      } as ApplicationSummary),
   );
 
   return {
     pagingInfo: {
       totalCount: count,
-      pagesCount: Math.ceil(count * 1.0 / params.pageSize),
+      pagesCount: Math.ceil((count * 1.0) / params.pageSize),
       index: params.page,
     },
-    items: copy
+    items: copy,
   };
 }
 
 export async function deleteApp(id: string, identity: Identity) {
   await ApplicationModel.deleteOne({
-    appId: id
+    appId: id,
   }).exec();
 }
 
 export async function getById(id: string, identity: Identity) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
-    appId: id
+    appId: id,
   };
   if (!isAdminOrReviewerResult) {
     query.submitterId = identity.userId;
@@ -323,16 +404,16 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy)
-    .prepareApplicantionForUser(isAdminOrReviewerResult);
+  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicantionForUser(
+    isAdminOrReviewerResult,
+  );
   return viewAbleApplication;
 }
-
 
 async function findApplication(appId: string, identity: Identity) {
   const isReviewer = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
-    appId
+    appId,
   };
 
   if (!isReviewer) {
@@ -349,34 +430,38 @@ async function findApplication(appId: string, identity: Identity) {
 async function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = (await getAppConfig()).auth.REVIEW_SCOPE;
   const scopes = identity.tokenInfo.context.scope;
-  return scopes.some(v => v == REVIEW_SCOPE);
+  return scopes.some((v) => v == REVIEW_SCOPE);
 }
 
 function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const removedIds: string[] = [];
-  const ethicsArrayBefore =
-    appDocObj.sections.ethicsLetter.approvalLetterDocs.sort((a, b) => a.objectId.localeCompare(b.objectId)).map(e => e.objectId);
-  const ethicsArrayAfter =
-    result.sections.ethicsLetter.approvalLetterDocs.sort((a, b) => a.objectId.localeCompare(b.objectId)).map(e => e.objectId);
+  const ethicsArrayBefore = appDocObj.sections.ethicsLetter.approvalLetterDocs
+    .sort((a, b) => a.objectId.localeCompare(b.objectId))
+    .map((e) => e.objectId);
+  const ethicsArrayAfter = result.sections.ethicsLetter.approvalLetterDocs
+    .sort((a, b) => a.objectId.localeCompare(b.objectId))
+    .map((e) => e.objectId);
   const diff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
-  diff.forEach(o => removedIds.push(o));
+  diff.forEach((o) => removedIds.push(o));
 
-  if (appDocObj.sections.signature.signedAppDocObjId
-
-      && appDocObj.sections.signature.signedAppDocObjId != result.sections.signature.signedAppDocObjId) {
+  if (
+    appDocObj.sections.signature.signedAppDocObjId &&
+    appDocObj.sections.signature.signedAppDocObjId != result.sections.signature.signedAppDocObjId
+  ) {
     removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
   }
 
   return removedIds;
 }
 
-async function sendEmail(emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+async function sendEmail(
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   fromEmail: string,
   fromName: string,
   to: Set<string>,
   subject: string,
-  html: string) {
-
+  html: string,
+) {
   const info = await emailClient.sendMail({
     from: `"${fromName}" <${fromEmail}>`, // sender address
     to: Array.from(to).join(','), // list of receivers
@@ -399,159 +484,201 @@ function mapField(field: string) {
   }
 }
 
-async function sendSubmissionConfirmation(updatedApp: Application,
-                                          emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
-                                          config: AppConfig) {
-
+async function sendSubmissionConfirmation(
+  updatedApp: Application,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+) {
   const submittedEmail = await renderSubmittedEmail(updatedApp, config.email.links);
-  await sendEmail(emailClient,
+  await sendEmail(
+    emailClient,
     config.email.fromAddress,
     config.email.fromName,
     getApplicantEmails(updatedApp),
-    `[${updatedApp.appId}] We Received your Application`, submittedEmail.html);
+    `[${updatedApp.appId}] We Received your Application`,
+    submittedEmail.html,
+  );
 }
 
-async function sendRevisionsRequestEmail(app: Application,
-                                         emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
-                                         config: AppConfig) {
-
+async function sendRevisionsRequestEmail(
+  app: Application,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+) {
   const submittedEmail = await renderRevisionsEmail(app, config);
-  await sendEmail(emailClient,
+  await sendEmail(
+    emailClient,
     config.email.fromAddress,
     config.email.fromName,
     getApplicantEmails(app),
-    `[${app.appId}] Your Application has been Reopened for Revisions`, submittedEmail.html);
+    `[${app.appId}] Your Application has been Reopened for Revisions`,
+    submittedEmail.html,
+  );
 }
 
-async function sendApplicationApprovedEmail(updatedApp: Application,
-                                            config: AppConfig,
-                                            emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
-
+async function sendApplicationApprovedEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   const email = await renderApprovedEmail(updatedApp, config.email.links);
-  await sendEmail(emailClient,
+  await sendEmail(
+    emailClient,
     config.email.fromAddress,
     config.email.fromName,
     getApplicantEmails(updatedApp),
-    `[${updatedApp.appId}] Your Application has been Approved`, email.html);
-
-
+    `[${updatedApp.appId}] Your Application has been Approved`,
+    email.html,
+  );
 }
-async function sendCollaboratorAddedEmail(updatedApp: Application,
-                                    config: AppConfig,
-                                    emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
-
+async function sendCollaboratorAddedEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   const collaborators = updatedApp.sections.collaborators.list;
-  const reviewEmail = await renderCollaboratorAdded(updatedApp, {
-    firstName: config.email.reviewerFirstName,
-    lastName: config.email.reviewerLastName,
-   }, {
-     info: collaborators[collaborators.length - 1].info,
-     addedOn: new Date()
-   }, {
-    baseUrl: config.ui.baseUrl,
-    pathTemplate: config.ui.sectionPath,
-  });
+  const reviewEmail = await renderCollaboratorAdded(
+    updatedApp,
+    {
+      firstName: config.email.reviewerFirstName,
+      lastName: config.email.reviewerLastName,
+    },
+    {
+      info: collaborators[collaborators.length - 1].info,
+      addedOn: new Date(),
+    },
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+  );
   const emailContent = reviewEmail.html;
   const title = `A New Collaborator has been Added`;
   const subject = `[${updatedApp.appId}] ${title}`;
 
-  await sendEmail(emailClient,
+  await sendEmail(
+    emailClient,
     config.email.fromAddress,
     config.email.fromName,
     new Set([config.email.dacoAddress]),
     subject,
-    emailContent);
+    emailContent,
+  );
 }
 
 async function sendCollaboratorApprovedEmail(
   updatedApp: Application,
   collaborator: Collaborator,
   config: AppConfig,
-  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
-  const collaboratorApprovedEmail = await renderCollaboratorNotificationEmail(updatedApp, collaborator, config.email.links);
+  const collaboratorApprovedEmail = await renderCollaboratorNotificationEmail(
+    updatedApp,
+    collaborator,
+    config.email.links,
+  );
   const emailContent = collaboratorApprovedEmail.html;
   const title = `You have been Granted Access`;
   const subject = `[${updatedApp.appId}] ${title}`;
 
-  await sendEmail(emailClient,
+  await sendEmail(
+    emailClient,
     config.email.fromAddress,
     config.email.fromName,
     new Set([collaborator.info.googleEmail, collaborator.info.institutionEmail]),
     subject,
-    emailContent);
+    emailContent,
+  );
 }
 
-async function sendEthicsLetterSubmitted(updatedApp: Application,
-                                        config: AppConfig,
-                                        emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
-
+async function sendEthicsLetterSubmitted(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   const ethicLetters = updatedApp.sections.ethicsLetter.approvalLetterDocs;
-  const reviewEmail = await renderEthicsLetterEmail(updatedApp, {
-    firstName: config.email.reviewerFirstName,
-    lastName: config.email.reviewerLastName,
-   }, {
-     addedOn: ethicLetters[ethicLetters.length - 1].uploadedAtUtc
-   }, {
-    baseUrl: config.ui.baseUrl,
-    pathTemplate: config.ui.sectionPath,
-  });
+  const reviewEmail = await renderEthicsLetterEmail(
+    updatedApp,
+    {
+      firstName: config.email.reviewerFirstName,
+      lastName: config.email.reviewerLastName,
+    },
+    {
+      addedOn: ethicLetters[ethicLetters.length - 1].uploadedAtUtc,
+    },
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+  );
   const emailContent = reviewEmail.html;
   const title = `A New Ethics Letter has been Added`;
   const subject = `[${updatedApp.appId}] ${title}`;
 
-  await sendEmail(emailClient,
+  await sendEmail(
+    emailClient,
     config.email.fromAddress,
     config.email.fromName,
     new Set([config.email.dacoAddress]),
     subject,
-    emailContent);
+    emailContent,
+  );
 }
 
-async function sendReviewEmail(oldApplication: Application,
-                               updatedApp: Application,
-                               config: AppConfig,
-                               emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
-
+async function sendReviewEmail(
+  oldApplication: Application,
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   let emailContent: string;
   let title: string;
   if (wasInRevisionRequestState(oldApplication)) {
     // send new app for review email
-    const reviewEmail = await renderReviewRevisedEmail(updatedApp, {
-      firstName: config.email.reviewerFirstName,
-      lastName: config.email.reviewerLastName,
-    }, {
-      baseUrl: config.ui.baseUrl,
-      pathTemplate: config.ui.sectionPath,
-    });
+    const reviewEmail = await renderReviewRevisedEmail(
+      updatedApp,
+      {
+        firstName: config.email.reviewerFirstName,
+        lastName: config.email.reviewerLastName,
+      },
+      {
+        baseUrl: config.ui.baseUrl,
+        pathTemplate: config.ui.sectionPath,
+      },
+    );
     emailContent = reviewEmail.html;
     title = `[${updatedApp.appId}] A Revised Application has been Submitted`;
   } else {
     // send new app for review email
-    const reviewEmail = await renderReviewEmail(updatedApp, {
-      firstName: config.email.reviewerFirstName,
-      lastName: config.email.reviewerLastName,
-    }, {
-      baseUrl: config.ui.baseUrl,
-      pathTemplate: config.ui.sectionPath,
-    });
+    const reviewEmail = await renderReviewEmail(
+      updatedApp,
+      {
+        firstName: config.email.reviewerFirstName,
+        lastName: config.email.reviewerLastName,
+      },
+      {
+        baseUrl: config.ui.baseUrl,
+        pathTemplate: config.ui.sectionPath,
+      },
+    );
     emailContent = reviewEmail.html;
     title = `[${updatedApp.appId}] A New Application has been Submitted`;
   }
 
-  await sendEmail(emailClient,
+  await sendEmail(
+    emailClient,
     config.email.fromAddress,
     config.email.fromName,
     new Set([config.email.dacoAddress]),
     title,
-    emailContent);
+    emailContent,
+  );
 }
-
 
 function getApplicantEmails(app: Application) {
   return new Set([
     app.submitterEmail,
     app.sections.applicant.info.googleEmail,
-    app.sections.applicant.info.institutionEmail
+    app.sections.applicant.info.institutionEmail,
   ]);
 }
