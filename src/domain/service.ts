@@ -274,19 +274,16 @@ export async function search(
     pageSize: number;
     sortBy: { field: string; direction: string }[];
     includeCollaborators?: boolean;
-    useCursor?: boolean;
+    cursorSearch?: boolean;
   },
   identity: Identity,
-): Promise<any> {
-  // ): Promise<SearchResult> {
-  // check identity has admin privilege, DACO-REVIEW.WRITE (user or ego application)
+): Promise<SearchResult> {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
     query.submitterId = identity.userId;
   }
 
-  // user collaborators param
   if (params.states.length > 0) {
     query.state = {
       $in: params.states as State[],
@@ -298,7 +295,7 @@ export async function search(
     query.$or.push({ searchValues: new RegExp(params.query, 'gi') });
   }
 
-  // add default sort by appId
+  // TODO: add default sort by appId
   const sortObj: any = {};
   params.sortBy.forEach((sb) => {
     sortObj[mapField(sb.field)] = sb.direction == 'asc' ? 1 : -1;
@@ -317,37 +314,18 @@ export async function search(
     };
   }
 
-  if (params.useCursor) {
-    const stuff: ApplicationSummary[] = [];
+  let apps = [];
+  if (params.cursorSearch) {
     for await (const app of await ApplicationModel.find(query)) {
-      const summary = {
-        appId: `${app.appId}`,
-        applicant: { info: app.sections.applicant.info },
-        submitterId: app.submitterId,
-        approvedAtUtc: app.approvedAtUtc,
-        closedAtUtc: app.closedAtUtc,
-        closedBy: app.closedBy,
-        expiresAtUtc: app.expiresAtUtc,
-        state: app.state,
-        ethics: {
-          // tslint:disable-next-line:no-null-keyword
-          declaredAsRequired: app.sections.ethicsLetter?.declaredAsRequired,
-        },
-        submittedAtUtc: app.submittedAtUtc,
-        lastUpdatedAtUtc: app.lastUpdatedAtUtc,
-        ...(params.includeCollaborators && {
-          collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
-        }),
-      } as ApplicationSummary;
-      stuff.push(summary);
+      apps.push(app);
     }
-    return stuff;
+  } else {
+    apps = await ApplicationModel.find(query)
+      .skip(params.page > 0 ? params.page * params.pageSize : 0)
+      .limit(params.pageSize)
+      .sort(sortObj)
+      .exec();
   }
-  const apps = await ApplicationModel.find(query)
-    .skip(params.page > 0 ? params.page * params.pageSize : 0)
-    .limit(params.pageSize)
-    .sort(sortObj)
-    .exec();
 
   // applicant + collaborators get access
   const copy = apps.map(

@@ -255,6 +255,13 @@ const createApplicationsRouter = (
     { accessor: 'affiliation', name: 'AFFILIATION' },
   ];
   const headerRow: string[] = fileHeaders.map((header) => header.name);
+  const parseApprovedUser = (userInfo: PersonalInfo, lastUpdatedAtUtc: Date) => ({
+    userName: userInfo.displayName,
+    openId: userInfo.googleEmail,
+    email: userInfo.institutionEmail,
+    affiliation: userInfo.primaryAffiliation,
+    changed: lastUpdatedAtUtc,
+  });
 
   router.get(
     '/export/approved-users/',
@@ -264,32 +271,22 @@ const createApplicationsRouter = (
         ...getSearchParams(req, 'appId:asc'),
         states: ['APPROVED'] as State[],
         includeCollaborators: true,
-        useCursor: true,
+        cursorSearch: true,
       };
       logger.info(`exporting approved users for all applications`);
       const results = await search(params, (req as IRequest).identity);
 
-      const foo = results
+      const parsedResults = results.items
         .map((appResult: ApplicationSummary) => {
           const applicantInfo = appResult.applicant.info;
-          const applicant = {
-            userName: applicantInfo.displayName,
-            openId: applicantInfo.googleEmail,
-            email: applicantInfo.institutionEmail,
-            affiliation: applicantInfo.primaryAffiliation,
-            changed: appResult.lastUpdatedAtUtc,
-          };
-          const collabs = (appResult.collaborators || []).map((collab) => ({
-            userName: collab.displayName,
-            openId: collab.googleEmail,
-            email: collab.institutionEmail,
-            affiliation: collab.primaryAffiliation,
-            changed: appResult.lastUpdatedAtUtc,
-          }));
+          const applicant = parseApprovedUser(applicantInfo, appResult.lastUpdatedAtUtc);
+          const collabs = (appResult.collaborators || []).map((collab) =>
+            parseApprovedUser(collab, appResult.lastUpdatedAtUtc),
+          );
           return [applicant, ...collabs];
         })
         .flat();
-      const wat = uniqBy(foo, 'openId').map((row: any) => {
+      const uniqueApprovedUsers = uniqBy(parsedResults, 'openId').map((row: any) => {
         const dataRow: string[] = fileHeaders.map((header) => {
           // if value is missing, add empty string so the column has content
           return row[header.accessor as any] || '';
@@ -299,9 +296,10 @@ const createApplicationsRouter = (
       // treat as blob to write to a file object
       // then you can name it
       res.set('Content-Type', 'text/csv');
-      const withHeaders = [headerRow, ...wat].join('\n');
+      const withHeaders = [headerRow, ...uniqueApprovedUsers].join('\n');
       // verify the correct filename
-      res.status(200).attachment('daco-users.csv').send(withHeaders);
+      const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DD');
+      res.status(200).attachment(`daco-users-${currentDate}.csv`).send(withHeaders);
     }),
   );
 
