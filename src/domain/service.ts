@@ -4,7 +4,7 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
-import _, { includes } from 'lodash';
+import _, { includes, isEmpty } from 'lodash';
 import {
   ApplicationStateManager,
   getSearchFieldValues,
@@ -295,11 +295,13 @@ export async function search(
     query.$or.push({ searchValues: new RegExp(params.query, 'gi') });
   }
 
-  // TODO: add default sort by appId
+  // default sort by appId
   const sortObj: any = {};
-  params.sortBy.forEach((sb) => {
-    sortObj[mapField(sb.field)] = sb.direction == 'asc' ? 1 : -1;
-  });
+  isEmpty(params.sortBy)
+    ? params.sortBy.forEach((sb) => {
+        sortObj[mapField(sb.field)] = sb.direction == 'asc' ? 1 : -1;
+      })
+    : (sortObj['appId'] = 1);
 
   // separate query to get total docs
   const count = await ApplicationModel.find(query).countDocuments();
@@ -327,7 +329,6 @@ export async function search(
       .exec();
   }
 
-  // applicant + collaborators get access
   const copy = apps.map(
     (app: ApplicationDocument) =>
       ({

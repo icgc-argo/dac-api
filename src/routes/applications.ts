@@ -16,12 +16,10 @@ import {
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import { Identity } from '@overture-stack/ego-token-middleware';
-import { FilterQuery } from 'mongoose';
 
 import {
-  Application,
   ApplicationSummary,
-  FileFormat,
+  CSVFileHeader,
   PersonalInfo,
   State,
   UpdateApplication,
@@ -35,7 +33,7 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import archiver from 'archiver';
 import moment from 'moment';
 import { Readable } from 'stream';
-import { ApplicationModel, ApplicationDocument } from '../domain/model';
+import { getSearchParams, parseApprovedUser } from '../utils/misc';
 
 interface IRequest extends Request {
   identity: Identity;
@@ -207,26 +205,6 @@ const createApplicationsRouter = (
     }),
   );
 
-  const getSearchParams = (req: Request, defaultSort: string) => {
-    const query = (req.query.query as string | undefined) || '';
-    const states = req.query.states ? ((req.query.states as string).split(',') as State[]) : [];
-    const page = Number(req.query.page) || 0;
-    const pageSize = Number(req.query.pageSize) || 25;
-    const sort = (req.query.sort as string | undefined) || defaultSort;
-    const sortBy = sort.split(',').map((s) => {
-      const sortField = s.trim().split(':');
-      return { field: sortField[0].trim(), direction: sortField[1].trim() };
-    });
-
-    return {
-      query,
-      states,
-      page,
-      pageSize,
-      sortBy,
-    };
-  };
-
   router.get(
     '/applications/',
     authFilter([]),
@@ -242,40 +220,20 @@ const createApplicationsRouter = (
     }),
   );
 
-  type CSVFileHeader = {
-    accessor?: string;
-    name: string;
-  };
-
-  const fileHeaders: CSVFileHeader[] = [
-    { accessor: 'userName', name: 'USER NAME' },
-    { accessor: 'openId', name: 'OPENID' },
-    { accessor: 'email', name: 'EMAIL' },
-    { accessor: 'changed', name: 'CHANGED' }, // verify what this value should be
-    { accessor: 'affiliation', name: 'AFFILIATION' },
-  ];
-  const headerRow: string[] = fileHeaders.map((header) => header.name);
-  const parseApprovedUser = (userInfo: PersonalInfo, lastUpdatedAtUtc: Date) => ({
-    userName: userInfo.displayName,
-    openId: userInfo.googleEmail,
-    email: userInfo.institutionEmail,
-    affiliation: userInfo.primaryAffiliation,
-    changed: lastUpdatedAtUtc,
-  });
-
   router.get(
     '/export/approved-users/',
     authFilter([config.auth.REVIEW_SCOPE]),
     wrapAsync(async (req: Request, res: Response) => {
+      logger.info(`exporting approved users for all applications`);
       const params = {
         ...getSearchParams(req, 'appId:asc'),
         states: ['APPROVED'] as State[],
         includeCollaborators: true,
         cursorSearch: true,
       };
-      logger.info(`exporting approved users for all applications`);
       const results = await search(params, (req as IRequest).identity);
 
+      // applicant + collaborators get daco access
       const parsedResults = results.items
         .map((appResult: ApplicationSummary) => {
           const applicantInfo = appResult.applicant.info;
@@ -286,18 +244,27 @@ const createApplicationsRouter = (
           return [applicant, ...collabs];
         })
         .flat();
+
+      const fileHeaders: CSVFileHeader[] = [
+        { accessor: 'userName', name: 'USER NAME' },
+        { accessor: 'openId', name: 'OPENID' },
+        { accessor: 'email', name: 'EMAIL' },
+        { accessor: 'changed', name: 'CHANGED' }, // verify what this value should be
+        { accessor: 'affiliation', name: 'AFFILIATION' },
+      ];
+      const headerRow: string[] = fileHeaders.map((header) => header.name);
+
       const uniqueApprovedUsers = uniqBy(parsedResults, 'openId').map((row: any) => {
         const dataRow: string[] = fileHeaders.map((header) => {
           // if value is missing, add empty string so the column has content
-          return row[header.accessor as any] || '';
+          return row[header.accessor as string] || '';
         });
         return dataRow.join(',');
       });
-      // treat as blob to write to a file object
-      // then you can name it
+
       res.set('Content-Type', 'text/csv');
       const withHeaders = [headerRow, ...uniqueApprovedUsers].join('\n');
-      // verify the correct filename
+      // TODO: verify the correct filename
       const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DD');
       res.status(200).attachment(`daco-users-${currentDate}.csv`).send(withHeaders);
     }),

@@ -225,6 +225,10 @@ export interface UpdateApplication {
 }
 
 export type FileFormat = 'daco-file-format';
+export type CSVFileHeader = {
+  accessor?: string;
+  name: string;
+};
 
 export const TERMS_AGREEMENT_NAME = 'introduction_agree_to_terms';
 export const IT_AGREEMENT_SOFTWARE_UPDATES = 'it_agreement_software_updates';
