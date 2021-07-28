@@ -213,7 +213,7 @@ function validatePersonalInfo(info: PersonalInfo, errors: SectionError[], valida
     validateEmail(info.institutionEmail, 'institutionEmail', errors),
     validateRequired(info.primaryAffiliation, 'primaryAffiliation', errors),
     validateRequired(info.positionTitle, 'positionTitle', errors),
-    validateUrl(info.website, 'website', errors),
+    validateUrl(info.website, 'website', errors) && validateRequired(info.website, 'website', errors),
   ];
 
   return !validations.some(x => x == false);
