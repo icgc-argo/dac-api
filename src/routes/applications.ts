@@ -16,6 +16,8 @@ import {
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import { Identity } from '@overture-stack/ego-token-middleware';
+import { FilterQuery } from 'mongoose';
+
 import {
   Application,
   ApplicationSummary,
@@ -25,7 +27,7 @@ import {
   UpdateApplication,
 } from '../domain/interface';
 import { AppConfig } from '../config';
-import _ from 'lodash';
+import _, { uniqBy } from 'lodash';
 import { Storage } from '../storage';
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
@@ -33,6 +35,7 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import archiver from 'archiver';
 import moment from 'moment';
 import { Readable } from 'stream';
+import { ApplicationModel, ApplicationDocument } from '../domain/model';
 
 interface IRequest extends Request {
   identity: Identity;
@@ -208,7 +211,7 @@ const createApplicationsRouter = (
     const query = (req.query.query as string | undefined) || '';
     const states = req.query.states ? ((req.query.states as string).split(',') as State[]) : [];
     const page = Number(req.query.page) || 0;
-    const pageSize = Number(req.query.pageSize) || 10; // for testing; revert to 25
+    const pageSize = Number(req.query.pageSize) || 25;
     const sort = (req.query.sort as string | undefined) || defaultSort;
     const sortBy = sort.split(',').map((s) => {
       const sortField = s.trim().split(':');
@@ -245,27 +248,13 @@ const createApplicationsRouter = (
   };
 
   const fileHeaders: CSVFileHeader[] = [
-    { accessor: 'displayName', name: 'USER NAME' },
-    { accessor: 'googleEmail', name: 'OPENID' },
-    { accessor: 'institutionalEmail', name: 'EMAIL' },
-    { accessor: 'lastUpdatedAtUtc', name: 'CHANGED' }, // verify what this value should be
-    { accessor: 'primaryAffiliation', name: 'AFFILIATION' },
+    { accessor: 'userName', name: 'USER NAME' },
+    { accessor: 'openId', name: 'OPENID' },
+    { accessor: 'email', name: 'EMAIL' },
+    { accessor: 'changed', name: 'CHANGED' }, // verify what this value should be
+    { accessor: 'affiliation', name: 'AFFILIATION' },
   ];
   const headerRow: string[] = fileHeaders.map((header) => header.name);
-
-  const convertToCsvRow = (userData: PersonalInfo, lastUpdated: Date) => {
-    // File Header	USER NAME	OPENID	EMAIL	CHANGED	AFFILIATION
-    // is CHANGED the date the app was last modified, or the date this user was added to the file?
-    const dataRow: string[] = fileHeaders.map((header) => {
-      if (header.name === 'CHANGED') {
-        return lastUpdated.toString(); // not sure about formatting
-      } else {
-        // if value is missing, add empty string
-        return userData[header.accessor as keyof PersonalInfo] || '';
-      }
-    });
-    return dataRow.join(',');
-  };
 
   router.get(
     '/export/approved-users/',
@@ -278,63 +267,41 @@ const createApplicationsRouter = (
         useCursor: true,
       };
       logger.info(`exporting approved users for all applications`);
-      // so here, iterate through apps and write result to file
-      // where to do unique call? you would need to get all the results first
-      // so, load everything row into a stream, then call unique func
-      // then write to file
+      const results = await search(params, (req as IRequest).identity);
 
-      let fooNum = 0;
-      const docs: any[] = [];
-      const getStuff = async (pageNum: number) =>
-        await search({ ...params, page: pageNum, useCursor: true }, (req as IRequest).identity);
-      // return res.status(200).send(withHeaders);
-      // const result = await search(params, (req as IRequest).identity);
-      const result = await search(
-        { ...params, page: fooNum, useCursor: true },
-        (req as IRequest).identity,
-      );
-      await result
-        .on('data', (doc: any) => {
-          docs.push(doc);
-          fooNum += 1;
+      const foo = results
+        .map((appResult: ApplicationSummary) => {
+          const applicantInfo = appResult.applicant.info;
+          const applicant = {
+            userName: applicantInfo.displayName,
+            openId: applicantInfo.googleEmail,
+            email: applicantInfo.institutionEmail,
+            affiliation: applicantInfo.primaryAffiliation,
+            changed: appResult.lastUpdatedAtUtc,
+          };
+          const collabs = (appResult.collaborators || []).map((collab) => ({
+            userName: collab.displayName,
+            openId: collab.googleEmail,
+            email: collab.institutionEmail,
+            affiliation: collab.primaryAffiliation,
+            changed: appResult.lastUpdatedAtUtc,
+          }));
+          return [applicant, ...collabs];
         })
-        .on('end', () => {
-          console.log('Done!');
-          console.log(docs.length);
-          console.log('foo num: ', fooNum);
+        .flat();
+      const wat = uniqBy(foo, 'openId').map((row: any) => {
+        const dataRow: string[] = fileHeaders.map((header) => {
+          // if value is missing, add empty string so the column has content
+          return row[header.accessor as any] || '';
         });
-
-      // const readable = new Stream.Readable({
-      //   read() {}
-      // });
-
-      // res.write is causing: Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
-      // res.write(headerRow.concat('\n').join(','));
-      // for each approved application, create csv row and push into stream
-      // console.log(result);
-      const foo = result.items.map((appResult: ApplicationSummary) => {
-        const applicantData = convertToCsvRow(appResult.applicant.info, appResult.lastUpdatedAtUtc);
-        const collaboratorData =
-          appResult.collaborators?.map((collab) =>
-            convertToCsvRow(collab, appResult.lastUpdatedAtUtc).concat('\n'),
-          ) || [];
-        const combined = [...[applicantData], ...collaboratorData].join('\n');
-        // res.write(combined);
-        return combined;
+        return dataRow.join(',');
       });
-
       // treat as blob to write to a file object
       // then you can name it
-      // res.set('Content-Type', 'text/csv');
-      // const withHeaders = [headerRow, ...foo].join('\n');
-      // readable.push(withHeaders);
-      // res.attachment('daco-users.csv');
-      // readable.pipe(res);
-      return res.status(200).send(foo);
-      // return res.status(200).end();
-      // return res.status(200).download('/daco-users.csv', 'daco-users.csv');
-
-      // return res.status(200).send(result);
+      res.set('Content-Type', 'text/csv');
+      const withHeaders = [headerRow, ...wat].join('\n');
+      // verify the correct filename
+      res.status(200).attachment('daco-users.csv').send(withHeaders);
     }),
   );
 

@@ -317,37 +317,37 @@ export async function search(
     };
   }
 
-  let apps;
   if (params.useCursor) {
-    let fooNum = 0;
-    const docs: any[] = [];
-    apps = await ApplicationModel.find(query)
-      .skip(params.page > 0 ? params.page * params.pageSize : 0)
-      // .limit(params.pageSize)
-      .sort(sortObj)
-      .cursor()
-      .on('data', (doc: any) => {
-        docs.push(doc);
-        fooNum += 1;
-      })
-      .on('end', () => {
-        console.log('Done!', docs.length);
-        return docs;
-      });
-    // .on('data', (doc) => {
-    //   console.log(doc);
-    // })
-    // .on('end', () => {
-    //   console.log('Done!');
-    // });
-    // return apps;
-  } else {
-    apps = await ApplicationModel.find(query)
-      .skip(params.page > 0 ? params.page * params.pageSize : 0)
-      .limit(params.pageSize)
-      .sort(sortObj)
-      .exec();
+    const stuff: ApplicationSummary[] = [];
+    for await (const app of await ApplicationModel.find(query)) {
+      const summary = {
+        appId: `${app.appId}`,
+        applicant: { info: app.sections.applicant.info },
+        submitterId: app.submitterId,
+        approvedAtUtc: app.approvedAtUtc,
+        closedAtUtc: app.closedAtUtc,
+        closedBy: app.closedBy,
+        expiresAtUtc: app.expiresAtUtc,
+        state: app.state,
+        ethics: {
+          // tslint:disable-next-line:no-null-keyword
+          declaredAsRequired: app.sections.ethicsLetter?.declaredAsRequired,
+        },
+        submittedAtUtc: app.submittedAtUtc,
+        lastUpdatedAtUtc: app.lastUpdatedAtUtc,
+        ...(params.includeCollaborators && {
+          collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
+        }),
+      } as ApplicationSummary;
+      stuff.push(summary);
+    }
+    return stuff;
   }
+  const apps = await ApplicationModel.find(query)
+    .skip(params.page > 0 ? params.page * params.pageSize : 0)
+    .limit(params.pageSize)
+    .sort(sortObj)
+    .exec();
 
   // applicant + collaborators get access
   const copy = apps.map(
@@ -367,7 +367,6 @@ export async function search(
         },
         submittedAtUtc: app.submittedAtUtc,
         lastUpdatedAtUtc: app.lastUpdatedAtUtc,
-        // collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info)
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
