@@ -20,7 +20,7 @@ import { Identity } from '@overture-stack/ego-token-middleware';
 import {
   ApplicationSummary,
   CSVFileHeader,
-  PersonalInfo,
+  FileFormat,
   State,
   UpdateApplication,
 } from '../domain/interface';
@@ -232,7 +232,7 @@ const createApplicationsRouter = (
         cursorSearch: true,
       };
       const results = await search(params, (req as IRequest).identity);
-
+      const fileFormat = req.query.format;
       // applicant + collaborators get daco access
       const parsedResults = results.items
         .map((appResult: ApplicationSummary) => {
@@ -245,28 +245,33 @@ const createApplicationsRouter = (
         })
         .flat();
 
-      const fileHeaders: CSVFileHeader[] = [
-        { accessor: 'userName', name: 'USER NAME' },
-        { accessor: 'openId', name: 'OPENID' },
-        { accessor: 'email', name: 'EMAIL' },
-        { accessor: 'changed', name: 'CHANGED' }, // verify what this value should be
-        { accessor: 'affiliation', name: 'AFFILIATION' },
-      ];
-      const headerRow: string[] = fileHeaders.map((header) => header.name);
+      // other formats may be added in future but for now only handling DACO_FILE_FORMAT type, all else will return 400
+      if (fileFormat === FileFormat.DACO_FILE_FORMAT) {
+        const fileHeaders: CSVFileHeader[] = [
+          { accessor: 'userName', name: 'USER NAME' },
+          { accessor: 'openId', name: 'OPENID' },
+          { accessor: 'email', name: 'EMAIL' },
+          { accessor: 'changed', name: 'CHANGED' }, // verify what this value should be
+          { accessor: 'affiliation', name: 'AFFILIATION' },
+        ];
+        const headerRow: string[] = fileHeaders.map((header) => header.name);
 
-      const uniqueApprovedUsers = uniqBy(parsedResults, 'openId').map((row: any) => {
-        const dataRow: string[] = fileHeaders.map((header) => {
-          // if value is missing, add empty string so the column has content
-          return row[header.accessor as string] || '';
+        const uniqueApprovedUsers = uniqBy(parsedResults, 'openId').map((row: any) => {
+          const dataRow: string[] = fileHeaders.map((header) => {
+            // if value is missing, add empty string so the column has content
+            return row[header.accessor as string] || '';
+          });
+          return dataRow.join(',');
         });
-        return dataRow.join(',');
-      });
 
-      res.set('Content-Type', 'text/csv');
-      const withHeaders = [headerRow, ...uniqueApprovedUsers].join('\n');
-      // TODO: verify the correct filename
-      const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DD');
-      res.status(200).attachment(`daco-users-${currentDate}.csv`).send(withHeaders);
+        res.set('Content-Type', 'text/csv');
+        const withHeaders = [headerRow, ...uniqueApprovedUsers].join('\n');
+        // TODO: verify the correct filename
+        const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DDTHH:mm');
+        res.status(200).attachment(`daco-users-${currentDate}.csv`).send(withHeaders);
+      } else {
+        return res.status(400).send('Unrecognized or missing file format for export');
+      }
     }),
   );
 

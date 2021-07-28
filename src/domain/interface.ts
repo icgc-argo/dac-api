@@ -224,7 +224,10 @@ export interface UpdateApplication {
   };
 }
 
-export type FileFormat = 'daco-file-format';
+export enum FileFormat {
+  DACO_FILE_FORMAT = 'daco-file-format'
+}
+
 export type CSVFileHeader = {
   accessor?: string;
   name: string;
