@@ -226,7 +226,7 @@ const createApplicationsRouter = (
     wrapAsync(async (req: Request, res: Response) => {
       logger.info(`exporting approved users for all applications`);
       const params = {
-        ...getSearchParams(req, 'appId:asc'),
+        ...getSearchParams(req),
         states: ['APPROVED'] as State[],
         includeCollaborators: true,
         cursorSearch: true,

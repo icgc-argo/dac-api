@@ -296,7 +296,7 @@ export async function search(
 
   // default sort by appId
   const sortObj: any = {};
-  isEmpty(params.sortBy)
+  params.sortBy.length > 0
     ? params.sortBy.forEach((sb) => {
         sortObj[mapField(sb.field)] = sb.direction == 'asc' ? 1 : -1;
       })
@@ -317,7 +317,7 @@ export async function search(
 
   let apps = [];
   if (params.cursorSearch) {
-    for await (const app of await ApplicationModel.find(query)) {
+    for await (const app of await ApplicationModel.find(query).sort(sortObj)) {
       apps.push(app);
     }
   } else {

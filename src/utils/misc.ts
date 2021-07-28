@@ -40,16 +40,18 @@ const _mergeKnown = (a: any, b: any) => {
   });
 };
 
-export const getSearchParams = (req: Request, defaultSort: string) => {
+export const getSearchParams = (req: Request, defaultSort?: string) => {
   const query = (req.query.query as string | undefined) || '';
   const states = req.query.states ? ((req.query.states as string).split(',') as State[]) : [];
   const page = Number(req.query.page) || 0;
   const pageSize = Number(req.query.pageSize) || 25;
   const sort = (req.query.sort as string | undefined) || defaultSort;
-  const sortBy = sort.split(',').map((s) => {
-    const sortField = s.trim().split(':');
-    return { field: sortField[0].trim(), direction: sortField[1].trim() };
-  });
+  const sortBy = sort
+    ? sort.split(',').map((s) => {
+        const sortField = s.trim().split(':');
+        return { field: sortField[0].trim(), direction: sortField[1].trim() };
+      })
+    : [];
 
   return {
     query,
