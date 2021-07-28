@@ -1,14 +1,31 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import wrapAsync from '../utils/wrapAsync';
-import { create, createCollaborator, deleteApp, deleteCollaborator,
-  getById, search, updateCollaborator, uploadDocument, updatePartial,
-  deleteDocument, getApplicationAssetsAsStream } from '../domain/service';
+import {
+  create,
+  createCollaborator,
+  deleteApp,
+  deleteCollaborator,
+  getById,
+  search,
+  updateCollaborator,
+  uploadDocument,
+  updatePartial,
+  deleteDocument,
+  getApplicationAssetsAsStream,
+} from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import { Identity } from '@overture-stack/ego-token-middleware';
-import { Application, UpdateApplication } from '../domain/interface';
+
+import {
+  ApplicationSummary,
+  CSVFileHeader,
+  FileFormat,
+  State,
+  UpdateApplication,
+} from '../domain/interface';
 import { AppConfig } from '../config';
-import _ from 'lodash';
+import _, { uniqBy } from 'lodash';
 import { Storage } from '../storage';
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
@@ -16,42 +33,63 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import archiver from 'archiver';
 import moment from 'moment';
 import { Readable } from 'stream';
+import { getSearchParams, parseApprovedUser } from '../utils/misc';
+
 interface IRequest extends Request {
   identity: Identity;
 }
 
-const createApplicationsRouter = (config: AppConfig,
-                                  authFilter: (scopes: string[]) => RequestHandler,
-                                  storageClient: Storage,
-                                  emailClient: Transporter<SMTPTransport.SentMessageInfo>) => {
-
+const createApplicationsRouter = (
+  config: AppConfig,
+  authFilter: (scopes: string[]) => RequestHandler,
+  storageClient: Storage,
+  emailClient: Transporter<SMTPTransport.SentMessageInfo>,
+) => {
   const router = Router();
 
-  router.delete('/applications/:id/assets/:type/assetId/:assetId',
+  router.delete(
+    '/applications/:id/assets/:type/assetId/:assetId',
     authFilter([]),
     wrapAsync(async (req: Request, res: Response) => {
       const appId = validateId(req.params.id);
       const type = validateType(req.params.type) as 'ETHICS' | 'SIGNED_APP';
       const objectId = req.params.assetId;
-      logger.info(`delete document [app: ${appId}, type: ${type}, assetId: ${objectId}, user Id:${(req as IRequest).identity.userId}]`);
-      const app = await deleteDocument(appId, type, objectId, (req as IRequest).identity, storageClient);
+      logger.info(
+        `delete document [app: ${appId}, type: ${type}, assetId: ${objectId}, user Id:${
+          (req as IRequest).identity.userId
+        }]`,
+      );
+      const app = await deleteDocument(
+        appId,
+        type,
+        objectId,
+        (req as IRequest).identity,
+        storageClient,
+      );
       return res.status(200).send(app);
-    })
+    }),
   );
 
-  router.get('/applications/:id/assets/APP_PACKAGE',
+  router.get(
+    '/applications/:id/assets/APP_PACKAGE',
     authFilter([]),
     wrapAsync(async (req: Request, res: Response) => {
       const appId = validateId(req.params.id);
-      logger.info(`download app package [app: ${appId}, user Id:${(req as IRequest).identity.userId}]`);
-      const assets = await getApplicationAssetsAsStream(appId, (req as IRequest).identity, storageClient);
+      logger.info(
+        `download app package [app: ${appId}, user Id:${(req as IRequest).identity.userId}]`,
+      );
+      const assets = await getApplicationAssetsAsStream(
+        appId,
+        (req as IRequest).identity,
+        storageClient,
+      );
       const zip = archiver('zip', {
-        zlib: { level: 0 }
+        zlib: { level: 0 },
       });
 
       // append all asset streams to the zip archive
-      assets.forEach(a => {
-        zip.append(a.stream as Readable, {name:  a.name});
+      assets.forEach((a) => {
+        zip.append(a.stream as Readable, { name: a.name });
       });
 
       const zipName = `${appId}_${moment().format('YYYYMMDD')}.zip`;
@@ -67,10 +105,11 @@ const createApplicationsRouter = (config: AppConfig,
 
       // finialize the zip.
       zip.finalize();
-    })
+    }),
   );
 
-  router.post('/applications/:id/assets/:type/upload',
+  router.post(
+    '/applications/:id/assets/:type/upload',
     authFilter([]),
     wrapAsync(async (req: Request, res: Response) => {
       const uploadedFile = req.files?.file;
@@ -82,13 +121,21 @@ const createApplicationsRouter = (config: AppConfig,
       }
       const appId = validateId(req.params.id);
       const type = validateType(req.params.type) as 'ETHICS' | 'SIGNED_APP';
-      logger.info(`upload app file [app: ${appId}, type: ${type}, file: ${uploadedFile.name}, user Id:${(req as IRequest).identity.userId}]`);
-      const app = await uploadDocument(appId,
-        type, uploadedFile, (req as IRequest).identity,
+      logger.info(
+        `upload app file [app: ${appId}, type: ${type}, file: ${uploadedFile.name}, user Id:${
+          (req as IRequest).identity.userId
+        }]`,
+      );
+      const app = await uploadDocument(
+        appId,
+        type,
+        uploadedFile,
+        (req as IRequest).identity,
         storageClient,
-        emailClient);
+        emailClient,
+      );
       return res.status(201).send(app);
-   })
+    }),
   );
 
   router.post(
@@ -109,8 +156,15 @@ const createApplicationsRouter = (config: AppConfig,
       const validatedId = validateId(id);
       // todo validate structure
       const collaborator = req.body;
-      logger.info(`creating new collaborator [app: ${id}, user Id:${(req as IRequest).identity.userId}]`);
-      const app = await createCollaborator(validatedId, collaborator, (req as IRequest).identity, emailClient);
+      logger.info(
+        `creating new collaborator [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+      );
+      const app = await createCollaborator(
+        validatedId,
+        collaborator,
+        (req as IRequest).identity,
+        emailClient,
+      );
       return res.status(200).send(app);
     }),
   );
@@ -124,7 +178,11 @@ const createApplicationsRouter = (config: AppConfig,
       const collaboratorId = req.params.collaboratorId;
       // todo validate structure
       const collaborator = req.body;
-      logger.info(`updating collaborators [app: ${id}, collaboratorId: ${collaboratorId}, user Id:${(req as IRequest).identity.userId}]`);
+      logger.info(
+        `updating collaborators [app: ${id}, collaboratorId: ${collaboratorId}, user Id:${
+          (req as IRequest).identity.userId
+        }]`,
+      );
       const app = await updateCollaborator(validatedId, collaborator, (req as IRequest).identity);
       return res.status(200).send(app);
     }),
@@ -137,7 +195,11 @@ const createApplicationsRouter = (config: AppConfig,
       const id = req.params.id;
       const validatedId = validateId(id);
       const collaboratorId = req.params.collaboratorId;
-      logger.info(`deleting collaborator [app: ${id}, collaboratorId: ${collaboratorId}, user Id:${(req as IRequest).identity.userId}]`);
+      logger.info(
+        `deleting collaborator [app: ${id}, collaboratorId: ${collaboratorId}, user Id:${
+          (req as IRequest).identity.userId
+        }]`,
+      );
       const app = await deleteCollaborator(validatedId, collaboratorId, (req as IRequest).identity);
       return res.status(200).send(app);
     }),
@@ -147,26 +209,69 @@ const createApplicationsRouter = (config: AppConfig,
     '/applications/',
     authFilter([]),
     wrapAsync(async (req: Request, res: Response) => {
-      const query = req.query.query as string | undefined || '';
-      const states = req.query.states ? (req.query.states as string).split(',') : [];
-      const page = Number(req.query.page) || 0;
-      const pageSize = Number(req.query.pageSize) || 25;
-      const sort = req.query.sort as string | undefined || 'state:desc';
-      const sortBy = sort.split(',').map(s => {
-        const sortField = s.trim().split(':');
-        return { field: sortField[0].trim(), direction: sortField[1].trim() };
-      });
-
-      const params = {
-        query,
-        states,
-        page,
-        pageSize,
-        sortBy
-      };
-      logger.info(`searching applications [query: ${JSON.stringify(params)}, user Id:${(req as IRequest).identity.userId}]`);
+      const params = getSearchParams(req, 'state:desc');
+      logger.info(
+        `searching applications [query: ${JSON.stringify(params)}, user Id:${
+          (req as IRequest).identity.userId
+        }]`,
+      );
       const app = await search(params, (req as IRequest).identity);
       return res.status(200).send(app);
+    }),
+  );
+
+  router.get(
+    '/export/approved-users/',
+    authFilter([config.auth.REVIEW_SCOPE]),
+    wrapAsync(async (req: Request, res: Response) => {
+      logger.info(`exporting approved users for all applications`);
+      const params = {
+        ...getSearchParams(req),
+        states: ['APPROVED'] as State[],
+        includeCollaborators: true,
+        cursorSearch: true,
+      };
+      const results = await search(params, (req as IRequest).identity);
+      const fileFormat = req.query.format;
+      // applicant + collaborators get daco access
+      const parsedResults = results.items
+        .map((appResult: ApplicationSummary) => {
+          const applicantInfo = appResult.applicant.info;
+          const applicant = parseApprovedUser(applicantInfo, appResult.lastUpdatedAtUtc);
+          const collabs = (appResult.collaborators || []).map((collab) =>
+            parseApprovedUser(collab, appResult.lastUpdatedAtUtc),
+          );
+          return [applicant, ...collabs];
+        })
+        .flat();
+
+      // other formats may be added in future but for now only handling DACO_FILE_FORMAT type, all else will return 400
+      if (fileFormat === FileFormat.DACO_FILE_FORMAT) {
+        const fileHeaders: CSVFileHeader[] = [
+          { accessor: 'userName', name: 'USER NAME' },
+          { accessor: 'openId', name: 'OPENID' },
+          { accessor: 'email', name: 'EMAIL' },
+          { accessor: 'changed', name: 'CHANGED' }, // verify what this value should be
+          { accessor: 'affiliation', name: 'AFFILIATION' },
+        ];
+        const headerRow: string[] = fileHeaders.map((header) => header.name);
+
+        const uniqueApprovedUsers = uniqBy(parsedResults, 'openId').map((row: any) => {
+          const dataRow: string[] = fileHeaders.map((header) => {
+            // if value is missing, add empty string so the column has content
+            return row[header.accessor as string] || '';
+          });
+          return dataRow.join(',');
+        });
+
+        res.set('Content-Type', 'text/csv');
+        const withHeaders = [headerRow, ...uniqueApprovedUsers].join('\n');
+        // TODO: verify the correct filename
+        const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DDTHH:mm');
+        res.status(200).attachment(`daco-users-${currentDate}.csv`).send(withHeaders);
+      } else {
+        return res.status(400).send('Unrecognized or missing file format for export');
+      }
     }),
   );
 
@@ -176,7 +281,9 @@ const createApplicationsRouter = (config: AppConfig,
     wrapAsync(async (req: Request, res: Response) => {
       const id = req.params.id;
       const validatedId = validateId(id);
-      logger.info(`fetching application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`);
+      logger.info(
+        `fetching application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+      );
       const result = await getById(validatedId, (req as IRequest).identity);
       if (!result) {
         return res.status(404).send();
@@ -187,11 +294,13 @@ const createApplicationsRouter = (config: AppConfig,
 
   router.delete(
     '/applications/:id',
-    authFilter([ config.auth.REVIEW_SCOPE ]),
+    authFilter([config.auth.REVIEW_SCOPE]),
     wrapAsync(async (req: Request, res: Response) => {
       const id = req.params.id;
       const validatedId = validateId(id);
-      logger.info(`deleting application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`);
+      logger.info(
+        `deleting application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+      );
       await deleteApp(validatedId, (req as IRequest).identity);
       return res.status(200).end();
     }),
@@ -204,12 +313,19 @@ const createApplicationsRouter = (config: AppConfig,
       const id = req.params.id;
       const validatedId = validateId(id);
       const app = req.body as Partial<UpdateApplication>;
-      logger.info(`updating application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`);
-      const updated = await updatePartial(id, app, (req as IRequest).identity, storageClient, emailClient);
+      logger.info(
+        `updating application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+      );
+      const updated = await updatePartial(
+        id,
+        app,
+        (req as IRequest).identity,
+        storageClient,
+        emailClient,
+      );
       return res.status(200).send(updated);
     }),
   );
-
 
   return router;
 };
