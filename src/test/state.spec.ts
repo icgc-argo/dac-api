@@ -403,7 +403,7 @@ function getRandomInfo() {
     'googleEmail': 'bashar@gmail.com',
     'displayName': 'Bashar Allabadi',
     'institutionEmail': 'bashar@oicr.on.ca',
-    'institutionWebsite': 'http://www.oicr.on.ca',
+    'website': 'http://www.oicr.on.ca',
     'lastName': 'Allabadi',
     'middleName': 'ali',
     'positionTitle': 'Software developer',
