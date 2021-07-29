@@ -1,5 +1,13 @@
 import { BadRequest } from '../utils/errors';
-import { Address, AgreementItem, Application, Collaborator, PersonalInfo, SectionError, SectionStatus } from './interface';
+import {
+  Address,
+  AgreementItem,
+  Application,
+  Collaborator,
+  PersonalInfo,
+  SectionError,
+  SectionStatus,
+} from './interface';
 import validator from 'validate.js';
 import _ from 'lodash';
 import { countriesList } from '../utils/constants';
@@ -26,17 +34,21 @@ export function validateRepresentativeSection(app: Application) {
   }
   const validations = [
     validatePersonalInfo(app.sections.representative.info, errors, false),
-    validatePrimaryAffiliationMatching(app.sections.representative.info.primaryAffiliation, app.sections.applicant.info.primaryAffiliation, errors)
+    validatePrimaryAffiliationMatching(
+      app.sections.representative.info.primaryAffiliation,
+      app.sections.applicant.info.primaryAffiliation,
+      errors,
+    ),
   ];
 
-  const isValid = addressResult && !validations.some(x => x === false);
-  return {isValid, errors};
+  const isValid = addressResult && !validations.some((x) => x === false);
+  return { isValid, errors };
 }
 
 export function validateApplicantSection(app: Application) {
   const applicantErrors: SectionError[] = [];
   const addressResult = validateAddress(app.sections.applicant.address, applicantErrors);
-  const infoResult = validatePersonalInfo(app.sections.applicant.info, applicantErrors);
+  const infoResult = validatePersonalInfo(app.sections.applicant.info, applicantErrors, true, true);
   app.sections.applicant.meta.status = addressResult && infoResult ? 'COMPLETE' : 'INCOMPLETE';
   app.sections.applicant.meta.errorsList = applicantErrors;
 }
@@ -63,7 +75,7 @@ export function validateEthicsLetterSection(app: Application) {
     app.sections.ethicsLetter.meta.status = 'INCOMPLETE';
     errors.push({
       field: 'approvalLetterDocs',
-      message: 'At least one ethics letter is required'
+      message: 'At least one ethics letter is required',
     });
     return false;
   }
@@ -83,7 +95,7 @@ export function validateDataAccessAgreement(app: Application) {
 }
 
 export function validateAgreementArray(ags: AgreementItem[]) {
-  const incomplete = ags.some(ag => ag.accepted !== true);
+  const incomplete = ags.some((ag) => ag.accepted !== true);
   return !incomplete;
 }
 
@@ -91,10 +103,14 @@ export function validateCollaborator(collaborator: Collaborator, application: Ap
   const errors: SectionError[] = [];
   const validations = [
     validatePersonalInfo(collaborator.info, errors),
-    validateRequired(collaborator.type, 'type' , errors),
-    validatePrimaryAffiliationMatching(collaborator.info.primaryAffiliation, application.sections.applicant.info.primaryAffiliation, errors)
+    validateRequired(collaborator.type, 'type', errors),
+    validatePrimaryAffiliationMatching(
+      collaborator.info.primaryAffiliation,
+      application.sections.applicant.info.primaryAffiliation,
+      errors,
+    ),
   ];
-  const valid = !validations.some(x => x == false);
+  const valid = !validations.some((x) => x == false);
   return { valid, errors };
 }
 
@@ -113,12 +129,16 @@ export function validateProjectInfo(app: Application) {
     validateWordLength(app.sections.projectInfo.methodology, 200, 'methodology', errors),
     validatePublications(app.sections.projectInfo.publicationsURLs, errors),
   ];
-  const valid = !validations.some(x => x == false);
+  const valid = !validations.some((x) => x == false);
   app.sections.projectInfo.meta.status = valid ? 'COMPLETE' : 'INCOMPLETE';
   app.sections.projectInfo.meta.errorsList = errors;
 }
 
-export function validatePrimaryAffiliationMatching(val: string, referenceVal: string, errors: SectionError[]) {
+export function validatePrimaryAffiliationMatching(
+  val: string,
+  referenceVal: string,
+  errors: SectionError[],
+) {
   if (!referenceVal) {
     return true;
   }
@@ -128,7 +148,7 @@ export function validatePrimaryAffiliationMatching(val: string, referenceVal: st
 
   errors.push({
     field: 'primaryAffililation',
-    message: 'Primary Affiliation must be the same as the Applicant'
+    message: 'Primary Affiliation must be the same as the Applicant',
   });
   return false;
 }
@@ -138,13 +158,13 @@ function validateUrl(val: string | undefined, name: string, errors: SectionError
     return true;
   }
   const error: string[] | undefined = validator.single(val, {
-    url: true
+    url: true,
   });
 
   if (error) {
     errors.push({
       field: name,
-      message: 'Value is not a valid URL'
+      message: 'Value is not a valid URL',
     });
     return false;
   }
@@ -156,13 +176,13 @@ function validateEmail(val: string, name: string, errors: SectionError[]) {
     return true;
   }
   const error: string[] | undefined = validator.single(val, {
-    email: true
+    email: true,
   });
 
   if (error) {
     errors.push({
       field: name,
-      message: 'Value is not a valid email'
+      message: 'Value is not a valid email',
     });
     return false;
   }
@@ -173,7 +193,7 @@ function validatePublications(publications: string[], errors: SectionError[]) {
   if (publications.length < 3) {
     errors.push({
       field: 'publications',
-      message: 'you need at least 3 unique publications URLs'
+      message: 'you need at least 3 unique publications URLs',
     });
     return false;
   }
@@ -182,14 +202,14 @@ function validatePublications(publications: string[], errors: SectionError[]) {
     return validateUrl(p, `publications.${index}`, errors);
   });
 
-  return !validations.some(x => !x);
+  return !validations.some((x) => !x);
 }
 
 function validateWordLength(val: string, length: number, name: string, errors: SectionError[]) {
   if (val && countWords(val) > length) {
     errors.push({
       field: name,
-      message: `field ${name} exceeded allowed number of words`
+      message: `field ${name} exceeded allowed number of words`,
     });
     return false;
   }
@@ -203,7 +223,12 @@ function countWords(str: string) {
   return str.split(' ').length;
 }
 
-function validatePersonalInfo(info: PersonalInfo, errors: SectionError[], validateGoogleEmailRequired: boolean = true) {
+function validatePersonalInfo(
+  info: PersonalInfo,
+  errors: SectionError[],
+  validateGoogleEmailRequired: boolean = true,
+  validateWebsiteRequired: boolean = false,
+) {
   const validations = [
     validateRequired(info.firstName, 'firstName', errors),
     validateRequired(info.lastName, 'lastName', errors),
@@ -214,9 +239,10 @@ function validatePersonalInfo(info: PersonalInfo, errors: SectionError[], valida
     validateRequired(info.primaryAffiliation, 'primaryAffiliation', errors),
     validateRequired(info.positionTitle, 'positionTitle', errors),
     validateUrl(info.website, 'website', errors),
+    validateWebsiteRequired ? validateRequired(info.website, 'website', errors) : true,
   ];
 
-  return !validations.some(x => x == false);
+  return !validations.some((x) => x == false);
 }
 
 function validateAddress(address: Address, errors: SectionError[]) {
@@ -225,9 +251,9 @@ function validateAddress(address: Address, errors: SectionError[]) {
     validateRequired(address.cityAndProvince, 'cityAndProvince', errors),
     validateRequired(address.country, 'country', errors),
     isValidCountry(address.country, errors),
-    validateRequired(address.postalCode, 'postalCode', errors)
+    validateRequired(address.postalCode, 'postalCode', errors),
   ];
-  return !validations.some(x => x == false);
+  return !validations.some((x) => x == false);
 }
 
 function isValidCountry(country: string, errors: SectionError[]): boolean {
@@ -245,14 +271,18 @@ function isValidCountry(country: string, errors: SectionError[]): boolean {
   return true;
 }
 
-function validateRequired(val: string | boolean | null | undefined, name: string, errors: SectionError[]): boolean {
+function validateRequired(
+  val: string | boolean | null | undefined,
+  name: string,
+  errors: SectionError[],
+): boolean {
   if (typeof val == 'boolean') {
     return val !== null && val !== undefined;
   }
   if (!val || val.trim() == '') {
     errors.push({
       field: name,
-      message: `field ${name} is required`
+      message: `field ${name} is required`,
     });
     return false;
   }
