@@ -387,8 +387,8 @@ paths:
             text/csv:
               schema:
                 type: string
-              example: USER NAME,OPENID,EMAIL,CHANGED,AFFILIATION
-                       Bob Example,bob@example.com,bob@some_gmail_domain.com,2021-07-23T16:49,A Research Centre
+              example: USER NAME,OPENID,EMAIL,CSA,CHANGED,AFFILIATION
+                       Bob Example,bob@example.com,bob@some_gmail_domain.com,true,2021-07-23T16:49,A Research Centre
 
         '400':
           description: 'Unrecognized or missing file format for export'
