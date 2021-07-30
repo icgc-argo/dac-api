@@ -251,6 +251,7 @@ const createApplicationsRouter = (
           { accessor: 'userName', name: 'USER NAME' },
           { accessor: 'openId', name: 'OPENID' },
           { accessor: 'email', name: 'EMAIL' },
+          { accessor: 'csa', name: 'CSA' },
           { accessor: 'changed', name: 'CHANGED' }, // verify what this value should be
           { accessor: 'affiliation', name: 'AFFILIATION' },
         ];
@@ -258,6 +259,9 @@ const createApplicationsRouter = (
 
         const uniqueApprovedUsers = uniqBy(parsedResults, 'openId').map((row: any) => {
           const dataRow: string[] = fileHeaders.map((header) => {
+            if (header.accessor === 'csa') {
+              return true;
+            }
             // if value is missing, add empty string so the column has content
             return row[header.accessor as string] || '';
           });
