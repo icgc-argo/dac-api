@@ -270,7 +270,7 @@ const createApplicationsRouter = (
         const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DDTHH:mm');
         res.status(200).attachment(`daco-users-${currentDate}.csv`).send(withHeaders);
       } else {
-        return res.status(400).send('Unrecognized or missing file format for export');
+        throw new BadRequest('Unrecognized or missing file format for export');
       }
     }),
   );
