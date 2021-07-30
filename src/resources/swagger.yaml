@@ -367,6 +367,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/Collaborator'
 
+  /export/approved-users/:
+    parameters:
+      - name: format
+        required: true
+        in: query
+        schema:
+          type: string
+          enum: [ 'daco-file-format' ]
+
+    get:
+      tags:
+        - Admin
+      summary: Download a csv of all approved users
+      responses:
+        '200':
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+              example: USER NAME,OPENID,EMAIL,CHANGED,AFFILIATION
+                       Bob Example,bob@example.com,bob@some_gmail_domain.com,2021-07-23T16:49,A Research Centre
+
+        '400':
+          description: 'Unrecognized or missing file format for export'
+
 tags:
   - name: Health
     description: Service status monitoring
