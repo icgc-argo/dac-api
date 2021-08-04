@@ -13,17 +13,17 @@ import {
   IT_AGREEMENT_PROVIDE_INSTITUTIONAL_POLICIES,
   IT_AGREEMENT_CONTACT_DACO_FRAUD,
   APPENDIX_ICGC_GOALS_POLICIES,
-  APPENDIX_LARGE_SCALE_DATA_SHARING,
-  APPENDIX_PREPUBLICATION_POLICY,
-  APPENDIX_PUBLICATION_POLICY,
-  APPENDIX_NIH_GENOMIC_INVENTIONS,
-  APPENDIX_OECD_GENETIC_INVENTIONS,
-  APPENDIX_CLOUD_SECURITY,
-  APPENDIX_GA4GH_FRAMEWORK,
+  APPENDIX_DATA_ACCESS_POLICY,
+  APPENDIX_IP_POLICY,
   DAA_CORRECT_APPLICATION_CONTENT,
-  DAA_AGREE_TO_TERMS, UpdateApplication,
-  AgreementItem, Collaborator, State,
-  SectionStatus, UploadDocumentType, RevisionRequestUpdate, SectionError
+  DAA_AGREE_TO_TERMS,
+  UpdateApplication,
+  AgreementItem,
+  Collaborator,
+  State,
+  SectionStatus,
+  UploadDocumentType,
+  RevisionRequestUpdate,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -34,12 +34,21 @@ import {
   validateEthicsLetterSection,
   validatePrimaryAffiliationMatching,
   validateProjectInfo,
-  validateRepresentativeSection
+  validateRepresentativeSection,
 } from './validations';
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 
-const allSections: Array<keyof Application['sections']> =
-  ['appendices', 'dataAccessAgreement', 'terms', 'applicant', 'collaborators', 'ethicsLetter', 'representative', 'projectInfo', 'signature'];
+const allSections: Array<keyof Application['sections']> = [
+  'appendices',
+  'dataAccessAgreement',
+  'terms',
+  'applicant',
+  'collaborators',
+  'ethicsLetter',
+  'representative',
+  'projectInfo',
+  'signature',
+];
 
 /**
  * Array contains mapping that will govern which sections should be marked as locked
@@ -47,13 +56,24 @@ const allSections: Array<keyof Application['sections']> =
  *
  * for example applicaions in review are completely locked for applicants but partially locked for admins.
  */
-const stateToLockedSectionsMap: Record<State, Record<'REVIEWER' | 'APPLICANT', Array<keyof Application['sections']>>> = {
+const stateToLockedSectionsMap: Record<
+  State,
+  Record<'REVIEWER' | 'APPLICANT', Array<keyof Application['sections']>>
+> = {
   REVIEW: {
     APPLICANT: allSections,
     REVIEWER: allSections,
   },
   APPROVED: {
-    APPLICANT: ['appendices', 'dataAccessAgreement', 'terms', 'applicant', 'representative', 'projectInfo', 'signature'],
+    APPLICANT: [
+      'appendices',
+      'dataAccessAgreement',
+      'terms',
+      'applicant',
+      'representative',
+      'projectInfo',
+      'signature',
+    ],
     REVIEWER: allSections,
   },
   'REVISIONS REQUESTED': {
@@ -82,10 +102,9 @@ const stateToLockedSectionsMap: Record<State, Record<'REVIEWER' | 'APPLICANT', A
   },
   RENEWING: {
     APPLICANT: [],
-    REVIEWER: []
-  }
+    REVIEWER: [],
+  },
 };
-
 
 export class ApplicationStateManager {
   public readonly currentApplication: Application;
@@ -95,9 +114,12 @@ export class ApplicationStateManager {
   }
 
   prepareApplicantionForUser(isReviewer: boolean) {
-    allSections.forEach(s => {
-      this.currentApplication.sections[s].meta.status =
-        calculateViewableSectionStatus( this.currentApplication, s, isReviewer);
+    allSections.forEach((s) => {
+      this.currentApplication.sections[s].meta.status = calculateViewableSectionStatus(
+        this.currentApplication,
+        s,
+        isReviewer,
+      );
     });
     if (this.currentApplication.sections.representative.addressSameAsApplicant) {
       this.currentApplication.sections.representative.address = undefined;
@@ -112,9 +134,9 @@ export class ApplicationStateManager {
     }
 
     if (type == 'SIGNED_APP' && current.state == 'SIGN AND SUBMIT') {
-        resetSignedDocument(current);
-        current.sections.signature.meta.status = 'INCOMPLETE';
-        return current;
+      resetSignedDocument(current);
+      current.sections.signature.meta.status = 'INCOMPLETE';
+      return current;
     }
     throw new BadRequest('Operation not allowed');
   }
@@ -141,10 +163,14 @@ export class ApplicationStateManager {
 
   deleteCollaborator(collaboratorId: string) {
     const current = this.currentApplication;
-    current.sections.collaborators.list =
-      current.sections.collaborators.list.filter(c => c.id?.toString() !== collaboratorId);
-    current.sections.collaborators.meta.status =
-      current.sections.collaborators.list.some(c => c.meta.status != 'COMPLETE') ? 'INCOMPLETE' : 'COMPLETE';
+    current.sections.collaborators.list = current.sections.collaborators.list.filter(
+      (c) => c.id?.toString() !== collaboratorId,
+    );
+    current.sections.collaborators.meta.status = current.sections.collaborators.list.some(
+      (c) => c.meta.status != 'COMPLETE',
+    )
+      ? 'INCOMPLETE'
+      : 'COMPLETE';
 
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
@@ -166,10 +192,10 @@ export class ApplicationStateManager {
     const { valid, errors } = validateCollaborator(collaborator, current);
     if (!valid) {
       throw new BadRequest({
-        errors
+        errors,
       });
     }
-    const existing = current.sections.collaborators.list.find(c => c.id == collaborator.id);
+    const existing = current.sections.collaborators.list.find((c) => c.id == collaborator.id);
     if (!existing) {
       throw new NotFound('No collaborator with this id');
     }
@@ -177,19 +203,33 @@ export class ApplicationStateManager {
     if (!!updated.info.firstName.trim() && !!updated.info.lastName.trim()) {
       updated.info.displayName = updated.info.firstName.trim() + ' ' + updated.info.lastName.trim();
     }
-    current.sections.collaborators.list =
-      current.sections.collaborators.list.filter(c => c.id !== collaborator.id);
+    current.sections.collaborators.list = current.sections.collaborators.list.filter(
+      (c) => c.id !== collaborator.id,
+    );
 
     // before adding the collaborator check if any other collaborator has the same google email / institution email
-    if (current.sections.collaborators.list.some(c => c.info.googleEmail == collaborator.info.googleEmail
-      || c.info.institutionEmail === collaborator.info.institutionEmail)) {
-        throw new ConflictError('COLLABORATOR_EXISTS', 'This collaborator has already been added to your applictaion.');
+    if (
+      current.sections.collaborators.list.some(
+        (c) =>
+          c.info.googleEmail == collaborator.info.googleEmail ||
+          c.info.institutionEmail === collaborator.info.institutionEmail,
+      )
+    ) {
+      throw new ConflictError(
+        'COLLABORATOR_EXISTS',
+        'This collaborator has already been added to your applictaion.',
+      );
     }
 
     // check if the collaborator is same as applicant
-    if (current.sections.applicant.info.googleEmail == collaborator.info.googleEmail
-      || current.sections.applicant.info.institutionEmail === collaborator.info.institutionEmail) {
-        throw new ConflictError('COLLABORATOR_SAME_AS_APPLICANT', 'The applicant does not need to be added as a collaborator.');
+    if (
+      current.sections.applicant.info.googleEmail == collaborator.info.googleEmail ||
+      current.sections.applicant.info.institutionEmail === collaborator.info.institutionEmail
+    ) {
+      throw new ConflictError(
+        'COLLABORATOR_SAME_AS_APPLICANT',
+        'The applicant does not need to be added as a collaborator.',
+      );
     }
 
     updated.meta.status = 'COMPLETE';
@@ -223,23 +263,37 @@ export class ApplicationStateManager {
     collaborator.id = new Date().getTime().toString();
     collaborator.meta = {
       errorsList: [],
-      status: 'COMPLETE'
+      status: 'COMPLETE',
     };
 
     if (!!collaborator.info.firstName.trim() && !!collaborator.info.lastName.trim()) {
-      collaborator.info.displayName = collaborator.info.firstName.trim() + ' ' + collaborator.info.lastName.trim();
+      collaborator.info.displayName =
+        collaborator.info.firstName.trim() + ' ' + collaborator.info.lastName.trim();
     }
 
     // check unique collaborator
-    if (current.sections.collaborators.list.some(c => c.info.googleEmail == collaborator.info.googleEmail
-      || c.info.institutionEmail === collaborator.info.institutionEmail)) {
-        throw new ConflictError('COLLABORATOR_EXISTS', 'This collaborator has already been added to your application');
+    if (
+      current.sections.collaborators.list.some(
+        (c) =>
+          c.info.googleEmail == collaborator.info.googleEmail ||
+          c.info.institutionEmail === collaborator.info.institutionEmail,
+      )
+    ) {
+      throw new ConflictError(
+        'COLLABORATOR_EXISTS',
+        'This collaborator has already been added to your application',
+      );
     }
 
     // check if the collaborator is same as applicant
-    if (current.sections.applicant.info.googleEmail == collaborator.info.googleEmail
-      || current.sections.applicant.info.institutionEmail === collaborator.info.institutionEmail) {
-        throw new ConflictError('COLLABORATOR_SAME_AS_APPLICANT', 'The applicant does not need to be added as a collaborator.');
+    if (
+      current.sections.applicant.info.googleEmail == collaborator.info.googleEmail ||
+      current.sections.applicant.info.institutionEmail === collaborator.info.institutionEmail
+    ) {
+      throw new ConflictError(
+        'COLLABORATOR_SAME_AS_APPLICANT',
+        'The applicant does not need to be added as a collaborator.',
+      );
     }
 
     current.sections.collaborators.list.push(collaborator);
@@ -303,11 +357,12 @@ export class ApplicationStateManager {
   }
 }
 
-
 function canUpdateCollaborators(current: Application) {
-  return current.state == 'DRAFT'
-    || current.state == 'SIGN AND SUBMIT'
-    || (current.state == 'REVISIONS REQUESTED' && current.revisionRequest.collaborators.requested);
+  return (
+    current.state == 'DRAFT' ||
+    current.state == 'SIGN AND SUBMIT' ||
+    (current.state == 'REVISIONS REQUESTED' && current.revisionRequest.collaborators.requested)
+  );
 }
 
 function deleteEthicsLetterDocument(current: Application, objectId: string) {
@@ -315,7 +370,7 @@ function deleteEthicsLetterDocument(current: Application, objectId: string) {
     throw new Error('Must declare ethics letter as required first');
   }
 
-  if (!current.sections.ethicsLetter.approvalLetterDocs.some(x => x.objectId == objectId)) {
+  if (!current.sections.ethicsLetter.approvalLetterDocs.some((x) => x.objectId == objectId)) {
     throw new Error('this id doesnt exist');
   }
 
@@ -323,9 +378,11 @@ function deleteEthicsLetterDocument(current: Application, objectId: string) {
     sections: {
       ethicsLetter: {
         // send the all the items without the deleted one
-        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.filter(d => d.objectId !== objectId),
-      }
-    }
+        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.filter(
+          (d) => d.objectId !== objectId,
+        ),
+      },
+    },
   };
 
   if (current.state == 'DRAFT') {
@@ -349,11 +406,13 @@ export function getSearchFieldValues(appDoc: Application) {
     appDoc.sections.ethicsLetter.declaredAsRequired ? 'yes' : 'no',
     // this will be ET to match admin location when they do search
     moment(appDoc.lastUpdatedAtUtc).tz('America/Toronto').format('YYYY-MM-DD'),
-    appDoc.expiresAtUtc ? moment(appDoc.expiresAtUtc).tz('America/Toronto').format('YYYY-MM-DD') : '',
+    appDoc.expiresAtUtc
+      ? moment(appDoc.expiresAtUtc).tz('America/Toronto').format('YYYY-MM-DD')
+      : '',
     appDoc.sections.applicant.info.displayName,
     appDoc.sections.applicant.info.googleEmail,
     appDoc.sections.applicant.info.primaryAffiliation,
-  ].filter(x => !(x === null || x === undefined || x.trim() === ''));
+  ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
 }
 
 export function newApplication(identity: Identity): Partial<Application> {
@@ -369,18 +428,18 @@ export function newApplication(identity: Identity): Partial<Application> {
       },
       appendices: {
         meta: { status: 'PRISTINE', errorsList: [] },
-        agreements: getAppendixAgreements()
+        agreements: getAppendixAgreements(),
       },
       dataAccessAgreement: {
         meta: { status: 'PRISTINE', errorsList: [] },
-        agreements: getDataAccessAgreement()
+        agreements: getDataAccessAgreement(),
       },
       terms: {
         meta: { status: 'PRISTINE', errorsList: [] },
         agreement: {
           accepted: false,
-          name: TERMS_AGREEMENT_NAME
-        }
+          name: TERMS_AGREEMENT_NAME,
+        },
       },
       applicant: {
         meta: { status: 'PRISTINE', errorsList: [] },
@@ -389,7 +448,7 @@ export function newApplication(identity: Identity): Partial<Application> {
           cityAndProvince: '',
           country: '',
           postalCode: '',
-          streetAddress: ''
+          streetAddress: '',
         },
         info: {
           firstName: '',
@@ -403,7 +462,7 @@ export function newApplication(identity: Identity): Partial<Application> {
           primaryAffiliation: '',
           suffix: '',
           title: '',
-        }
+        },
       },
       projectInfo: {
         background: '',
@@ -413,13 +472,13 @@ export function newApplication(identity: Identity): Partial<Application> {
         title: '',
         summary: '',
         publicationsURLs: [],
-        meta: { status: 'PRISTINE', errorsList: [] }
+        meta: { status: 'PRISTINE', errorsList: [] },
       },
       ethicsLetter: {
         // tslint:disable-next-line:no-null-keyword
         declaredAsRequired: null,
         approvalLetterDocs: [],
-        meta: { status: 'PRISTINE', errorsList: [] }
+        meta: { status: 'PRISTINE', errorsList: [] },
       },
       representative: {
         address: {
@@ -427,7 +486,7 @@ export function newApplication(identity: Identity): Partial<Application> {
           cityAndProvince: '',
           country: '',
           postalCode: '',
-          streetAddress: ''
+          streetAddress: '',
         },
         addressSameAsApplicant: false,
         info: {
@@ -443,17 +502,17 @@ export function newApplication(identity: Identity): Partial<Application> {
           suffix: '',
           title: '',
         },
-        meta: { status: 'PRISTINE', errorsList: [] }
+        meta: { status: 'PRISTINE', errorsList: [] },
       },
       signature: {
         meta: {
           status: 'DISABLED',
-          errorsList: []
+          errorsList: [],
         },
         signedAppDocObjId: '',
-        signedDocName: ''
-      }
-    }
+        signedDocName: '',
+      },
+    },
   };
   return app;
 }
@@ -486,8 +545,8 @@ export function emptyRevisionRequest() {
     },
     signature: {
       details: '',
-      requested: false
-    }
+      requested: false,
+    },
   };
 }
 
@@ -499,13 +558,15 @@ function uploadEthicsLetter(current: Application, id: string, name: string) {
     sections: {
       ethicsLetter: {
         // we need to provide the existing items as well for the merge logic to work correctly and not delete array items
-        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.concat([{
-          name,
-          objectId: id,
-          uploadedAtUtc: new Date(),
-        }]),
-      }
-    }
+        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.concat([
+          {
+            name,
+            objectId: id,
+            uploadedAtUtc: new Date(),
+          },
+        ]),
+      },
+    },
   };
 
   if (current.state == 'DRAFT') {
@@ -524,8 +585,10 @@ function uploadEthicsLetter(current: Application, id: string, name: string) {
   return current;
 }
 
-function updateAppStateForReviewApplication(current: Application, updatePart: Partial<UpdateApplication>) {
-
+function updateAppStateForReviewApplication(
+  current: Application,
+  updatePart: Partial<UpdateApplication>,
+) {
   // if the admin has chosen a custom expiry date and asked to save
   if (updatePart.expiresAtUtc) {
     // todo this needs validation
@@ -546,7 +609,10 @@ function updateAppStateForReviewApplication(current: Application, updatePart: Pa
   }
 }
 
-function transitionToRevisionsRequested(current: Application, updatePart: Partial<UpdateApplication>) {
+function transitionToRevisionsRequested(
+  current: Application,
+  updatePart: Partial<UpdateApplication>,
+) {
   if (updatePart.revisionRequest == undefined) {
     throw new BadRequest('you need to select at least one specific section');
   }
@@ -554,8 +620,7 @@ function transitionToRevisionsRequested(current: Application, updatePart: Partia
   validateRevisionRequest(updatePart.revisionRequest);
 
   // update the current state of revision request for the app with the incoming data
-  current.revisionRequest =
-    mergeKnown(current.revisionRequest, updatePart.revisionRequest);
+  current.revisionRequest = mergeKnown(current.revisionRequest, updatePart.revisionRequest);
 
   markSectionsForReview(current);
 
@@ -588,11 +653,10 @@ function transitionToApproved(current: Application, updatePart: Partial<UpdateAp
 }
 
 function validateRevisionRequest(revisionRequest: RevisionRequestUpdate) {
-
   const atleastOneRequested = Object.keys(revisionRequest)
-    .map(k => k as keyof RevisionRequestUpdate)
-    .filter(k => k != 'general')
-    .some(k => revisionRequest[k]?.requested);
+    .map((k) => k as keyof RevisionRequestUpdate)
+    .filter((k) => k != 'general')
+    .some((k) => revisionRequest[k]?.requested);
 
   if (!atleastOneRequested) {
     throw new BadRequest('At least one specific section should be requested for revision');
@@ -603,31 +667,35 @@ function validateRevisionRequest(revisionRequest: RevisionRequestUpdate) {
 
 function markSectionsForReview(current: Application) {
   const atleastOneNonSignatureRequeted = Object.keys(current.revisionRequest)
-    .map(k => k as keyof RevisionRequestUpdate)
-    .filter(k => k != 'general' && k != 'signature')
-    .some(k => current.revisionRequest[k]?.requested);
+    .map((k) => k as keyof RevisionRequestUpdate)
+    .filter((k) => k != 'general' && k != 'signature')
+    .some((k) => current.revisionRequest[k]?.requested);
 
   Object.keys(current.revisionRequest)
-    .map(k => k as keyof RevisionRequestUpdate)
-    .filter(k => k != 'general' && k != 'signature')
-    .filter(k => current.revisionRequest[k]?.requested)
-    .forEach(k => {
+    .map((k) => k as keyof RevisionRequestUpdate)
+    .filter((k) => k != 'general' && k != 'signature')
+    .filter((k) => current.revisionRequest[k]?.requested)
+    .forEach((k) => {
       type sectionNames = keyof Application['sections'] & keyof Application['revisionRequest'];
       current.sections[k as sectionNames].meta.status = 'REVISIONS REQUESTED';
     });
 
-
   // special handling for the signature section since it should be done last thing
   // and we want to disable it until other sections are updated.
   if (current.revisionRequest.signature.requested) {
-    current.sections.signature.meta.status =
-      atleastOneNonSignatureRequeted ? 'REVISIONS REQUESTED DISABLED' : 'REVISIONS REQUESTED';
+    current.sections.signature.meta.status = atleastOneNonSignatureRequeted
+      ? 'REVISIONS REQUESTED DISABLED'
+      : 'REVISIONS REQUESTED';
   } else {
     current.sections.signature.meta.status = 'DISABLED';
   }
 }
 
-function updateAppStateForSignAndSubmit(current: Application, updatePart: Partial<UpdateApplication>, updateDocs?: boolean) {
+function updateAppStateForSignAndSubmit(
+  current: Application,
+  updatePart: Partial<UpdateApplication>,
+  updateDocs?: boolean,
+) {
   // applicant wants to submit the app
   if (updatePart.state == 'REVIEW') {
     const ready = isReadyForReview(current);
@@ -663,9 +731,9 @@ function resetSectionUpdatedFlag(current: Application) {
 
 export function wasInRevisionRequestState(app: Application) {
   const revisionsRequested = Object.keys(app.revisionRequest)
-    .map(k => k as keyof Application['revisionRequest'])
-    .filter(k => k !== 'general')
-    .some(k => {
+    .map((k) => k as keyof Application['revisionRequest'])
+    .filter((k) => k !== 'general')
+    .some((k) => {
       return app.revisionRequest[k].requested;
     });
 
@@ -676,47 +744,57 @@ function isReadyForReview(application: Application) {
   return application.sections.signature.meta.status === 'COMPLETE';
 }
 
-function updateAppStateForApprovedApplication(currentApplication: Application,
+function updateAppStateForApprovedApplication(
+  currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
   isReviewer: boolean,
-  updateDocs?: boolean) {
-
-  if (currentApplication.sections.ethicsLetter.declaredAsRequired
-      && updateDocs) {
+  updateDocs?: boolean,
+) {
+  if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
     updateEthics(updatePart, currentApplication, updateDocs);
   }
 }
 
-function updateAppStateForReturnedApplication(current: Application,
+function updateAppStateForReturnedApplication(
+  current: Application,
   updatePart: Partial<UpdateApplication>,
-  updateDocs?: boolean) {
-    if (current.revisionRequest.applicant.requested) {
-      updateApplicantSection(updatePart, current);
-    }
-    if (current.revisionRequest.representative.requested) {
-      updateRepresentative(updatePart, current);
-    }
-    if (current.revisionRequest.projectInfo.requested) {
-      updateProjectInfo(updatePart, current);
-    }
-    if (current.revisionRequest.ethicsLetter.requested) {
-      updateEthics(updatePart, current, updateDocs);
-    }
+  updateDocs?: boolean,
+) {
+  if (current.revisionRequest.applicant.requested) {
+    updateApplicantSection(updatePart, current);
+  }
+  if (current.revisionRequest.representative.requested) {
+    updateRepresentative(updatePart, current);
+  }
+  if (current.revisionRequest.projectInfo.requested) {
+    updateProjectInfo(updatePart, current);
+  }
+  if (current.revisionRequest.ethicsLetter.requested) {
+    updateEthics(updatePart, current, updateDocs);
+  }
 
-  const signatureSectionStatus = current.revisionRequest.signature.requested ?
-    'REVISIONS REQUESTED' : 'PRISTINE';
+  const signatureSectionStatus = current.revisionRequest.signature.requested
+    ? 'REVISIONS REQUESTED'
+    : 'PRISTINE';
 
-  const rollBackSignatureStatus = current.revisionRequest.signature.requested ?
-    'REVISIONS REQUESTED DISABLED' : 'DISABLED';
+  const rollBackSignatureStatus = current.revisionRequest.signature.requested
+    ? 'REVISIONS REQUESTED DISABLED'
+    : 'DISABLED';
 
-  transitionToSignAndSubmitOrRollBack(current, signatureSectionStatus, rollBackSignatureStatus, 'REVISIONS REQUESTED');
+  transitionToSignAndSubmitOrRollBack(
+    current,
+    signatureSectionStatus,
+    rollBackSignatureStatus,
+    'REVISIONS REQUESTED',
+  );
 }
 
-function updateAppStateForDraftApplication(current: Application,
+function updateAppStateForDraftApplication(
+  current: Application,
   updatePart: Partial<UpdateApplication>,
-  updateDocs?: boolean) {
-
+  updateDocs?: boolean,
+) {
   updateTerms(updatePart, current);
   updateApplicantSection(updatePart, current);
   updateRepresentative(updatePart, current);
@@ -730,11 +808,12 @@ function updateAppStateForDraftApplication(current: Application,
   transitionToSignAndSubmitOrRollBack(current, 'PRISTINE', 'DISABLED', 'DRAFT');
 }
 
-function transitionToSignAndSubmitOrRollBack(current: Application,
+function transitionToSignAndSubmitOrRollBack(
+  current: Application,
   signatureSectionStateAfter: SectionStatus,
   rollBackSignatureStatus: SectionStatus,
-  rollbackStatus: State) {
-
+  rollbackStatus: State,
+) {
   const isReady = isReadyToSignAndSubmit(current);
   if (isReady) {
     toSignAndSubmit(current, signatureSectionStateAfter);
@@ -757,25 +836,38 @@ function toSignAndSubmit(current: Application, signatureSectionState: SectionSta
 
 function updateAppendices(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.appendices?.agreements) {
-    mergeAgreementArray(current.sections.appendices.agreements, updatePart.sections.appendices.agreements);
+    mergeAgreementArray(
+      current.sections.appendices.agreements,
+      updatePart.sections.appendices.agreements,
+    );
     validateAppendices(current);
   }
 }
 
 function updateDataAccessAgreements(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.dataAccessAgreement?.agreements) {
-    mergeAgreementArray(current.sections.dataAccessAgreement.agreements, updatePart.sections.dataAccessAgreement.agreements);
+    mergeAgreementArray(
+      current.sections.dataAccessAgreement.agreements,
+      updatePart.sections.dataAccessAgreement.agreements,
+    );
     validateDataAccessAgreement(current);
   }
 }
 
-function updateEthics(updatePart: Partial<UpdateApplication>, current: Application, updateDocs?: boolean) {
+function updateEthics(
+  updatePart: Partial<UpdateApplication>,
+  current: Application,
+  updateDocs?: boolean,
+) {
   if (updatePart.sections?.ethicsLetter) {
     // prevent update of the documents from here
     if (!updateDocs) {
       delete updatePart.sections.ethicsLetter.approvalLetterDocs;
     }
-    current.sections.ethicsLetter = mergeKnown(current.sections.ethicsLetter, updatePart.sections.ethicsLetter);
+    current.sections.ethicsLetter = mergeKnown(
+      current.sections.ethicsLetter,
+      updatePart.sections.ethicsLetter,
+    );
 
     // if the applicant switched the answer from yes to no, we no longer keep
     if (!current.sections.ethicsLetter.declaredAsRequired) {
@@ -787,9 +879,14 @@ function updateEthics(updatePart: Partial<UpdateApplication>, current: Applicati
 
 function updateProjectInfo(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.projectInfo) {
-    current.sections.projectInfo = mergeKnown(current.sections.projectInfo, updatePart.sections.projectInfo);
+    current.sections.projectInfo = mergeKnown(
+      current.sections.projectInfo,
+      updatePart.sections.projectInfo,
+    );
     // remove duplicated /  falsy values
-    const uniquePubs = _.uniq(current.sections.projectInfo.publicationsURLs.filter(v => !!v?.trim()));
+    const uniquePubs = _.uniq(
+      current.sections.projectInfo.publicationsURLs.filter((v) => !!v?.trim()),
+    );
     current.sections.projectInfo.publicationsURLs = uniquePubs;
     validateProjectInfo(current);
   }
@@ -810,22 +907,28 @@ function updateRepresentative(updatePart: Partial<UpdateApplication>, current: A
   if (updatePart.sections?.representative) {
     // we don't want to update address from representative if we are using same applicant address
     // this is an edge case if there is an API misuse
-    if (updatePart.sections.representative.addressSameAsApplicant === true
-        || (current.sections.representative.addressSameAsApplicant === true
-          && updatePart.sections.representative.addressSameAsApplicant !== false)) {
+    if (
+      updatePart.sections.representative.addressSameAsApplicant === true ||
+      (current.sections.representative.addressSameAsApplicant === true &&
+        updatePart.sections.representative.addressSameAsApplicant !== false)
+    ) {
       updatePart.sections.representative.address = {
         building: '',
         cityAndProvince: '',
         country: '',
         postalCode: '',
-        streetAddress: ''
+        streetAddress: '',
       };
     }
 
-    current.sections.representative = mergeKnown(current.sections.representative, updatePart.sections.representative);
+    current.sections.representative = mergeKnown(
+      current.sections.representative,
+      updatePart.sections.representative,
+    );
     const info = current.sections.representative.info;
     if (!!info.firstName.trim() && !!info.lastName.trim()) {
-      current.sections.representative.info.displayName = info.firstName.trim() + ' ' + info.lastName.trim();
+      current.sections.representative.info.displayName =
+        info.firstName.trim() + ' ' + info.lastName.trim();
     }
     const currentState = current.sections.representative.meta.status;
     current.sections.representative.meta.updated = true;
@@ -834,7 +937,7 @@ function updateRepresentative(updatePart: Partial<UpdateApplication>, current: A
 }
 
 function updateRepresentitaveSectionState(app: Application) {
-  const {isValid, errors} = validateRepresentativeSection(app);
+  const { isValid, errors } = validateRepresentativeSection(app);
   app.sections.representative.meta.errorsList = errors;
   const revRequested = app.revisionRequest.representative.requested;
   const wasUpdated = app.sections.representative.meta.updated;
@@ -842,7 +945,11 @@ function updateRepresentitaveSectionState(app: Application) {
   app.sections.representative.meta.status = newState;
 }
 
-function transitionSectionState(wasUpdated: boolean | undefined, isValid: boolean, revRequested: boolean) {
+function transitionSectionState(
+  wasUpdated: boolean | undefined,
+  isValid: boolean,
+  revRequested: boolean,
+) {
   let newState: SectionStatus;
   if (wasUpdated) {
     newState = isValid ? 'COMPLETE' : 'INCOMPLETE';
@@ -857,20 +964,25 @@ function transitionSectionState(wasUpdated: boolean | undefined, isValid: boolea
 }
 
 function updateCollaboratorsSectionState(app: Application) {
-  const isValid = !app.sections.collaborators.list
-    .some(c => c.meta.status != 'COMPLETE');
-  const newState: SectionStatus =
-    transitionSectionState(app.sections.collaborators.meta.updated,
-      isValid, app.revisionRequest.collaborators.requested);
+  const isValid = !app.sections.collaborators.list.some((c) => c.meta.status != 'COMPLETE');
+  const newState: SectionStatus = transitionSectionState(
+    app.sections.collaborators.meta.updated,
+    isValid,
+    app.revisionRequest.collaborators.requested,
+  );
   app.sections.collaborators.meta.status = newState;
 }
 
 function updateApplicantSection(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.applicant) {
-    current.sections.applicant = mergeKnown(current.sections.applicant, updatePart.sections.applicant);
+    current.sections.applicant = mergeKnown(
+      current.sections.applicant,
+      updatePart.sections.applicant,
+    );
     const info = current.sections.applicant.info;
     if (!!info.firstName.trim() && !!info.lastName.trim()) {
-      current.sections.applicant.info.displayName = info.firstName.trim() + ' ' + info.lastName.trim();
+      current.sections.applicant.info.displayName =
+        info.firstName.trim() + ' ' + info.lastName.trim();
     }
     validateApplicantSection(current);
 
@@ -890,7 +1002,7 @@ function updateApplicantSection(updatePart: Partial<UpdateApplication>, current:
 }
 
 function validateCollaboratorsSection(app: Application) {
-  const validations = app.sections.collaborators.list.map(c => {
+  const validations = app.sections.collaborators.list.map((c) => {
     const { valid, errors } = validateCollaborator(c, app);
     if (valid) {
       c.meta.status = 'COMPLETE';
@@ -903,33 +1015,33 @@ function validateCollaboratorsSection(app: Application) {
   });
 
   // if any collaborator is invalid mark the section as incomplete
-  if (validations.some(x => x == false)) {
+  if (validations.some((x) => x == false)) {
     app.sections.collaborators.meta.status = 'INCOMPLETE';
   }
 }
 
 function mergeAgreementArray(current: AgreementItem[], update: AgreementItem[]) {
-  update.forEach(ai => {
+  update.forEach((ai) => {
     const name = ai.name;
-    const target = current.find(a => a.name == name);
+    const target = current.find((a) => a.name == name);
     if (!target) return;
     target.accepted = ai.accepted;
   });
 }
 
-
 function isReadyToSignAndSubmit(app: Application) {
   const sections = app.sections;
-  const requiredSectionsComplete = sections.terms.meta.status == 'COMPLETE'
-    && sections.applicant.meta.status == 'COMPLETE'
-    && sections.representative.meta.status == 'COMPLETE'
-    && sections.projectInfo.meta.status == 'COMPLETE'
-    && sections.ethicsLetter.meta.status == 'COMPLETE'
-    && sections.dataAccessAgreement.meta.status == 'COMPLETE'
-    && sections.appendices.meta.status == 'COMPLETE'
+  const requiredSectionsComplete =
+    sections.terms.meta.status == 'COMPLETE' &&
+    sections.applicant.meta.status == 'COMPLETE' &&
+    sections.representative.meta.status == 'COMPLETE' &&
+    sections.projectInfo.meta.status == 'COMPLETE' &&
+    sections.ethicsLetter.meta.status == 'COMPLETE' &&
+    sections.dataAccessAgreement.meta.status == 'COMPLETE' &&
+    sections.appendices.meta.status == 'COMPLETE' &&
     // only check that collaborators section is not incomplete or not in revisions requested (which can happen)
-    && (sections.collaborators.meta.status !== 'INCOMPLETE'
-      && sections.collaborators.meta.status !== 'REVISIONS REQUESTED');
+    sections.collaborators.meta.status !== 'INCOMPLETE' &&
+    sections.collaborators.meta.status !== 'REVISIONS REQUESTED';
 
   return requiredSectionsComplete;
 }
@@ -941,33 +1053,13 @@ function getAppendixAgreements() {
       accepted: false,
     },
     {
-      name: APPENDIX_LARGE_SCALE_DATA_SHARING,
+      name: APPENDIX_DATA_ACCESS_POLICY,
       accepted: false,
     },
     {
-      name: APPENDIX_PREPUBLICATION_POLICY,
+      name: APPENDIX_IP_POLICY,
       accepted: false,
     },
-    {
-      name: APPENDIX_PUBLICATION_POLICY,
-      accepted: false,
-    },
-    {
-      name: APPENDIX_NIH_GENOMIC_INVENTIONS,
-      accepted: false,
-    },
-    {
-      name: APPENDIX_OECD_GENETIC_INVENTIONS,
-      accepted: false,
-    },
-    {
-      name: APPENDIX_CLOUD_SECURITY,
-      accepted: false,
-    },
-    {
-      name: APPENDIX_GA4GH_FRAMEWORK,
-      accepted: false,
-    }
   ];
 }
 
@@ -1012,34 +1104,53 @@ function getDataAccessAgreement() {
   ];
 }
 
-function calculateViewableSectionStatus(app: Application, section: keyof Application['sections'], isReviewer: boolean): SectionStatus {
-  const reviewableSections: Array<keyof RevisionRequestUpdate> = ['applicant', 'collaborators', 'ethicsLetter', 'projectInfo', 'signature', 'representative'];
+function calculateViewableSectionStatus(
+  app: Application,
+  section: keyof Application['sections'],
+  isReviewer: boolean,
+): SectionStatus {
+  const reviewableSections: Array<keyof RevisionRequestUpdate> = [
+    'applicant',
+    'collaborators',
+    'ethicsLetter',
+    'projectInfo',
+    'signature',
+    'representative',
+  ];
   const reviewableSection = reviewableSections.includes(section as keyof RevisionRequestUpdate);
 
-  if (shouldBeLockedByAtThisState(app.state, section, isReviewer)
-      || (!reviewableSection && wasInRevisionRequestState(app))) {
-      return 'LOCKED';
+  if (
+    shouldBeLockedByAtThisState(app.state, section, isReviewer) ||
+    (!reviewableSection && wasInRevisionRequestState(app))
+  ) {
+    return 'LOCKED';
   }
   // an extra logic is needed for sections that are usually editable but no revisions required
   // for them in a returned application Or they have revisions
-  else if (reviewableSection
-    && (app.state == 'REVISIONS REQUESTED' || wasInRevisionRequestState(app))
-    && !isReviewer) {
+  else if (
+    reviewableSection &&
+    (app.state == 'REVISIONS REQUESTED' || wasInRevisionRequestState(app)) &&
+    !isReviewer
+  ) {
     // mark sections that don't have revision requests as locked
     // for example if applicant section is OK we lock it.
     // an edge case is if the applicant changes primary affiliation of applicant and the
     // representative/collaborators now become invalid although they were complete
     // in that case we unlock them and mark as incomplete (decision on slack)
-    if (section !== 'signature'
-      && app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true
-      && app.sections[section].meta.status == 'COMPLETE') {
+    if (
+      section !== 'signature' &&
+      app.revisionRequest[section as keyof RevisionRequestUpdate].requested !== true &&
+      app.sections[section].meta.status == 'COMPLETE'
+    ) {
       return 'LOCKED';
     }
 
     // mark sections that have revision requests and now completed with custom status to
     // show they were updated after the revision request
-    if (app.revisionRequest[section as keyof RevisionRequestUpdate].requested === true
-          && app.sections[section].meta.status == 'COMPLETE') {
+    if (
+      app.revisionRequest[section as keyof RevisionRequestUpdate].requested === true &&
+      app.sections[section].meta.status == 'COMPLETE'
+    ) {
       return 'REVISIONS MADE';
     }
   }
@@ -1047,7 +1158,7 @@ function calculateViewableSectionStatus(app: Application, section: keyof Applica
   // even after approval, we need to indicate that using a section state 'AMMENDABLE'
   else if (app.state == 'APPROVED' && ['ethicsLetter', 'collaborators'].includes(section)) {
     if (section == 'ethicsLetter') {
-      return app.sections.ethicsLetter.declaredAsRequired ? 'AMMENDABLE' :  'LOCKED';
+      return app.sections.ethicsLetter.declaredAsRequired ? 'AMMENDABLE' : 'LOCKED';
     }
     if (section == 'collaborators') {
       return 'AMMENDABLE';
@@ -1058,7 +1169,11 @@ function calculateViewableSectionStatus(app: Application, section: keyof Applica
   return app.sections[section].meta.status;
 }
 
-function shouldBeLockedByAtThisState(state: State, section: keyof Application['sections'], isReviewer: boolean) {
+function shouldBeLockedByAtThisState(
+  state: State,
+  section: keyof Application['sections'],
+  isReviewer: boolean,
+) {
   return stateToLockedSectionsMap[state][isReviewer ? 'REVIEWER' : 'APPLICANT'].includes(section);
 }
 
