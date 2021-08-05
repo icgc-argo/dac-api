@@ -47,7 +47,7 @@ const App = (config: AppConfig,
       };
 
   const app = express();
-  app.set('port', process.env.PORT || 3000);
+  app.set('port', process.env.PORT || 3001);
   app.use(bodyParser.json());
   app.use(fileUpload());
   app.get('/', (req, res) => res.status(200).send('hello world'));

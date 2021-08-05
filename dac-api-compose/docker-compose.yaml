@@ -47,6 +47,36 @@ services:
       - "1025:1025"
       - "8025:8025"      
 
+  nginx:
+    build:
+      context: ./nginx
+    ports:
+      - "9090:8080"
+
+  server:
+    build: 
+      context: ../
+    depends_on:
+      - mongodb
+    environment:
+      NODE_ENV: development
+      EMAIL_HOST: mailhog
+      EMAIL_PORT: 1025
+      AUTH_ENABLED: "true"
+      BASE_PATH: /
+      VAULT_ENABLED: "false"
+      DB_URL: mongodb://mongodb:27017/appdb
+      DB_NAME: appdb
+      DB_USERNAME: admin
+      DB_PASSWORD: password
+      OBJECT_STORAGE_ENDPOINT: http://object-storage:9000/
+      OBJECT_STORAGE_BUCKET: daco-dev
+      OBJECT_STORAGE_KEY: minio
+      OBJECT_STORAGE_SECRET: minio123
+      PORT: 3001
+    ports:
+      - "3001:3001"
+
 volumes:
   mongodb_data:
     name: appdb_db_vol_1

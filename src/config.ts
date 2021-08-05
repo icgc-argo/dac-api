@@ -161,6 +161,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',
     }
   };
+  console.log('CONFIG: ', config);
   return config;
 };
 

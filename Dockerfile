@@ -22,7 +22,7 @@ FROM node:16 as builder
 WORKDIR /app
 RUN chown -R node:node /app
 USER node
-# copy the package json and install first to optimize docker cache for node modules
+# copy the package json and install first to optimize docker cache for node0modules
 COPY package.json /app/
 COPY package-lock.json /app/
 RUN npm ci
