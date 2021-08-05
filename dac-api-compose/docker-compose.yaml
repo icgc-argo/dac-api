@@ -1,6 +1,16 @@
 version: '3.8'
 
 services:
+  object-storage:
+    image: minio/minio
+    container_name: object-storage
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    command: server /data
+    ports:
+      - "8085:9000"
+
   vault:
     image: vault
     volumes:
@@ -29,16 +39,6 @@ services:
       MONGODB_DATABASE: appdb
       MONGODB_ROOT_PASSWORD: password123
 
-  object-storage:
-    image: minio/minio
-    container_name: object-storage
-    environment:
-      MINIO_ACCESS_KEY: minio
-      MINIO_SECRET_KEY: minio123
-    command: server /data
-    ports:
-      - "8085:9000"
-
   # for email services
   mailhog:
     image: mailhog/mailhog
@@ -50,15 +50,28 @@ services:
   nginx:
     build:
       context: ./nginx
+    depends_on:
+        - service
     ports:
-      - "9090:8080"
+      - "8080:80"
 
-  server:
+  service:
     build: 
       context: ../
     depends_on:
       - mongodb
+      - object-storage
+    restart: on-failure
     environment:
+      JWT_KEY: "-----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnzyis1ZjfNB0bBgKFMSv
+        vkTtwlvBsaJq7S5wA+kzeVOVpVWwkWdVha4s38XM/pa/yr47av7+z3VTmvDRyAHc
+        aT92whREFpLv9cj5lTeJSibyr/Mrm/YtjCZVWgaOYIhwrXwKLqPr/11inWsAkfIy
+        tvHWTxZYEcXLgAXFuUuaS3uF9gEiNQwzGTU1v0FqkqTBr4B8nW3HCN47XUu0t8Y0
+        e+lf4s4OxQawWD79J9/5d3Ry0vbV3Am1FtGJiJvOwRsIfVChDpYStTcHTCMqtvWb
+        V6L11BWkpzGXSW4Hv43qa+GSYOD2QU68Mb59oSk2OB+BtOLpJofmbGEGgvmwyCI9
+        MwIDAQAB
+        -----END PUBLIC KEY-----"
       NODE_ENV: development
       EMAIL_HOST: mailhog
       EMAIL_PORT: 1025
