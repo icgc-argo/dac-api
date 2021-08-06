@@ -119,10 +119,11 @@ export async function getApplicationAssetsAsStream(
   });
 
   // get the assets as streams from the response bodies
-  const downloaded = docs.map(async (d) => {
-    const stream = await storageClient.downloadAsStream(d.id);
+  const downloaded = docs.map(async (doc) => {
+    const stream = await storageClient.downloadAsStream(doc.id);
+    // log what is returned here
     return {
-      ...d,
+      ...doc,
       stream,
     };
   });
