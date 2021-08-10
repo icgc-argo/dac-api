@@ -163,7 +163,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
           'https://docs.icgc-argo.org/docs/data-access/data-access',
         dataAccessGuide:
           process.env.EMAIL_DATA_ACCESS_GUIDE_URL ||
-          'https://www.icgc-argo.org/page/132/data-access-and-data-use-policies-and-guidelines',
+          'https://docs.icgc-argo.org/docs/data-access/data-download',
         revisionsRequestedGuide:
           process.env.REVISIONS_REQUESTED_GUIDE_URL ||
           'https://docs.icgc-argo.org/docs/data-access/daco/approval#requested-revisions',

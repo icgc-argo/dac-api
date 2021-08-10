@@ -1,9 +1,4 @@
-import {
-  ICGC_25K_URL,
-  ICGC_ARGO_PLATFORM_URL,
-  ICGC_ARGO_URL,
-  DATA_ACCESS_AGREEMENT_URL,
-} from '../utils/constants';
+import { ICGC_25K_URL, ICGC_ARGO_PLATFORM_URL, ICGC_ARGO_URL } from '../utils/constants';
 import { AppConfig } from '../config';
 import { Application } from '../domain/interface';
 import { appInfoBox, approvalDetailsBox, compose, textParagraphSection } from './common';
