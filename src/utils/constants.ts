@@ -1,3 +1,5 @@
+import urlJoin from 'url-join';
+
 const countries = [
   { code: 'AF', name: 'Afghanistan' },
   { code: 'AX', name: 'Aland Islands' },
@@ -255,3 +257,6 @@ export const ICGC_ARGO_PLATFORM_URL = 'https://platform.icgc-argo.org/';
 export const ICGC_ARGO_URL = 'https://www.icgc-argo.org/';
 export const DATA_ACCESS_POLICY_URL =
   'https://www.icgc-argo.org/page/132/data-access-and-data-use-policies-and-guidelines';
+export const ICGC_DACO_URL = 'https://daco.icgc-argo.org/';
+
+export const ICGC_ARGO_CONTACT_URL = urlJoin(ICGC_ARGO_PLATFORM_URL, 'contact');

@@ -16,7 +16,7 @@ export type ComposeArgs = {
 
 export type ClosureData = { guideText: string; guideLink: string };
 
-const defaultTextStyle = {
+export const defaultTextStyle = {
   color: '#000000',
   'font-size': '14px',
   padding: '0',
@@ -291,6 +291,10 @@ export function approvalDetailsBox(app: Application, accessEmail: string) {
     },
   ];
 
+  return approvalDetailsContent(data);
+}
+
+export const approvalDetailsContent = (data: { label: string; value: string }[]) => {
   return `
   <mj-section padding="0px 0px 20px 0px">
       <mj-column border="1px #dcdde1 solid" border-top="0px" padding="0" >
@@ -325,8 +329,7 @@ export function approvalDetailsBox(app: Application, accessEmail: string) {
         </mj-table>
       </mj-column>
     </mj-section>`;
-}
-
+};
 function closure(props: { guideLink: string; guideText: string }) {
   const { guideLink, guideText } = props;
   return `

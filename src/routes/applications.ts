@@ -200,7 +200,12 @@ const createApplicationsRouter = (
           (req as IRequest).identity.userId
         }]`,
       );
-      const app = await deleteCollaborator(validatedId, collaboratorId, (req as IRequest).identity);
+      const app = await deleteCollaborator(
+        validatedId,
+        collaboratorId,
+        (req as IRequest).identity,
+        emailClient,
+      );
       return res.status(200).send(app);
     }),
   );

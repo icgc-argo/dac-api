@@ -3,6 +3,7 @@ import renderNewReview from '../emails/review-new';
 import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
+import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
 import {
   getAppInReview,
   getAppInRevisionRequested,
@@ -90,6 +91,38 @@ describe('emails', () => {
       };
       const email = await renderCollaboratorNotificationEmail(app, collab, {
         dataAccessGuide: 'https://www.google.com',
+        reviewGuide: '',
+        applyingForAccess: '',
+        revisionsRequestedGuide: '',
+      });
+      console.log(email.emailMjml);
+    });
+
+    it('should render a collaborator removed notification email', async () => {
+      const app = getApprovedApplication();
+      const collab: Collaborator = {
+        meta: {
+          errorsList: [],
+          status: 'COMPLETE',
+        },
+        info: {
+          firstName: 'Bashar',
+          lastName: 'Allabadi',
+          googleEmail: 'bashar@example.com',
+          primaryAffiliation: 'OICR',
+          institutionEmail: 'adsa@example.com',
+          middleName: '',
+          positionTitle: 'Manager',
+          suffix: '',
+          title: '',
+          displayName: '',
+          website: '',
+        },
+        type: 'personnel',
+      };
+
+      const email = await renderCollaboratorRemovedEmail(app, collab, {
+        dataAccessGuide: '',
         reviewGuide: '',
         applyingForAccess: '',
         revisionsRequestedGuide: '',

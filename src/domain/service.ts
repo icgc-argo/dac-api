@@ -34,6 +34,7 @@ import renderSubmittedEmail from '../emails/submitted';
 import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
+import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
 
 export async function deleteDocument(
   appId: string,
@@ -174,6 +175,7 @@ export async function deleteCollaborator(
   appId: string,
   collaboratorId: string,
   identity: Identity,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
@@ -184,6 +186,15 @@ export async function deleteCollaborator(
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.deleteCollaborator(collaboratorId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
+
+  const collaborator = appDoc.sections.collaborators.list.find(
+    (collab) => collab.id === collaboratorId,
+  );
+  console.log('collaborator found: ', collaborator);
+  if (result.state === 'APPROVED' && collaborator) {
+    const config = await getAppConfig();
+    sendCollaboratorRemovedEmail(result, collaborator, config, emailClient);
+  }
 }
 
 export async function create(identity: Identity) {
@@ -560,6 +571,31 @@ async function sendCollaboratorApprovedEmail(
   );
   const emailContent = collaboratorApprovedEmail.html;
   const title = `You have been Granted Access`;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    new Set([collaborator.info.googleEmail, collaborator.info.institutionEmail]),
+    subject,
+    emailContent,
+  );
+}
+
+async function sendCollaboratorRemovedEmail(
+  updatedApp: Application,
+  collaborator: Collaborator,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const collaboratorRemovedEmail = await renderCollaboratorRemovedEmail(
+    updatedApp,
+    collaborator,
+    config.email.links,
+  );
+  const emailContent = collaboratorRemovedEmail.html;
+  const title = `Your Access to ICGC Controlled Data has been Removed`;
   const subject = `[${updatedApp.appId}] ${title}`;
 
   await sendEmail(
