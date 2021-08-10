@@ -10,7 +10,7 @@ export type UILinksInfo = {
 export type ComposeArgs = {
   receiver: Receiver;
   message: string;
-  includeClousre?: boolean;
+  includeClosure?: boolean;
   closureData?: ClosureData;
 };
 
@@ -30,7 +30,7 @@ export function compose(cardData: ComposeArgs, subject: string) {
         subject,
         receiver: cardData.receiver,
         message: cardData.message,
-        withClosure: cardData.includeClousre === undefined ? true : cardData.includeClousre,
+        withClosure: cardData.includeClosure === undefined ? true : cardData.includeClosure,
         closureData: cardData.closureData,
       })}
     </mjml>
