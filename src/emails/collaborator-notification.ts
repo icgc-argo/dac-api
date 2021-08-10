@@ -1,25 +1,37 @@
-import { ICGC_25K_URL, ICGC_ARGO_URL, ICGC_ARGO_PLATFORM_URL, DATA_ACCESS_AGREEMENT_URL, DATA_ACCESS_POLICY_URL } from '../utils/constants';
+import {
+  ICGC_25K_URL,
+  ICGC_ARGO_URL,
+  ICGC_ARGO_PLATFORM_URL,
+  DATA_ACCESS_AGREEMENT_URL,
+  DATA_ACCESS_POLICY_URL,
+} from '../utils/constants';
 import { AppConfig } from '../config';
 import { Application, Collaborator, PersonalInfo } from '../domain/interface';
 import { appInfoBox, approvalDetailsBox, compose, textParagraphSection } from './common';
 import { compileMjmlInPromise } from './mjml';
 
-
-export default async function(app: Application, collaborator: Collaborator, linksConfigs: AppConfig['email']['links']) {
+export default async function (
+  app: Application,
+  collaborator: Collaborator,
+  linksConfigs: AppConfig['email']['links'],
+) {
   const info = collaborator.info;
-  const emailMjml = compose({
-    message: messageBody(app, info),
-    receiver: {
-      first: info.firstName,
-      last: info.lastName,
-      suffix: info.suffix,
-      title: info.title,
+  const emailMjml = compose(
+    {
+      message: messageBody(app, info),
+      receiver: {
+        first: info.firstName,
+        last: info.lastName,
+        suffix: info.suffix,
+        title: info.title,
+      },
+      closureData: {
+        guideLink: linksConfigs.dataAccessGuide,
+        guideText: 'Help Guides for Accessing Controlled Data',
+      },
     },
-    closureData: {
-      guideLink: linksConfigs.dataAccessGuide,
-      guideText: 'Help Guides for Accessing Controlled Data'
-    }
-  }, 'You have been Granted Access');
+    'You have been Granted Access',
+  );
 
   const htmlOutput = await compileMjmlInPromise(emailMjml);
   if (htmlOutput.errors.length > 0) {
@@ -30,13 +42,22 @@ export default async function(app: Application, collaborator: Collaborator, link
 }
 
 function messageBody(app: Application, recipient: PersonalInfo) {
-  return  `
-    ${textParagraphSection(`You have been granted access to ICGC Controlled Data, as requested by the Principal Investigator of your project on the following application. <strong>Kindly note, it may take up to 24 hours for authorization to take effect.</strong>`, { padding: '0px 0px 20px 0px' })}
+  return `
+    ${textParagraphSection(
+      `You have been granted access to ICGC Controlled Data, as requested by the Principal Investigator of your project on the following application. <strong>Kindly note, it may take up to 24 hours for authorization to take effect.</strong>`,
+      { padding: '0px 0px 20px 0px' },
+    )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
     ${approvalDetailsBox(app, recipient.googleEmail)}
-    ${textParagraphSection(`Please note that access to ICGC Controlled Data remains conditional upon respecting the terms and conditions of the <a href="${DATA_ACCESS_AGREEMENT_URL}"> Data Access Agreement</a>, particularly regarding (but not limited to) the publication moratorium and re-identification of research participants.`, { padding: '0px 0px 20px 0px' })}
-    ${textParagraphSection(`The length of the access period is two years starting from the date of approval. At the end of the 2-years period, your Principal Investigator can renew your access.`, { padding: '0px 0px 20px 0px' })}
-    ${textParagraphSection(`Next Steps:`, {  padding: '0px 0px 2px 0px', 'font-weight': 'bold'  })}
+    ${textParagraphSection(
+      `Please note that access to ICGC Controlled Data remains conditional upon respecting the terms and conditions of the Data Access Agreement, particularly regarding (but not limited to) the publication moratorium and re-identification of research participants.`,
+      { padding: '0px 0px 20px 0px' },
+    )}
+    ${textParagraphSection(
+      `The length of the access period is two years starting from the date of approval. At the end of the 2-year period, your Principal Investigator can renew your access.`,
+      { padding: '0px 0px 20px 0px' },
+    )}
+    ${textParagraphSection(`Next Steps:`, { padding: '0px 0px 2px 0px', 'font-weight': 'bold' })}
     ${bulletPoints()}
   `;
 }

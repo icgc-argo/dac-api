@@ -41,12 +41,13 @@ export interface AppConfig {
     auth: {
       user: string | undefined;
       password: string | undefined;
-    },
+    };
     links: {
       reviewGuide: string;
       applyingForAccess: string;
       dataAccessGuide: string;
-    }
+      revisionsRequestedGuide: string;
+    };
   };
   ui: {
     baseUrl: string;
@@ -128,17 +129,18 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       enabled: process.env.AUTH_ENABLED !== 'false',
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE'
+      REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
     },
     ui: {
       baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org',
-      sectionPath: process.env.DACO_UI_APPLICATION_SECTION_PATH || '/applications/{id}?section={section}',
+      sectionPath:
+        process.env.DACO_UI_APPLICATION_SECTION_PATH || '/applications/{id}?section={section}',
     },
     storage: {
       endpoint: process.env.OBJECT_STORAGE_ENDPOINT || '',
       region: process.env.OBJECT_STORAGE_REGION || 'nova',
       bucket: process.env.OBJECT_STORAGE_BUCKET || 'daco',
-      key:  secrets.OBJECT_STORAGE_KEY || process.env.OBJECT_STORAGE_KEY,
+      key: secrets.OBJECT_STORAGE_KEY || process.env.OBJECT_STORAGE_KEY,
       secret: secrets.OBJECT_STORAGE_SECRET || process.env.OBJECT_STORAGE_SECRET,
       timeout: Number(process.env.OBJECT_STORAGE_TIMEOUT_MILLIS) || 5000,
     },
@@ -153,13 +155,22 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
         password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
       },
       links: {
-        reviewGuide: process.env.EMAIL_REVIEW_GUIDE_URL || 'https://daco.icgc-argo.org/guides/review',
-        applyingForAccess: process.env.EMAIL_APPLYING_FOR_ACCESS_GUIDE_URL || 'https://docs.icgc-argo.org/docs/data-access/data-access',
-        dataAccessGuide: process.env.EMAIL_DATA_ACCESS_GUIDE_URL || 'https://docs.icgc-argo.org/docs/data-access/data-download',
+        reviewGuide:
+          process.env.EMAIL_REVIEW_GUIDE_URL ||
+          'https://docs.icgc-argo.org/docs/data-access/daco/approval#review-process',
+        applyingForAccess:
+          process.env.EMAIL_APPLYING_FOR_ACCESS_GUIDE_URL ||
+          'https://docs.icgc-argo.org/docs/data-access/data-access',
+        dataAccessGuide:
+          process.env.EMAIL_DATA_ACCESS_GUIDE_URL ||
+          'https://www.icgc-argo.org/page/132/data-access-and-data-use-policies-and-guidelines',
+        revisionsRequestedGuide:
+          process.env.REVISIONS_REQUESTED_GUIDE_URL ||
+          'https://docs.icgc-argo.org/docs/data-access/daco/approval#requested-revisions',
       },
       reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',
-    }
+    },
   };
   return config;
 };

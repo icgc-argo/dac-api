@@ -438,12 +438,14 @@ async function sendEmail(
   to: Set<string>,
   subject: string,
   html: string,
+  bcc?: string,
 ) {
   const info = await emailClient.sendMail({
     from: `"${fromName}" <${fromEmail}>`, // sender address
     to: Array.from(to).join(','), // list of receivers
     subject: subject, // Subject line
     html: html, // html body
+    ...(bcc && { bcc }),
   });
 }
 
@@ -490,6 +492,7 @@ async function sendRevisionsRequestEmail(
     getApplicantEmails(app),
     `[${app.appId}] Your Application has been Reopened for Revisions`,
     submittedEmail.html,
+    config.email.dacoAddress,
   );
 }
 
@@ -506,6 +509,7 @@ async function sendApplicationApprovedEmail(
     getApplicantEmails(updatedApp),
     `[${updatedApp.appId}] Your Application has been Approved`,
     email.html,
+    config.email.dacoAddress,
   );
 }
 async function sendCollaboratorAddedEmail(
