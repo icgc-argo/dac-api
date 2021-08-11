@@ -246,10 +246,12 @@ const countries = [
   { code: 'ZW', name: 'Zimbabwe' },
 ];
 
-export const countriesList: string[] = countries.map(s => s.name).sort((a, b) => a.localeCompare(b));
+export const countriesList: string[] = countries
+  .map((s) => s.name)
+  .sort((a, b) => a.localeCompare(b));
 
 export const ICGC_25K_URL = 'https://dcc.icgc.org/';
 export const ICGC_ARGO_PLATFORM_URL = 'https://platform.icgc-argo.org/';
 export const ICGC_ARGO_URL = 'https://www.icgc-argo.org/';
-export const DATA_ACCESS_AGREEMENT_URL = '#';
-export const DATA_ACCESS_POLICY_URL = '#';
+export const DATA_ACCESS_POLICY_URL =
+  'https://www.icgc-argo.org/page/132/data-access-and-data-use-policies-and-guidelines';

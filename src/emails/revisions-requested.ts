@@ -19,8 +19,8 @@ export default async function (app: Application, config: AppConfig) {
         title: info.title,
       },
       closureData: {
-        guideLink: config.email.links.applyingForAccess,
-        guideText: 'Help Guides for Applying for Access',
+        guideLink: config.email.links.revisionsRequestedGuide,
+        guideText: 'Help Guides for Requested Revisions',
       },
     },
     'Your Application has been Reopened for Revisions',
