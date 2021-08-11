@@ -62,7 +62,7 @@ function messageBody(app: Application, recipient: PersonalInfo) {
         { padding: '0px 0px 20px 0px' },
       )}
       ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-      ${approvalDetailsContent(removalData)}
+      ${approvalDetailsContent(removalData, false)}
       <mj-section padding="0">
       <mj-column padding="0">
         ${text(

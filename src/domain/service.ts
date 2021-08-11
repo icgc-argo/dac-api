@@ -187,13 +187,16 @@ export async function deleteCollaborator(
   const result = stateManager.deleteCollaborator(collaboratorId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 
-  const collaborator = appDoc.sections.collaborators.list.find(
-    (collab) => collab.id === collaboratorId,
-  );
-  console.log('collaborator found: ', collaborator);
-  if (result.state === 'APPROVED' && collaborator) {
-    const config = await getAppConfig();
-    sendCollaboratorRemovedEmail(result, collaborator, config, emailClient);
+  if (result.state === 'APPROVED') {
+    const collaborator = appDoc.sections.collaborators.list.find(
+      (collab) => collab.id === collaboratorId,
+    );
+
+    if (collaborator) {
+      logger.info('Collaborator was found, sending notification of access removal.');
+      const config = await getAppConfig();
+      sendCollaboratorRemovedEmail(result, collaborator, config, emailClient);
+    }
   }
 }
 

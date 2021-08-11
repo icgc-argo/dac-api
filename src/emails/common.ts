@@ -60,7 +60,7 @@ function header(title: string) {
         .app-tbl-lable {
           font-weight: 600;
           width: 145px;
-          padding: 2px 0px 2px 10px;
+          padding: 2px 4px 2px 10px;
           line-height: 22px;
           font-size:14px;
           color: #000;
@@ -294,11 +294,18 @@ export function approvalDetailsBox(app: Application, accessEmail: string) {
   return approvalDetailsContent(data);
 }
 
-export const approvalDetailsContent = (data: { label: string; value: string }[]) => {
+export const approvalDetailsContent = (
+  data: { label: string; value: string }[],
+  userHasAccess: boolean = true,
+) => {
   return `
   <mj-section padding="0px 0px 20px 0px">
       <mj-column border="1px #dcdde1 solid" border-top="0px" padding="0" >
-      <mj-text font-size="14px" padding="10px 0px 5px 85px">The following are your access details:</mj-text>
+     ${
+       userHasAccess
+         ? `<mj-text font-size="14px" padding="10px 0px 5px 85px">The following are your access details:</mj-text>`
+         : `<mj-text padding="5px 0px 5px 85px" />`
+     }
         <mj-table font-weight="400"
                   font-size="16px"
                   color="#000000"
