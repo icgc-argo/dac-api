@@ -16,16 +16,11 @@ import {
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import { Identity } from '@overture-stack/ego-token-middleware';
+import crypto from 'crypto';
 
-import {
-  ApplicationSummary,
-  CSVFileHeader,
-  FileFormat,
-  State,
-  UpdateApplication,
-} from '../domain/interface';
+import { FileFormat, UpdateApplication } from '../domain/interface';
 import { AppConfig } from '../config';
-import _, { uniqBy } from 'lodash';
+import _ from 'lodash';
 import { Storage } from '../storage';
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
@@ -33,9 +28,9 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import archiver from 'archiver';
 import moment from 'moment';
 import { Readable } from 'stream';
-import { getSearchParams, parseApprovedUser } from '../utils/misc';
+import { getSearchParams, createDacoCSVFile } from '../utils/misc';
 
-interface IRequest extends Request {
+export interface IRequest extends Request {
   identity: Identity;
 }
 
@@ -230,59 +225,29 @@ const createApplicationsRouter = (
     authFilter([config.auth.REVIEW_SCOPE]),
     wrapAsync(async (req: Request, res: Response) => {
       logger.info(`exporting approved users for all applications`);
-      const params = {
-        ...getSearchParams(req),
-        states: ['APPROVED'] as State[],
-        includeCollaborators: true,
-        cursorSearch: true,
-      };
-      const results = await search(params, (req as IRequest).identity);
-      const fileFormat = req.query.format;
-      // applicant + collaborators get daco access
-      const parsedResults = results.items
-        .map((appResult: ApplicationSummary) => {
-          const applicantInfo = appResult.applicant.info;
-          const applicant = parseApprovedUser(applicantInfo, appResult.lastUpdatedAtUtc);
-          const collabs = (appResult.collaborators || []).map((collab) =>
-            parseApprovedUser(collab, appResult.lastUpdatedAtUtc),
-          );
-          return [applicant, ...collabs];
-        })
-        .flat();
 
+      const fileFormat = req.query.format;
       // other formats may be added in future but for now only handling DACO_FILE_FORMAT type, all else will return 400
       if (fileFormat === FileFormat.DACO_FILE_FORMAT) {
-        const fileHeaders: CSVFileHeader[] = [
-          { accessor: 'userName', name: 'USER NAME' },
-          { accessor: 'openId', name: 'OPENID' },
-          { accessor: 'email', name: 'EMAIL' },
-          { accessor: 'csa', name: 'CSA' },
-          { accessor: 'changed', name: 'CHANGED' }, // verify what this value should be
-          { accessor: 'affiliation', name: 'AFFILIATION' },
-        ];
-        const headerRow: string[] = fileHeaders.map((header) => header.name);
-
-        const uniqueApprovedUsers = uniqBy(parsedResults, 'openId').map((row: any) => {
-          const dataRow: string[] = fileHeaders.map((header) => {
-            if (header.accessor === 'csa') {
-              return true;
-            }
-            // if value is missing, add empty string so the column has content
-            return row[header.accessor as string] || '';
-          });
-          return dataRow.join(',');
-        });
-
-        res.set('Content-Type', 'text/csv');
-        const withHeaders = [headerRow, ...uniqueApprovedUsers].join('\n');
-        // TODO: verify the correct filename
+        // createCSV
+        const csv = await createDacoCSVFile(req);
         const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DDTHH:mm');
-        res.status(200).attachment(`daco-users-${currentDate}.csv`).send(withHeaders);
+        res.set('Content-Type', 'text/csv');
+        res.status(200).attachment(`daco-users-${currentDate}.csv`).send(csv);
       } else {
         throw new BadRequest('Unrecognized or missing file format for export');
       }
     }),
   );
+
+  // router.get(
+  //   '/jobs/export-and-email/',
+  //   authFilter([config.auth.REVIEW_SCOPE]),
+  //   wrapAsync(async (req: Request, res: Response) => {
+  //     const foo = crypto.getCiphers();
+  //     console.log(foo);
+  //   }),
+  // );
 
   router.get(
     '/applications/:id',
