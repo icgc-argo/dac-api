@@ -62,6 +62,18 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo) {
 }
 
 function revisionTable(app: Application) {
+  const revisionsSectionOrder = [
+    'applicant',
+    'representative',
+    'collaborators',
+    'projectInfo',
+    'ethicsLetter',
+    'signature',
+  ];
+
+  const orderedRevisions = Object.keys(app.revisionRequest).sort(
+    (a, b) => revisionsSectionOrder.indexOf(a) - revisionsSectionOrder.indexOf(b),
+  );
   return `
   <mj-section padding="0px 0px 20px 0px">
     <mj-column border="0px #dcdde1 solid" padding="0" >
@@ -74,7 +86,7 @@ function revisionTable(app: Application) {
                   <td class="revisions-tbl-header" style="width:185px">Application Section</td>
                   <td class="revisions-tbl-header" style="width:354px">Requested Revisions</td>
                 </tr>
-                ${Object.keys(app.revisionRequest)
+                ${orderedRevisions
                   .map((r: string) => {
                     const sectionName = r as keyof Application['revisionRequest'];
                     if (
