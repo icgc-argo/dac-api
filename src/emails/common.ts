@@ -3,23 +3,23 @@ import { c } from '../utils/misc';
 import { Application, PersonalInfo } from '../domain/interface';
 
 export type UILinksInfo = {
-  baseUrl: string,
-  pathTemplate: string,
+  baseUrl: string;
+  pathTemplate: string;
 };
 
 export type ComposeArgs = {
   receiver: Receiver;
-  message: string ;
-  includeClousre?: boolean;
+  message: string;
+  includeClosure?: boolean;
   closureData?: ClosureData;
 };
 
-export type ClosureData = { guideText: string; guideLink: string; };
+export type ClosureData = { guideText: string; guideLink: string };
 
-const defaultTextStyle = {
+export const defaultTextStyle = {
   color: '#000000',
   'font-size': '14px',
-  'padding': '0'
+  padding: '0',
 };
 
 export function compose(cardData: ComposeArgs, subject: string) {
@@ -27,12 +27,12 @@ export function compose(cardData: ComposeArgs, subject: string) {
     <mjml>
       ${header(subject)}
       ${body({
-          subject,
-          receiver: cardData.receiver,
-          message: cardData.message,
-          withClosure: cardData.includeClousre === undefined ? true : cardData.includeClousre,
-          closureData: cardData.closureData
-        })}
+        subject,
+        receiver: cardData.receiver,
+        message: cardData.message,
+        withClosure: cardData.includeClosure === undefined ? true : cardData.includeClosure,
+        closureData: cardData.closureData,
+      })}
     </mjml>
   `;
 }
@@ -60,7 +60,7 @@ function header(title: string) {
         .app-tbl-lable {
           font-weight: 600;
           width: 145px;
-          padding: 2px 0px 2px 10px;
+          padding: 2px 4px 2px 10px;
           line-height: 22px;
           font-size:14px;
           color: #000;
@@ -96,13 +96,18 @@ function header(title: string) {
   `;
 }
 
-
-function body(props: {subject: string, receiver: Receiver, message: string, withClosure: boolean, closureData?: ClosureData}) {
-  const {subject, receiver, message, withClosure, closureData} = props;
+function body(props: {
+  subject: string;
+  receiver: Receiver;
+  message: string;
+  withClosure: boolean;
+  closureData?: ClosureData;
+}) {
+  const { subject, receiver, message, withClosure, closureData } = props;
   return `
     <mj-body background-color="#ffffff" width="600px" css-class="body">
       ${banner()}
-      ${card({subject, receiver, message, withClosure, closureData})}
+      ${card({ subject, receiver, message, withClosure, closureData })}
       ${footer()}
     </mj-body>
   `;
@@ -121,11 +126,17 @@ function banner() {
   `;
 }
 
-function card(props: {subject: string, receiver: Receiver, message: string, withClosure: boolean, closureData?: ClosureData}) {
+function card(props: {
+  subject: string;
+  receiver: Receiver;
+  message: string;
+  withClosure: boolean;
+  closureData?: ClosureData;
+}) {
   const { subject, receiver, message, withClosure, closureData } = props;
   return `
     ${cardHeader(subject)}
-    ${cardBody({receiver, message, withClosure, closureData})}
+    ${cardBody({ receiver, message, withClosure, closureData })}
   `;
 }
 
@@ -141,22 +152,27 @@ function cardHeader(title: string) {
   `;
 }
 
-function cardBody(props: {receiver: Receiver, message: string, withClosure: boolean, closureData?: ClosureData}) {
+function cardBody(props: {
+  receiver: Receiver;
+  message: string;
+  withClosure: boolean;
+  closureData?: ClosureData;
+}) {
   const { receiver, message, withClosure, closureData } = props;
   return `
     <mj-wrapper padding="30px 32px 52px 32px" css-class="body-section">
       ${greeting(receiver)}
       ${message}
-      ${ withClosure ? closure(c(closureData)) : ''}
+      ${withClosure ? closure(c(closureData)) : ''}
     </mj-wrapper>
   `;
 }
 
 type Receiver = {
-  title?: string,
-  first: string,
-  last: string,
-  suffix?: string,
+  title?: string;
+  first: string;
+  last: string;
+  suffix?: string;
 };
 
 function greeting(args: Receiver) {
@@ -164,30 +180,46 @@ function greeting(args: Receiver) {
     <mj-section padding="0">
       <mj-column padding="0">
       ${text(
-        `Dear ${args.title ? args.title + ' ' : '' }${args.first} ${args.last}${args.suffix ? ' ' + args.suffix : ''},`
-      , { ...defaultTextStyle,  padding: '0px 0px 20px 0px' })}
+        `Dear ${args.title ? args.title + ' ' : ''}${args.first} ${args.last}${
+          args.suffix ? ' ' + args.suffix : ''
+        },`,
+        { ...defaultTextStyle, padding: '0px 0px 20px 0px' },
+      )}
       </mj-column>
     </mj-section>
   `;
 }
 
-export function appInfoBox(app: Application, dateText?: string, dateValue?: Date, isLastChild: boolean = true) {
+export function appInfoBox(
+  app: Application,
+  dateText?: string,
+  dateValue?: Date,
+  isLastChild: boolean = true,
+) {
   const applicantInfo = app.sections.applicant.info;
   const applicantName = getApplicantName(app.sections.applicant.info);
-  return infoBox(app, [{
-      label: 'Application #',
-      value: app.appId
-    }, {
-      label: 'Applicant',
-      value: applicantName
-    }, {
-      label: 'Institution',
-      value: applicantInfo.primaryAffiliation,
-    }, {
-      label: dateText || 'Submitted on',
-      value: formatDate(dateValue || app.submittedAtUtc),
-    },
-  ], isLastChild);
+  return infoBox(
+    app,
+    [
+      {
+        label: 'Application #',
+        value: app.appId,
+      },
+      {
+        label: 'Applicant',
+        value: applicantName,
+      },
+      {
+        label: 'Institution',
+        value: applicantInfo.primaryAffiliation,
+      },
+      {
+        label: dateText || 'Submitted on',
+        value: formatDate(dateValue || app.submittedAtUtc),
+      },
+    ],
+    isLastChild,
+  );
 }
 
 export function formatDate(d: Date) {
@@ -195,12 +227,17 @@ export function formatDate(d: Date) {
 }
 
 export function getApplicantName(info: PersonalInfo) {
-  const applicantName =
-    `${info.title ? info.title + ' ' : '' }${info.firstName} ${info.lastName}${info.suffix ? ' ' + info.suffix : ''}`;
+  const applicantName = `${info.title ? info.title + ' ' : ''}${info.firstName} ${info.lastName}${
+    info.suffix ? ' ' + info.suffix : ''
+  }`;
   return applicantName;
 }
 
-export function infoBox(app: Application, data: {label: string, value: string}[], isLastChild: boolean = true) {
+export function infoBox(
+  app: Application,
+  data: { label: string; value: string }[],
+  isLastChild: boolean = true,
+) {
   return `
     <mj-section padding="0px 0px ${isLastChild ? '20px' : '0px'} 0px">
       <mj-column border="1px #dcdde1 solid" padding="0" >
@@ -215,8 +252,8 @@ export function infoBox(app: Application, data: {label: string, value: string}[]
                     </td>
                     <td>
                       <table width="100%">
-                        ${
-                          data.map(d => {
+                        ${data
+                          .map((d) => {
                             return `
                             <tr>
                               <td class="app-tbl-lable">
@@ -227,8 +264,8 @@ export function infoBox(app: Application, data: {label: string, value: string}[]
                               </td>
                             </tr>
                             `;
-                          }).join(`\n`)
-                        }
+                          })
+                          .join(`\n`)}
                       </table>
                     </td>
                   </tr>
@@ -239,21 +276,36 @@ export function infoBox(app: Application, data: {label: string, value: string}[]
 }
 
 export function approvalDetailsBox(app: Application, accessEmail: string) {
-  const data = [{
-    label: 'Title of Project',
-    value: app.sections.projectInfo.title
-  }, {
-    label: 'Access Email',
-    value: accessEmail,
-  }, {
-    label: 'Access Expiry Date',
-    value: formatDate(app.expiresAtUtc),
-  }];
+  const data = [
+    {
+      label: 'Title of Project',
+      value: app.sections.projectInfo.title,
+    },
+    {
+      label: 'Access Email',
+      value: accessEmail,
+    },
+    {
+      label: 'Access Expiry Date',
+      value: formatDate(app.expiresAtUtc),
+    },
+  ];
 
+  return approvalDetailsContent(data);
+}
+
+export const approvalDetailsContent = (
+  data: { label: string; value: string }[],
+  userHasAccess: boolean = true,
+) => {
   return `
   <mj-section padding="0px 0px 20px 0px">
       <mj-column border="1px #dcdde1 solid" border-top="0px" padding="0" >
-      <mj-text font-size="14px" padding="10px 0px 5px 85px">The following are your access details:</mj-text>
+     ${
+       userHasAccess
+         ? `<mj-text font-size="14px" padding="10px 0px 5px 85px">The following are your access details:</mj-text>`
+         : `<mj-text padding="5px 0px 5px 85px" />`
+     }
         <mj-table font-weight="400"
                   font-size="16px"
                   color="#000000"
@@ -264,8 +316,8 @@ export function approvalDetailsBox(app: Application, accessEmail: string) {
                     </td>
                     <td>
                       <table width="100%">
-                        ${
-                          data.map(d => {
+                        ${data
+                          .map((d) => {
                             return `
                             <tr>
                               <td class="app-tbl-lable">
@@ -276,35 +328,33 @@ export function approvalDetailsBox(app: Application, accessEmail: string) {
                               </td>
                             </tr>
                             `;
-                          }).join(`\n`)
-                        }
+                          })
+                          .join(`\n`)}
                       </table>
                     </td>
                   </tr>
         </mj-table>
       </mj-column>
     </mj-section>`;
-}
-
-function closure(props: {guideLink: string, guideText: string}) {
+};
+function closure(props: { guideLink: string; guideText: string }) {
   const { guideLink, guideText } = props;
   return `
     <mj-section padding="0">
       <mj-column padding="0">
         ${text(
-          `If you have any questions, please consult the <a href="${guideLink}">${guideText}</a> or <a href="https://platform.icgc-argo.org/contact">contact the ICGC DACO team</a>.`
-          , { ...defaultTextStyle,  padding: '20px 0px 0px 0px' })
-        }
-        ${text(
-          `Thank you for your interest in the International Cancer Genome Consortium.`,
-          { ...defaultTextStyle,  padding: '20px 0px 0px 0px' })
-
-        }
+          `If you have any questions, please consult the <a href="${guideLink}">${guideText}</a> or <a href="https://platform.icgc-argo.org/contact">contact the ICGC DACO team</a>.`,
+          { ...defaultTextStyle, padding: '20px 0px 0px 0px' },
+        )}
+        ${text(`Thank you for your interest in the International Cancer Genome Consortium.`, {
+          ...defaultTextStyle,
+          padding: '20px 0px 0px 0px',
+        })}
         ${text(
           `Sincerely, <br />
-          The <a href="https://daco.icgc-argo.org/">ICGC DACO</a> Team`, { ...defaultTextStyle,  padding: '20px 0px 0px 0px' }
-          )
-        }
+          The <a href="https://daco.icgc-argo.org/">ICGC DACO</a> Team`,
+          { ...defaultTextStyle, padding: '20px 0px 0px 0px' },
+        )}
       </mj-column>
     </mj-section>
   `;
@@ -317,7 +367,7 @@ function footer() {
       <mj-group>
         <mj-column width="100%" padding-right="0">
           <mj-text font-size="12px" align="center" line-height="16px" >
-            <a class="" href="https://platform.icgc-argo.org/contact">Contact Us</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://www.icgc-argo.org/page/72/introduction-and-goals-">Policies & Guidelines</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://docs.icgc-argo.org/docs/data-access/data-access">Help Guides</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://www.icgc-argo.org">Controlled Data Users</a>
+            <a class="" href="https://platform.icgc-argo.org/contact">Contact Us</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://www.icgc-argo.org/page/72/introduction-and-goals-">Policies & Guidelines</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://docs.icgc-argo.org/docs/data-access/daco/applying">Help Guides</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://www.icgc-argo.org/page/139/controlled-data-users">Controlled Data Users</a>
           </mj-text>
           <mj-text font-size="12px" align="center" line-height="16px" padding-top="0" >
             <a class="" href="https://www.icgc-argo.org/">ICGC ARGO Website</a>&#xA0;&#xA0;&#xA0;/&#xA0;&#xA0;&#xA0;<a class="" href="https://platform.icgc-argo.org/">ARGO Data Platform</a>
@@ -386,15 +436,19 @@ export function actionGetStarted(text: string, buttonText: string, buttonLink: s
 
 export function text(content: string, style: any = defaultTextStyle) {
   return `
-    <mj-text ${Object.keys(style).map((k: string) => `${k}="${style[k]}"`).join(' ')}>
+    <mj-text ${Object.keys(style)
+      .map((k: string) => `${k}="${style[k]}"`)
+      .join(' ')}>
       ${content}
     </mj-text>
   `;
 }
 
-export function textParagraphSection(content: string,
-                                     style: object = defaultTextStyle,
-                                     padding: string = '0') {
+export function textParagraphSection(
+  content: string,
+  style: object = defaultTextStyle,
+  padding: string = '0',
+) {
   return `
     <mj-section padding="${padding}">
       <mj-column padding="0">
