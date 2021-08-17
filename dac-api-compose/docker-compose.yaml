@@ -79,8 +79,6 @@ services:
       DB_USERNAME: admin
       DB_PASSWORD: password
       OBJECT_STORAGE_ENDPOINT: http://object-storage:9001/
-      OBJECT_STORAGE_REGION: nova
-      OBJECT_STORAGE_BUCKET: daco-dev
       OBJECT_STORAGE_KEY: minio
       OBJECT_STORAGE_SECRET: minio123
       PORT: 3001
