@@ -9,7 +9,8 @@ services:
       MINIO_SECRET_KEY: minio123
     command: server /data --console-address ":9001"
     ports:
-      - '9001:9000'
+      - '9001:9001'
+      - '9000:9000'
 
   vault:
     image: vault
