@@ -4,14 +4,14 @@ import _ from 'lodash';
 import fetch from 'node-fetch';
 import AWS, { S3 } from 'aws-sdk';
 import * as uuid from 'uuid';
+import logger from '../logger';
 let config: AppConfig;
 
-(async () => {
+async () => {
   config = await getAppConfig();
-});
+};
 
 export class Storage {
-
   private s3Client: S3;
   private readonly bucket: string;
   constructor(readonly config: AppConfig) {
@@ -24,25 +24,29 @@ export class Storage {
       s3ForcePathStyle: true,
       credentials: {
         accessKeyId: config.storage.key,
-        secretAccessKey: config.storage.secret
+        secretAccessKey: config.storage.secret,
       },
     });
-   }
+  }
 
   async createBucket() {
     try {
-      await this.s3Client.headBucket({
-        Bucket: this.bucket,
-      }).promise();
+      await this.s3Client
+        .headBucket({
+          Bucket: this.bucket,
+        })
+        .promise();
     } catch (err) {
       if (err.name == 'TimeoutError') {
-        console.error('couldn\'t connect to S3', err);
+        console.error("couldn't connect to S3", err);
         return;
       }
       console.error(`heading bucket: ${err}`, err);
-      await this.s3Client.createBucket({
-        Bucket: this.bucket
-      }).promise();
+      await this.s3Client
+        .createBucket({
+          Bucket: this.bucket,
+        })
+        .promise();
     }
   }
 
@@ -76,6 +80,8 @@ export class Storage {
       method: 'GET',
     });
 
+    logger.info(`S3 response status for file id ${id}: ${response.status}`);
+    logger.info(`S3 response size for file id ${id}: ${response.size}`);
     if (response.status !== 200) {
       throw new Error('Download from storage service failed');
     }
@@ -98,5 +104,3 @@ export class Storage {
     }
   }
 }
-
-
