@@ -4,7 +4,7 @@ import { State, PersonalInfo, ApplicationSummary, CSVFileHeader } from '../domai
 import moment from 'moment';
 import { search } from '../domain/service';
 import { IRequest } from '../routes/applications';
-import { scrypt, randomFill, createCipheriv } from 'crypto';
+import { createCipheriv, randomBytes } from 'crypto';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -118,29 +118,18 @@ export const createDacoCSVFile = async (req: Request) => {
   return [headerRow, ...uniqueApprovedUsers].join('\n');
 };
 
-const encryptFile = () => {
+export const encryptFile = async (text: string) => {
   const algorithm = 'aes-128-cbc';
-  const password = 'Password used to generate key';
+  const myKey = randomBytes(16).toString('hex');
 
-  // First, we'll generate the key. The key length is dependent on the algorithm.
-  // In this case for aes192, it is 24 bytes (192 bits).
-  scrypt(password, 'salt', 24, (err, key) => {
-    if (err) throw err;
-    // Then, we'll generate a random initialization vector
-    randomFill(new Uint8Array(16), (err, iv) => {
-      if (err) throw err;
+  const myIv = randomBytes(16);
 
-      // Once we have the key and iv, we can create and use the cipher...
-      const cipher = createCipheriv(algorithm, key, iv);
+  const cipher = createCipheriv(algorithm, myKey, myIv);
 
-      let encrypted = '';
-      cipher.setEncoding('hex');
-
-      cipher.on('data', (chunk) => (encrypted += chunk));
-      cipher.on('end', () => console.log(encrypted));
-
-      cipher.write('some clear text data');
-      cipher.end();
-    });
-  });
+  const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+  return {
+    iv: myIv,
+    content: encrypted,
+    key: myKey,
+  };
 };

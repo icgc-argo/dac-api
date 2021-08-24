@@ -28,7 +28,7 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import archiver from 'archiver';
 import moment from 'moment';
 import { Readable } from 'stream';
-import { getSearchParams, createDacoCSVFile } from '../utils/misc';
+import { getSearchParams, createDacoCSVFile, encryptFile } from '../utils/misc';
 
 export interface IRequest extends Request {
   identity: Identity;
@@ -240,14 +240,18 @@ const createApplicationsRouter = (
     }),
   );
 
-  // router.get(
-  //   '/jobs/export-and-email/',
-  //   authFilter([config.auth.REVIEW_SCOPE]),
-  //   wrapAsync(async (req: Request, res: Response) => {
-  //     const foo = crypto.getCiphers();
-  //     console.log(foo);
-  //   }),
-  // );
+  router.get(
+    '/jobs/export-and-email/',
+    authFilter([config.auth.REVIEW_SCOPE]),
+    wrapAsync(async (req: Request, res: Response) => {
+      // generate CSV file from approved users
+      const csv = await createDacoCSVFile(req);
+      const encrypted = encryptFile(csv);
+      // encrypt the file
+      // email to expected recipient
+      res.status(200).send(encrypted);
+    }),
+  );
 
   router.get(
     '/applications/:id',
