@@ -445,7 +445,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   return removedIds;
 }
 
-async function sendEmail(
+export async function sendEmail(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   fromEmail: string,
   fromName: string,

@@ -5,6 +5,8 @@ import moment from 'moment';
 import { search } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
+import { getAppConfig } from '../config';
+import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, IV_LENGTH } from './constants';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -118,18 +120,20 @@ export const createDacoCSVFile = async (req: Request) => {
   return [headerRow, ...uniqueApprovedUsers].join('\n');
 };
 
-export const encryptFile = async (text: string) => {
-  const algorithm = 'aes-128-cbc';
-  const myKey = randomBytes(16).toString('hex');
+export const encrypt: (
+  text: string,
+) => Promise<{ iv: string; content: string } | undefined> = async (text) => {
+  const config = await getAppConfig();
 
-  const myIv = randomBytes(16);
-
-  const cipher = createCipheriv(algorithm, myKey, myIv);
-
-  const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
-  return {
-    iv: myIv,
-    content: encrypted,
-    key: myKey,
-  };
+  try {
+    const iv = randomBytes(IV_LENGTH);
+    const cipher = createCipheriv(DACO_ENCRYPTION_ALGO, config.auth.DACO_ENCRYPTION_KEY, iv);
+    const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+    return {
+      iv: iv.toString(CHAR_ENCODING),
+      content: encrypted.toString(CHAR_ENCODING),
+    };
+  } catch (err) {
+    console.warn('Encryption failure: ', err);
+  }
 };

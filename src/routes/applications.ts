@@ -12,6 +12,7 @@ import {
   updatePartial,
   deleteDocument,
   getApplicationAssetsAsStream,
+  sendEmail,
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
@@ -19,7 +20,7 @@ import { Identity } from '@overture-stack/ego-token-middleware';
 import crypto from 'crypto';
 
 import { FileFormat, UpdateApplication } from '../domain/interface';
-import { AppConfig } from '../config';
+import { AppConfig, getAppConfig } from '../config';
 import _ from 'lodash';
 import { Storage } from '../storage';
 import { Transporter } from 'nodemailer';
@@ -28,7 +29,8 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import archiver from 'archiver';
 import moment from 'moment';
 import { Readable } from 'stream';
-import { getSearchParams, createDacoCSVFile, encryptFile } from '../utils/misc';
+import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
+import { DACO_EMAIL_DELIMITER } from '../utils/constants';
 
 export interface IRequest extends Request {
   identity: Identity;
@@ -246,10 +248,23 @@ const createApplicationsRouter = (
     wrapAsync(async (req: Request, res: Response) => {
       // generate CSV file from approved users
       const csv = await createDacoCSVFile(req);
-      const encrypted = encryptFile(csv);
-      // encrypt the file
-      // email to expected recipient
-      res.status(200).send(encrypted);
+      // encrypt csv content, return {content, iv}
+      const encrypted = await encrypt(csv);
+
+      if (encrypted?.content) {
+        const config = await getAppConfig();
+        sendEmail(
+          emailClient,
+          config.email.fromAddress,
+          config.email.fromName,
+          new Set([config.email.dccMailingList]),
+          'Approved DACO Users', // TODO: verify expected subject line
+          `${encrypted.iv}${DACO_EMAIL_DELIMITER}${encrypted?.content}`,
+        );
+        res.status(200).send('OK');
+      } else {
+        res.status(400).send('An unknown error occurred.');
+      }
     }),
   );
 
