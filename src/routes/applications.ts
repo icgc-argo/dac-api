@@ -31,6 +31,7 @@ import moment from 'moment';
 import { Readable } from 'stream';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
 import { DACO_EMAIL_DELIMITER } from '../utils/constants';
+import JSZip from 'jszip';
 
 export interface IRequest extends Request {
   identity: Identity;
@@ -75,33 +76,40 @@ const createApplicationsRouter = (
       logger.info(
         `download app package [app: ${appId}, user Id:${(req as IRequest).identity.userId}]`,
       );
-      const assets = await getApplicationAssetsAsStream(
-        appId,
-        (req as IRequest).identity,
-        storageClient,
-      );
-      const zip = archiver('zip', {
-        zlib: { level: 0 },
-      });
 
-      // append all asset streams to the zip archive
-      assets.forEach((a) => {
-        zip.append(a.stream as Readable, { name: a.name });
-      });
+      console.time('zip download');
 
-      const zipName = `${appId}_${moment().format('YYYYMMDD')}.zip`;
-      res.attachment(zipName);
+      try {
+        const assets = await getApplicationAssetsAsStream(
+          appId,
+          (req as IRequest).identity,
+          storageClient,
+        );
 
-      // pipe the zip stream output to the response directly
-      zip.pipe(res);
-
-      // on zip finish end the response
-      zip.on('finish', () => {
-        res.status(200).end();
-      });
-
-      // finialize the zip.
-      zip.finalize();
+        const zip = new JSZip();
+        assets.forEach((a) => {
+          zip.file(a.name, a.stream);
+        });
+        const zipName = `${appId}_${moment().format('YYYYMMDD')}.zip`;
+        res.set('Content-Type', 'application/zip');
+        res.attachment(zipName);
+        zip
+          .generateNodeStream({ type: 'nodebuffer', streamFiles: true })
+          .pipe(res)
+          .on('error', (err) => {
+            logger.info(`Error in zip stream for ${appId}: ${err}`);
+            res.status(500).write(err);
+            res.end();
+          })
+          .on('finish', () => {
+            logger.info(`Zip completed for ${appId}, sending response.`);
+            console.timeEnd('zip download');
+            res.status(200).end();
+          });
+      } catch (error) {
+        logger.error(`Error downloading zip file for ${appId}: ${error}`);
+        res.status(400).send(error.message || error.details || 'An unknown error occurred.');
+      }
     }),
   );
 
