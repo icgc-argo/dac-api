@@ -30,7 +30,6 @@ import archiver from 'archiver';
 import moment from 'moment';
 import { Readable } from 'stream';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
-import { DACO_EMAIL_DELIMITER } from '../utils/constants';
 import JSZip from 'jszip';
 
 export interface IRequest extends Request {
@@ -267,7 +266,15 @@ const createApplicationsRouter = (
           config.email.fromName,
           new Set([config.email.dccMailingList]),
           'Approved DACO Users', // TODO: verify expected subject line
-          `${encrypted.iv}${DACO_EMAIL_DELIMITER}${encrypted?.content}`,
+          `${encrypted.iv}`,
+          undefined,
+          [
+            {
+              filename: 'approved_users.csv',
+              content: encrypted.content,
+              contentType: 'text/plain',
+            },
+          ],
         );
         res.status(200).send('OK');
       } else {

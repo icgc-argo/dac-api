@@ -1,12 +1,7 @@
 import { expect } from 'chai';
 import { createDecipheriv } from 'crypto';
 import { encrypt } from '../utils/misc';
-import {
-  CHAR_ENCODING,
-  DACO_EMAIL_DELIMITER,
-  DACO_ENCRYPTION_ALGO,
-  IV_LENGTH,
-} from '../utils/constants';
+import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, IV_LENGTH } from '../utils/constants';
 
 describe('encryption', () => {
   it.only('should encrypt and decrypt text', async () => {
@@ -31,25 +26,14 @@ describe('encryption', () => {
       expect(typeof encrypted?.content).to.eq('string');
       expect(Buffer.from(encrypted!.iv, CHAR_ENCODING).length).to.eq(IV_LENGTH);
 
-      const emailContent = `${encrypted?.iv}${DACO_EMAIL_DELIMITER}${encrypted?.content}`;
-
-      // mock extracting iv from email content
-      const splitEmail = emailContent.split(DACO_EMAIL_DELIMITER);
-      const ivFromEmail = splitEmail[0];
-      const contentFromEmail = splitEmail[1].trim();
-
-      expect(ivFromEmail).to.eq(encrypted?.iv);
-      expect(contentFromEmail).to.eq(encrypted?.content);
-
-      expect(ivFromEmail).to.eq(encrypted?.iv);
       const decipher = createDecipheriv(
         DACO_ENCRYPTION_ALGO,
         mockEncryptionKey,
-        Buffer.from(ivFromEmail, CHAR_ENCODING),
+        Buffer.from(encrypted!.iv, CHAR_ENCODING),
       );
 
       const decrypted = Buffer.concat([
-        decipher.update(Buffer.from(contentFromEmail, CHAR_ENCODING)),
+        decipher.update(Buffer.from(encrypted!.content, CHAR_ENCODING)),
         decipher.final(),
       ]);
       expect(decrypted.toString()).to.eq(text);

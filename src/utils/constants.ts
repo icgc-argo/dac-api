@@ -255,7 +255,6 @@ export const countriesList: string[] = countries
 export const DACO_ENCRYPTION_ALGO = 'aes-128-cbc';
 export const CHAR_ENCODING = 'latin1';
 export const IV_LENGTH = 16;
-export const DACO_EMAIL_DELIMITER = '*****';
 
 // URLS
 export const ICGC_25K_URL = 'https://dcc.icgc.org/';
