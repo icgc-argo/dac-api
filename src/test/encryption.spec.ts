@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import { createDecipheriv } from 'crypto';
 import { encrypt } from '../utils/misc';
-import { getAppConfig } from '../config';
 import {
   CHAR_ENCODING,
   DACO_EMAIL_DELIMITER,
@@ -11,8 +10,6 @@ import {
 
 describe('encryption', () => {
   it.only('should encrypt and decrypt text', async () => {
-    const appConfig = await getAppConfig();
-
     const text = `USER NAME,OPENID,EMAIL,CHANGED,AFFILIATION
     First Tester,tester1@sample_email.com,tester1@example.com,2021-07-23T16:49,Some Institute
     string 222 string 1,collab3@sample_email.com,collab3@example.com,2021-07-23T16:58,Some Institute
@@ -22,8 +19,10 @@ describe('encryption', () => {
     Betty Boop,betty505@sample_email,betty_boop@example.com,2021-08-10T13:40,Some Institute
     Test2 Collab,collab_test2@sample_email,collab_test2@example.com,2021-08-11T13:00,Some Institute`;
 
+    const mockEncryptionKey = '0123456789123456';
+
     try {
-      const encrypted = await encrypt(text);
+      const encrypted = await encrypt(text, mockEncryptionKey);
 
       expect(encrypted).to.not.be.empty;
       expect(encrypted).to.haveOwnProperty('iv');
@@ -42,11 +41,10 @@ describe('encryption', () => {
       expect(ivFromEmail).to.eq(encrypted?.iv);
       expect(contentFromEmail).to.eq(encrypted?.content);
 
-      const myKey = appConfig.auth.DACO_ENCRYPTION_KEY;
       expect(ivFromEmail).to.eq(encrypted?.iv);
       const decipher = createDecipheriv(
         DACO_ENCRYPTION_ALGO,
-        myKey,
+        mockEncryptionKey,
         Buffer.from(ivFromEmail, CHAR_ENCODING),
       );
 

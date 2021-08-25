@@ -249,10 +249,10 @@ const createApplicationsRouter = (
       // generate CSV file from approved users
       const csv = await createDacoCSVFile(req);
       // encrypt csv content, return {content, iv}
-      const encrypted = await encrypt(csv);
+      const config = await getAppConfig();
+      const encrypted = await encrypt(csv, config.auth.DACO_ENCRYPTION_KEY);
 
       if (encrypted?.content) {
-        const config = await getAppConfig();
         sendEmail(
           emailClient,
           config.email.fromAddress,

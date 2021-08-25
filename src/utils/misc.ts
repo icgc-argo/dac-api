@@ -122,12 +122,11 @@ export const createDacoCSVFile = async (req: Request) => {
 
 export const encrypt: (
   text: string,
-) => Promise<{ iv: string; content: string } | undefined> = async (text) => {
-  const config = await getAppConfig();
-
+  encryptionKey: string,
+) => Promise<{ iv: string; content: string } | undefined> = async (text, encryptionKey) => {
   try {
     const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(DACO_ENCRYPTION_ALGO, config.auth.DACO_ENCRYPTION_KEY, iv);
+    const cipher = createCipheriv(DACO_ENCRYPTION_ALGO, encryptionKey, iv);
     const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
     return {
       iv: iv.toString(CHAR_ENCODING),
