@@ -49,7 +49,12 @@ const App = (config: AppConfig,
   const app = express();
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
-  app.use(fileUpload());
+  app.use(
+    fileUpload({
+      limits: { fileSize: process.env.FILE_UPLOAD_LIMIT || 5 * 1024 * 1024 },
+      abortOnLimit: true,
+    }),
+  );
   app.get('/', (req, res) => res.status(200).send('hello world'));
   app.get('/health', (req, res) => {
     const status = dbHealth.status == Status.OK ? 200 : 500;
