@@ -102,12 +102,11 @@ const createApplicationsRouter = (
           .on('error', (err) => {
             logger.info(`Error in zip stream for ${appId}: ${err}`);
             res.status(500).write(err);
-            res.end();
           })
           .on('finish', () => {
             logger.info(`Zip completed for ${appId}, sending response.`);
             console.timeEnd('zip download');
-            res.status(200).end();
+            res.status(200).send();
           });
       } catch (error) {
         logger.error(`Error downloading zip file for ${appId}: ${error}`);
