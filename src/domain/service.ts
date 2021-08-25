@@ -128,6 +128,7 @@ export async function getApplicationAssetsAsStream(
     };
   });
   const assets = await Promise.all(downloaded);
+  logger.info(`Returning all assets for ${appId} as stream.`);
   return assets;
 }
 
