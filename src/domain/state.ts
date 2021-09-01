@@ -121,9 +121,15 @@ export class ApplicationStateManager {
         isReviewer,
       );
     });
+
     if (this.currentApplication.sections.representative.addressSameAsApplicant) {
       this.currentApplication.sections.representative.address = undefined;
     }
+
+    // calculate the value of revisions requested field for the FE to use it.
+    this.currentApplication.revisionsRequested = this.currentApplication.state == 'REVISIONS REQUESTED'
+      || wasInRevisionRequestState(this.currentApplication);
+
     return this.currentApplication;
   }
 

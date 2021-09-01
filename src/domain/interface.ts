@@ -122,6 +122,9 @@ export interface Application {
   lastUpdatedAtUtc?: Date;
   createdAtUtc?: Date;
   searchValues: string[];
+  // calculated flag to indicate that revisions are being requested if any of the revisionRequest sections is true
+  // and this flag will be reset before each review since we do reset the revision request portion.
+  revisionsRequested: boolean;
   revisionRequest: {
     applicant: RevisionRequest;
     representative: RevisionRequest;
