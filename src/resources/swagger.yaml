@@ -637,6 +637,9 @@ components:
           type: string
         denialReason:
           type: string
+        revisionsRequested:
+          type: boolean
+          readOnly: true
         revisionRequests:
           type: object
           properties:
