@@ -122,6 +122,11 @@ export class ApplicationStateManager {
       );
     });
 
+    // if not reviewer don't show audit data
+    if (!isReviewer) {
+      this.currentApplication.updates = [];
+    }
+
     if (this.currentApplication.sections.representative.addressSameAsApplicant) {
       this.currentApplication.sections.representative.address = undefined;
     }
@@ -326,7 +331,7 @@ export class ApplicationStateManager {
     return current;
   }
 
-  updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean) {
+  updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean, updatedBy: string) {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
@@ -342,7 +347,7 @@ export class ApplicationStateManager {
         if (!isReviewer) {
           throw new Error('not allowed');
         }
-        updateAppStateForReviewApplication(current, updatePart);
+        updateAppStateForReviewApplication(current, updatePart, updatedBy);
         break;
 
       case 'SIGN AND SUBMIT':
@@ -519,6 +524,7 @@ export function newApplication(identity: Identity): Partial<Application> {
         signedDocName: '',
       },
     },
+    updates: [],
   };
   return app;
 }
@@ -594,6 +600,7 @@ function uploadEthicsLetter(current: Application, id: string, name: string) {
 function updateAppStateForReviewApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
+  updatedBy: string,
 ) {
   // if the admin has chosen a custom expiry date and asked to save
   if (updatePart.expiresAtUtc) {
@@ -603,11 +610,11 @@ function updateAppStateForReviewApplication(
 
   // admin wants to approve the app
   if (updatePart.state == 'APPROVED') {
-    return transitionToApproved(current, updatePart);
+    return transitionToApproved(current, updatedBy);
   }
 
   if (updatePart.state == 'REJECTED') {
-    return transitionToRejected(current, updatePart);
+    return transitionToRejected(current, updatePart, updatedBy);
   }
 
   if (updatePart.state == 'REVISIONS REQUESTED') {
@@ -642,15 +649,25 @@ function resetSignedDocument(current: Application) {
   current.sections.signature.signedDocName = '';
 }
 
-function transitionToRejected(current: Application, updatePart: Partial<UpdateApplication>) {
+function transitionToRejected(current: Application, updatePart: Partial<UpdateApplication>, rejectedBy: string) {
   current.state = 'REJECTED';
   current.denialReason = updatePart.denialReason || '';
+  current.updates.push({
+    date: new Date(),
+    type: 'REJECTED',
+    info: { rejectedBy }
+  });
   return current;
 }
 
-function transitionToApproved(current: Application, updatePart: Partial<UpdateApplication>) {
+function transitionToApproved(current: Application, approvedBy: string) {
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
+  current.updates.push({
+    date: new Date(),
+    type: 'APPROVED',
+    info: { approvedBy }
+  });
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
     current.expiresAtUtc = moment().add(2, 'year').toDate();

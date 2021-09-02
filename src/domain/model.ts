@@ -52,10 +52,10 @@ const RevisionRequest = {
 };
 
 const ApplicationUpdate =  new mongoose.Schema({
-  details: { type: String, required: false },
+  info: { type: {}, required: false },
   type: { type: String, required: false },
   date: { type: Date, required: false },
-});
+}, { _id: false });
 
 const EthicsLetterDocument =  new mongoose.Schema({
   objectId: { type: String, required: false },
