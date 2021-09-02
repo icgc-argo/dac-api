@@ -322,33 +322,37 @@ export class ApplicationStateManager {
 
   updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean) {
     const current = this.currentApplication;
-    switch (this.currentApplication.state) {
-      case 'APPROVED':
-        updateAppStateForApprovedApplication(current, updatePart, isReviewer);
-        break;
+    if (updatePart.state === 'CLOSED' && current.state !== 'REVIEW') {
+      transitionToClosed(current);
+    } else {
+      switch (this.currentApplication.state) {
+        case 'APPROVED':
+          updateAppStateForApprovedApplication(current, updatePart, isReviewer);
+          break;
 
-      case 'REVISIONS REQUESTED':
-        updateAppStateForReturnedApplication(current, updatePart);
-        break;
+        case 'REVISIONS REQUESTED':
+          updateAppStateForReturnedApplication(current, updatePart);
+          break;
 
-      case 'REVIEW':
-        // we are updating an application in review state (i.e. admin wants to a. approve, b. reject, c. request revisions)
-        if (!isReviewer) {
-          throw new Error('not allowed');
-        }
-        updateAppStateForReviewApplication(current, updatePart);
-        break;
+        case 'REVIEW':
+          // we are updating an application in review state (i.e. admin wants to a. approve, b. reject, c. request revisions)
+          if (!isReviewer) {
+            throw new Error('not allowed');
+          }
+          updateAppStateForReviewApplication(current, updatePart);
+          break;
 
-      case 'SIGN AND SUBMIT':
-        updateAppStateForSignAndSubmit(current, updatePart);
-        break;
+        case 'SIGN AND SUBMIT':
+          updateAppStateForSignAndSubmit(current, updatePart);
+          break;
 
-      case 'DRAFT':
-        updateAppStateForDraftApplication(current, updatePart);
-        break;
+        case 'DRAFT':
+          updateAppStateForDraftApplication(current, updatePart);
+          break;
 
-      default:
-        throw new Error();
+        default:
+          throw new Error(`Invalid app state: ${current.state}`);
+      }
     }
 
     // save / error
@@ -607,6 +611,10 @@ function updateAppStateForReviewApplication(
   if (updatePart.state == 'REVISIONS REQUESTED') {
     return transitionToRevisionsRequested(current, updatePart);
   }
+
+  if (updatePart.state === 'CLOSED') {
+    throw new Error('Cannot close an application in REVIEW state.');
+  }
 }
 
 function transitionToRevisionsRequested(
@@ -648,6 +656,15 @@ function transitionToApproved(current: Application, updatePart: Partial<UpdateAp
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
     current.expiresAtUtc = moment().add(2, 'year').toDate();
+  }
+  return current;
+}
+
+function transitionToClosed(current: Application) {
+  current.state = 'CLOSED';
+  // if expiresAtUtc exists, set to date app was closed
+  if (current.expiresAtUtc) {
+    current.expiresAtUtc = moment().toDate();
   }
   return current;
 }

@@ -105,7 +105,12 @@ export async function getApplicationAssetsAsStream(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
 
-  if (appDocObj.state !== 'REVIEW' && appDocObj.state !== 'APPROVED') {
+  if (
+    appDocObj.state !== 'REVIEW' &&
+    appDocObj.state !== 'APPROVED' &&
+    // can download assets if app is CLOSED and but was APPROVED (has expiresAt key).
+    !(appDocObj.state === 'CLOSED' && appDocObj.expiresAtUtc)
+  ) {
     throw new Error('Cannot download package in this state');
   }
 
@@ -144,6 +149,9 @@ export async function createCollaborator(
   }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.addCollaborator(collaborator);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
@@ -167,6 +175,9 @@ export async function updateCollaborator(
   }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.updateCollaborator(collaborator);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
@@ -184,6 +195,9 @@ export async function deleteCollaborator(
   }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.deleteCollaborator(collaboratorId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
@@ -225,6 +239,11 @@ export async function updatePartial(
   const isReviewer = await hasReviewScope(identity);
   const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
+
+  // if current state is CLOSED, modifications are not allowed
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
   const updatedApp = stateManager.updateApp(appPart, isReviewer);
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
@@ -235,7 +254,7 @@ export async function updatePartial(
   }
   const deleted = checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
-  // this can be a result of applicantion getting updated :
+  // this can be a result of application getting updated :
   // - Changing selection of ethics letter from required to not required
   // - Admin requests revisions (signed app has to be uploaded again)
   // - Applicant changes a completed section when the application is in state sign & submit
@@ -702,4 +721,8 @@ function getApplicantEmails(app: Application) {
     app.sections.applicant.info.googleEmail,
     app.sections.applicant.info.institutionEmail,
   ]);
+}
+
+function throwApplicationClosedError(): () => void {
+  throw new Error('Cannot modify an application in CLOSED state.');
 }
