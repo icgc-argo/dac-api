@@ -35,6 +35,7 @@ import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
+import { Attachment } from 'nodemailer/lib/mailer';
 
 export async function deleteDocument(
   appId: string,
@@ -446,7 +447,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   return removedIds;
 }
 
-async function sendEmail(
+export async function sendEmail(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   fromEmail: string,
   fromName: string,
@@ -454,6 +455,7 @@ async function sendEmail(
   subject: string,
   html: string,
   bcc?: Set<string>,
+  attachments?: Attachment[],
 ) {
   const info = await emailClient.sendMail({
     from: `"${fromName}" <${fromEmail}>`, // sender address
@@ -461,6 +463,7 @@ async function sendEmail(
     subject: subject, // Subject line
     html: html, // html body
     ...(bcc && { bcc: Array.from(bcc).join(',') }), // bcc address
+    ...(attachments && { attachments }),
   });
 }
 
