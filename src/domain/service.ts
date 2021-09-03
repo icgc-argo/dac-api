@@ -50,7 +50,7 @@ export async function deleteDocument(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteDocument(objectId, type);
+  const result = stateManager.deleteDocument(objectId, type, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
@@ -80,7 +80,7 @@ export async function uploadDocument(
   }
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addDocument(id, file.name, type);
+  const result = stateManager.addDocument(id, file.name, type, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
 
@@ -153,7 +153,7 @@ export async function createCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addCollaborator(collaborator);
+  const result = stateManager.addCollaborator(collaborator, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
     const config = await getAppConfig();
@@ -179,7 +179,7 @@ export async function updateCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.updateCollaborator(collaborator);
+  const result = stateManager.updateCollaborator(collaborator, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 }
 
@@ -199,7 +199,7 @@ export async function deleteCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteCollaborator(collaboratorId);
+  const result = stateManager.deleteCollaborator(collaboratorId, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 
   if (result.state === 'APPROVED') {
