@@ -696,11 +696,6 @@ const transitionToClosed: (current: Application, closedBy: string) => Applicatio
   if (current.expiresAtUtc) {
     current.expiresAtUtc = closedDate;
   }
-  current.updates.push({
-    date: closedDate,
-    info: { closedBy },
-    type: 'CLOSED',
-  });
   return current;
 };
 
