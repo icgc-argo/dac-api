@@ -132,8 +132,9 @@ export class ApplicationStateManager {
     }
 
     // calculate the value of revisions requested field for the FE to use it.
-    this.currentApplication.revisionsRequested = this.currentApplication.state == 'REVISIONS REQUESTED'
-      || wasInRevisionRequestState(this.currentApplication);
+    this.currentApplication.revisionsRequested =
+      this.currentApplication.state == 'REVISIONS REQUESTED' ||
+      wasInRevisionRequestState(this.currentApplication);
 
     return this.currentApplication;
   }
@@ -653,13 +654,17 @@ function resetSignedDocument(current: Application) {
   current.sections.signature.signedDocName = '';
 }
 
-function transitionToRejected(current: Application, updatePart: Partial<UpdateApplication>, rejectedBy: string) {
+function transitionToRejected(
+  current: Application,
+  updatePart: Partial<UpdateApplication>,
+  rejectedBy: string,
+) {
   current.state = 'REJECTED';
   current.denialReason = updatePart.denialReason || '';
   current.updates.push({
     date: new Date(),
     type: 'REJECTED',
-    info: { rejectedBy }
+    info: { rejectedBy },
   });
   return current;
 }
@@ -670,7 +675,7 @@ function transitionToApproved(current: Application, approvedBy: string) {
   current.updates.push({
     date: new Date(),
     type: 'APPROVED',
-    info: { approvedBy }
+    info: { approvedBy },
   });
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
