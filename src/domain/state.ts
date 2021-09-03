@@ -322,37 +322,33 @@ export class ApplicationStateManager {
 
   updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean) {
     const current = this.currentApplication;
-    if (updatePart.state === 'CLOSED' && current.state !== 'REVIEW') {
-      transitionToClosed(current);
-    } else {
-      switch (this.currentApplication.state) {
-        case 'APPROVED':
-          updateAppStateForApprovedApplication(current, updatePart, isReviewer);
-          break;
+    switch (this.currentApplication.state) {
+      case 'APPROVED':
+        updateAppStateForApprovedApplication(current, updatePart, isReviewer);
+        break;
 
-        case 'REVISIONS REQUESTED':
-          updateAppStateForReturnedApplication(current, updatePart);
-          break;
+      case 'REVISIONS REQUESTED':
+        updateAppStateForReturnedApplication(current, updatePart);
+        break;
 
-        case 'REVIEW':
-          // we are updating an application in review state (i.e. admin wants to a. approve, b. reject, c. request revisions)
-          if (!isReviewer) {
-            throw new Error('not allowed');
-          }
-          updateAppStateForReviewApplication(current, updatePart);
-          break;
+      case 'REVIEW':
+        // we are updating an application in review state (i.e. admin wants to a. approve, b. reject, c. request revisions)
+        if (!isReviewer) {
+          throw new Error('not allowed');
+        }
+        updateAppStateForReviewApplication(current, updatePart);
+        break;
 
-        case 'SIGN AND SUBMIT':
-          updateAppStateForSignAndSubmit(current, updatePart);
-          break;
+      case 'SIGN AND SUBMIT':
+        updateAppStateForSignAndSubmit(current, updatePart);
+        break;
 
-        case 'DRAFT':
-          updateAppStateForDraftApplication(current, updatePart);
-          break;
+      case 'DRAFT':
+        updateAppStateForDraftApplication(current, updatePart);
+        break;
 
-        default:
-          throw new Error(`Invalid app state: ${current.state}`);
-      }
+      default:
+        throw new Error(`Invalid app state: ${current.state}`);
     }
 
     // save / error
@@ -660,14 +656,20 @@ function transitionToApproved(current: Application, updatePart: Partial<UpdateAp
   return current;
 }
 
-function transitionToClosed(current: Application) {
+const transitionToClosed: (current: Application) => Application = (current) => {
   current.state = 'CLOSED';
   // if expiresAtUtc exists, set to date app was closed
   if (current.expiresAtUtc) {
     current.expiresAtUtc = moment().toDate();
   }
+  // current.updates.push({
+  //   date: new Date(),
+  //   details: '', // will become info when pr #173 is merged
+  //   // info: {closedBy: userId }
+  //   type: 'CLOSED',
+  // });
   return current;
-}
+};
 
 function validateRevisionRequest(revisionRequest: RevisionRequestUpdate) {
   const atleastOneRequested = Object.keys(revisionRequest)
@@ -713,6 +715,9 @@ function updateAppStateForSignAndSubmit(
   updatePart: Partial<UpdateApplication>,
   updateDocs?: boolean,
 ) {
+  if (updatePart.state === 'CLOSED') {
+    return transitionToClosed(current);
+  }
   // applicant wants to submit the app
   if (updatePart.state == 'REVIEW') {
     const ready = isReadyForReview(current);
@@ -767,6 +772,9 @@ function updateAppStateForApprovedApplication(
   isReviewer: boolean,
   updateDocs?: boolean,
 ) {
+  if (updatePart.state === 'CLOSED') {
+    return transitionToClosed(currentApplication);
+  }
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
     updateEthics(updatePart, currentApplication, updateDocs);
@@ -778,6 +786,9 @@ function updateAppStateForReturnedApplication(
   updatePart: Partial<UpdateApplication>,
   updateDocs?: boolean,
 ) {
+  if (updatePart.state === 'CLOSED') {
+    return transitionToClosed(current);
+  }
   if (current.revisionRequest.applicant.requested) {
     updateApplicantSection(updatePart, current);
   }
@@ -812,6 +823,9 @@ function updateAppStateForDraftApplication(
   updatePart: Partial<UpdateApplication>,
   updateDocs?: boolean,
 ) {
+  if (updatePart.state === 'CLOSED') {
+    return transitionToClosed(current);
+  }
   updateTerms(updatePart, current);
   updateApplicantSection(updatePart, current);
   updateRepresentative(updatePart, current);

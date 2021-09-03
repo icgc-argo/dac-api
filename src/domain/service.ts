@@ -108,8 +108,8 @@ export async function getApplicationAssetsAsStream(
   if (
     appDocObj.state !== 'REVIEW' &&
     appDocObj.state !== 'APPROVED' &&
-    // can download assets if app is CLOSED and but was APPROVED (has expiresAt key).
-    !(appDocObj.state === 'CLOSED' && appDocObj.expiresAtUtc)
+    // can download assets if app is CLOSED and but was APPROVED.
+    !(appDocObj.state === 'CLOSED' && appDocObj.approvedAtUtc)
   ) {
     throw new Error('Cannot download package in this state');
   }
