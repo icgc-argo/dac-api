@@ -946,11 +946,6 @@ function updateProjectInfo(updatePart: Partial<UpdateApplication>, current: Appl
       current.sections.projectInfo,
       updatePart.sections.projectInfo,
     );
-    // remove duplicated /  falsy values
-    const uniquePubs = _.uniq(
-      current.sections.projectInfo.publicationsURLs.filter((v) => !!v?.trim()),
-    );
-    current.sections.projectInfo.publicationsURLs = uniquePubs;
     validateProjectInfo(current);
   }
 }

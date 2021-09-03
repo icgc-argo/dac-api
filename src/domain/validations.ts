@@ -9,7 +9,7 @@ import {
   SectionStatus,
 } from './interface';
 import validator from 'validate.js';
-import _ from 'lodash';
+import _, { uniq } from 'lodash';
 import { countriesList } from '../utils/constants';
 import { c } from '../utils/misc';
 
@@ -197,7 +197,15 @@ function validatePublications(publications: string[], errors: SectionError[]) {
     });
     return false;
   }
-
+  const hasDuplicatePubs =
+    uniq(publications.filter((v) => !!v?.trim())).length < publications.length;
+  if (hasDuplicatePubs) {
+    errors.push({
+      field: 'publications',
+      message: 'Publication URLS must be unique',
+    });
+    return false;
+  }
   const validations = publications.map((p: string, index: number) => {
     return validateUrl(p, `publications.${index}`, errors);
   });
