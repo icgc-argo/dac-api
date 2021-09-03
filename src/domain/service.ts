@@ -245,7 +245,7 @@ export async function updatePartial(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const updatedApp = stateManager.updateApp(appPart, isReviewer);
+  const updatedApp = stateManager.updateApp(appPart, isReviewer, identity.userId);
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
   const stateChanged = appDocObj.state != updatedApp.state;
   const config = await getAppConfig();

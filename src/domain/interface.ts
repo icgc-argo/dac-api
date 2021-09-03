@@ -66,7 +66,7 @@ export interface Collaborator {
 }
 
 interface ApplicationUpdate {
-  details: string;
+  info: any;
   type: string;
   date: Date;
 }
@@ -122,6 +122,9 @@ export interface Application {
   lastUpdatedAtUtc?: Date;
   createdAtUtc?: Date;
   searchValues: string[];
+  // calculated flag to indicate that revisions are being requested if any of the revisionRequest sections is true
+  // and this flag will be reset before each review since we do reset the revision request portion.
+  revisionsRequested: boolean;
   revisionRequest: {
     applicant: RevisionRequest;
     representative: RevisionRequest;
@@ -185,6 +188,8 @@ export interface Application {
       signedDocName: string;
     };
   };
+  // this is intended for human auditing and wouldn't recommend using this for any application logic
+  // unless it's revised to fit the case.
   updates: ApplicationUpdate[];
 }
 

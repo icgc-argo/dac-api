@@ -34,7 +34,7 @@ describe('state manager', () => {
         terms,
 
       }
-    }, false);
+    }, false, '1');
 
     expect(result.sections.terms.agreement.accepted).to.eq(true);
     expect(result.sections.terms.meta.status).to.eq('COMPLETE');
@@ -56,7 +56,7 @@ describe('state manager', () => {
       }
     };
 
-    const result = state.updateApp(updatePart, false);
+    const result = state.updateApp(updatePart, false, '1');
     expect(result.sections.applicant.info).to.include(updatePart.sections?.applicant?.info);
   });
 
@@ -74,7 +74,7 @@ describe('state manager', () => {
       }
     };
 
-    state.updateApp(updatePart, false);
+    state.updateApp(updatePart, false, '1');
     expect(state.currentApplication.sections.representative.address?.country).to.eq('Palestine');
 
     const updatePart2: Partial<UpdateApplication> = {
@@ -85,7 +85,7 @@ describe('state manager', () => {
       }
     };
 
-    state.updateApp(updatePart2, false);
+    state.updateApp(updatePart2, false, '1');
     expect(state.currentApplication.sections.representative.address).to.include({
       building: '',
       cityAndProvince: '',
@@ -238,7 +238,7 @@ describe('state manager', () => {
           }
         }
       }
-    }, false);
+    }, false, '1');
     expect(app3.sections.collaborators.list[0].meta.status).to.eq('INCOMPLETE');
 
     // fix the collaborator to match applicant PA again
@@ -294,7 +294,7 @@ describe('state manager', () => {
               'details': 'Some generic comment'
           }
       }
-    }, true);
+    }, true, '1');
 
     const userApp = state.prepareApplicantionForUser(false);
     expect(userApp.sections.representative.meta.status).to.eq('REVISIONS REQUESTED');
@@ -325,7 +325,7 @@ export function getReadyToSignApp() {
   const state = new ApplicationStateManager(app);
   const newState = state.updateApp({
     sections: updatePart
-  }, false);
+  }, false, '1');
   expect(newState.state).to.eq('SIGN AND SUBMIT');
   return newState;
 }
@@ -338,7 +338,7 @@ export function getAppInReview() {
     state: 'REVIEW'
   };
   const state2 = new ApplicationStateManager(appAfterSign);
-  const result = state2.updateApp(updatePart, false);
+  const result = state2.updateApp(updatePart, false, '1');
   expect(result.state).to.eq('REVIEW');
   return result;
 }
@@ -349,7 +349,7 @@ export function getApprovedApplication() {
   const updatePart: Partial<UpdateApplication> = {
     state: 'APPROVED'
   };
-  const result = state.updateApp(updatePart, true);
+  const result = state.updateApp(updatePart, true, '1');
   expect(result.state).to.eq('APPROVED');
   expect(result.approvedAtUtc).to.not.eq(undefined);
   return result;
@@ -382,7 +382,7 @@ export function getAppInRevisionRequested() {
     },
     state: 'REVISIONS REQUESTED'
   };
-  const result = state.updateApp(update, true);
+  const result = state.updateApp(update, true, '1');
   expect(result.state).to.eq('REVISIONS REQUESTED');
   return result;
 }
