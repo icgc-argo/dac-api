@@ -226,7 +226,7 @@ export async function updatePartial(
   const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const updatedApp = stateManager.updateApp(appPart, isReviewer);
+  const updatedApp = stateManager.updateApp(appPart, isReviewer, identity.userId);
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
   const stateChanged = appDocObj.state != updatedApp.state;
   const config = await getAppConfig();
