@@ -35,6 +35,7 @@ import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
+import { Attachment } from 'nodemailer/lib/mailer';
 
 export async function deleteDocument(
   appId: string,
@@ -50,7 +51,7 @@ export async function deleteDocument(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteDocument(objectId, type);
+  const result = stateManager.deleteDocument(objectId, type, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
@@ -80,7 +81,7 @@ export async function uploadDocument(
   }
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addDocument(id, file.name, type);
+  const result = stateManager.addDocument(id, file.name, type, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
 
@@ -105,7 +106,12 @@ export async function getApplicationAssetsAsStream(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
 
-  if (appDocObj.state !== 'REVIEW' && appDocObj.state !== 'APPROVED') {
+  if (
+    appDocObj.state !== 'REVIEW' &&
+    appDocObj.state !== 'APPROVED' &&
+    // can download assets if app is CLOSED and but was APPROVED.
+    !(appDocObj.state === 'CLOSED' && appDocObj.approvedAtUtc)
+  ) {
     throw new Error('Cannot download package in this state');
   }
 
@@ -144,8 +150,11 @@ export async function createCollaborator(
   }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addCollaborator(collaborator);
+  const result = stateManager.addCollaborator(collaborator, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
     const config = await getAppConfig();
@@ -167,8 +176,11 @@ export async function updateCollaborator(
   }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.updateCollaborator(collaborator);
+  const result = stateManager.updateCollaborator(collaborator, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 }
 
@@ -184,8 +196,11 @@ export async function deleteCollaborator(
   }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteCollaborator(collaboratorId);
+  const result = stateManager.deleteCollaborator(collaboratorId, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 
   if (result.state === 'APPROVED') {
@@ -225,6 +240,11 @@ export async function updatePartial(
   const isReviewer = await hasReviewScope(identity);
   const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
+
+  // if current state is CLOSED, modifications are not allowed
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
   const updatedApp = stateManager.updateApp(appPart, isReviewer, identity.userId);
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
@@ -235,7 +255,7 @@ export async function updatePartial(
   }
   const deleted = checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
-  // this can be a result of applicantion getting updated :
+  // this can be a result of application getting updated :
   // - Changing selection of ethics letter from required to not required
   // - Admin requests revisions (signed app has to be uploaded again)
   // - Applicant changes a completed section when the application is in state sign & submit
@@ -446,7 +466,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   return removedIds;
 }
 
-async function sendEmail(
+export async function sendEmail(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   fromEmail: string,
   fromName: string,
@@ -454,6 +474,7 @@ async function sendEmail(
   subject: string,
   html: string,
   bcc?: Set<string>,
+  attachments?: Attachment[],
 ) {
   const info = await emailClient.sendMail({
     from: `"${fromName}" <${fromEmail}>`, // sender address
@@ -461,6 +482,7 @@ async function sendEmail(
     subject: subject, // Subject line
     html: html, // html body
     ...(bcc && { bcc: Array.from(bcc).join(',') }), // bcc address
+    ...(attachments && { attachments }),
   });
 }
 
@@ -702,4 +724,8 @@ function getApplicantEmails(app: Application) {
     app.sections.applicant.info.googleEmail,
     app.sections.applicant.info.institutionEmail,
   ]);
+}
+
+function throwApplicationClosedError(): () => void {
+  throw new Error('Cannot modify an application in CLOSED state.');
 }

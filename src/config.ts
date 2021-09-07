@@ -38,6 +38,7 @@ export interface AppConfig {
     port: number;
     reviewerFirstName: string;
     reviewerLastName: string;
+    dccMailingList: string;
     auth: {
       user: string | undefined;
       password: string | undefined;
@@ -58,6 +59,7 @@ export interface AppConfig {
     jwtKeyUrl: string;
     jwtKey: string;
     REVIEW_SCOPE: string;
+    DACO_ENCRYPTION_KEY: string;
   };
   storage: {
     endpoint: string;
@@ -130,6 +132,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
       REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
+      DACO_ENCRYPTION_KEY: secrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY,
     },
     ui: {
       baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org',
@@ -150,6 +153,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       dacoAddress: process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org',
       fromName: process.env.EMAIL_FROM_NAME || 'ICGC DACO',
       fromAddress: process.env.EMAIL_FROM_ADDRESS || 'no-reply-daco@icgc-argo.org',
+      dccMailingList: secrets.DCC_MAILING_LIST || process.env.DCC_MAILING_LIST,
       auth: {
         user: secrets.EMAIL_USER || process.env.EMAIL_USER,
         password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
