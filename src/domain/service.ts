@@ -35,6 +35,7 @@ import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
+import renderApplicationClosedEmail from '../emails/closed-approved';
 import { Attachment } from 'nodemailer/lib/mailer';
 
 export async function deleteDocument(
@@ -293,6 +294,17 @@ async function onStateChange(
     Promise.all(
       updatedApp.sections.collaborators.list.map((collab) => {
         sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
+          logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
+        );
+      }),
+    ).catch((err) => logger.error(err));
+  }
+
+  if (updatedApp.state === 'CLOSED' && oldApplication.state == 'APPROVED') {
+    await sendApplicationClosedEmail(updatedApp, config, emailClient);
+    Promise.all(
+      updatedApp.sections.collaborators.list.map((collab) => {
+        sendCollaboratorRemovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
           logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
         );
       }),
@@ -728,4 +740,20 @@ function getApplicantEmails(app: Application) {
 
 function throwApplicationClosedError(): () => void {
   throw new Error('Cannot modify an application in CLOSED state.');
+}
+
+async function sendApplicationClosedEmail(updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
+
+  const email = await renderApplicationClosedEmail(updatedApp, config.email.links);
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    `[${updatedApp.appId}] Your Access to ICGC Controlled Data has been Removed`,
+    email.html,
+    new Set([config.email.dacoAddress]),
+  );
 }

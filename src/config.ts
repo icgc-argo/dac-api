@@ -48,6 +48,7 @@ export interface AppConfig {
       applyingForAccess: string;
       dataAccessGuide: string;
       revisionsRequestedGuide: string;
+      dacoSurvey: string;
     };
   };
   ui: {
@@ -171,6 +172,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
         revisionsRequestedGuide:
           process.env.REVISIONS_REQUESTED_GUIDE_URL ||
           'https://docs.icgc-argo.org/docs/data-access/daco/approval#requested-revisions',
+        dacoSurvey: process.env.DACO_SURVEY_URL || '#',
       },
       reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',
