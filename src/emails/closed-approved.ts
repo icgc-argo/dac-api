@@ -8,7 +8,7 @@ import {
 } from '../utils/constants';
 import { AppConfig } from '../config';
 import { Application, Collaborator, PersonalInfo } from '../domain/interface';
-import { appInfoBox, approvalDetailsBox, compose, textParagraphSection } from './common';
+import { appInfoBox, approvalDetailsBox, approvalDetailsContent, compose, formatDate, textParagraphSection } from './common';
 import { compileMjmlInPromise } from './mjml';
 
 export default async function (
@@ -40,13 +40,27 @@ export default async function (
 }
 
 function messageBody(app: Application, recipient: PersonalInfo) {
+  const removalData = [
+    {
+      label: 'Title of Project',
+      value: app.sections.projectInfo.title,
+    },
+    {
+      label: 'Access Email',
+      value: recipient.googleEmail,
+    },
+    {
+      label: 'Access Expired on',
+      value: formatDate(app.closedAtUtc || new Date()), // what value would this be
+    },
+  ];
   return `
     ${textParagraphSection(
       `The following application has been closed and <strong>Access to ICGC Controlled Data has been removed for the following project team</strong>. Kindly note, it may take up to 24 hours for this status change to take effect.`,
       { padding: '0px 0px 20px 0px' },
     )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-    ${approvalDetailsBox(app, recipient.googleEmail)}
+    ${approvalDetailsContent(removalData, false)}
     ${textParagraphSection(
       `If you did not close this application and you have questions about the reason for this action, please <a href="${ICGC_ARGO_CONTACT_URL}">contact the ICGC DACO team</a>. `,
       { padding: '0px 0px 20px 0px' },
