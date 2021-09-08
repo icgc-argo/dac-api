@@ -4,7 +4,6 @@ import {
   ICGC_ARGO_PLATFORM_URL,
   DATA_ACCESS_POLICY_URL,
   ICGC_ARGO_CONTACT_URL,
-  DACO_SURVEY_URL,
 } from '../utils/constants';
 import { AppConfig } from '../config';
 import { Application, Collaborator, PersonalInfo } from '../domain/interface';
@@ -19,7 +18,7 @@ export default async function (
   const applicantInfo = app.sections.applicant.info;
   const emailMjml = compose(
     {
-      message: messageBody(app, applicantInfo),
+      message: messageBody(app, applicantInfo, linksConfigs.dacoSurvey),
       receiver: {
         first: applicantInfo.firstName,
         last: applicantInfo.lastName,
@@ -39,7 +38,7 @@ export default async function (
   return { html: htmlOutput.html, emailMjml };
 }
 
-function messageBody(app: Application, recipient: PersonalInfo) {
+function messageBody(app: Application, recipient: PersonalInfo, surveyUrl: string) {
   const removalData = [
     {
       label: 'Title of Project',
@@ -51,7 +50,7 @@ function messageBody(app: Application, recipient: PersonalInfo) {
     },
     {
       label: 'Access Expired on',
-      value: formatDate(app.closedAtUtc || new Date()), // what value would this be
+      value: formatDate(app.closedAtUtc || new Date()),
     },
   ];
   return `
@@ -66,7 +65,7 @@ function messageBody(app: Application, recipient: PersonalInfo) {
       { padding: '0px 0px 20px 0px' },
     )}
     ${textParagraphSection(
-      `We would appreciate any feedback on your successes and challenges with accessing ICGC Controlled Data and the outcomes of your research project. Please take a moment to <a href="${DACO_SURVEY_URL}">fill out this short feedback survey</a>.`,
+      `We would appreciate any feedback on your successes and challenges with accessing ICGC Controlled Data and the outcomes of your research project. Please take a moment to <a href="${surveyUrl}">fill out this short feedback survey</a>.`,
       { padding: '0px 0px 20px 0px' },
     )}
     ${textParagraphSection(
