@@ -4,13 +4,21 @@ import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
+import renderClosedEmail from '../emails/closed-approved';
 import {
   getAppInReview,
   getAppInRevisionRequested,
   getApprovedApplication,
-  getReadyToSignApp,
 } from './state.spec';
 import { Collaborator } from '../domain/interface';
+
+const stub = {
+  dataAccessGuide: '',
+  reviewGuide: '',
+  applyingForAccess: '',
+  revisionsRequestedGuide: '',
+  dacoSurvey: '',
+};
 
 describe('emails', () => {
   describe('email rendering', () => {
@@ -21,6 +29,7 @@ describe('emails', () => {
         dataAccessGuide: '',
         reviewGuide: 'https://test.example.com',
         revisionsRequestedGuide: '',
+        dacoSurvey: '',
       });
       console.log(email.emailMjml);
     });
@@ -58,12 +67,7 @@ describe('emails', () => {
 
     it('should render approved email', async () => {
       const app = getApprovedApplication();
-      const email = await renderApprovedEmail(app, {
-        dataAccessGuide: 'https://www.google.com',
-        reviewGuide: '',
-        applyingForAccess: '',
-        revisionsRequestedGuide: '',
-      });
+      const email = await renderApprovedEmail(app, stub);
       console.log(email.emailMjml);
     });
 
@@ -90,10 +94,8 @@ describe('emails', () => {
         type: 'personnel',
       };
       const email = await renderCollaboratorNotificationEmail(app, collab, {
+        ...stub,
         dataAccessGuide: 'https://www.google.com',
-        reviewGuide: '',
-        applyingForAccess: '',
-        revisionsRequestedGuide: '',
       });
       console.log(email.emailMjml);
     });
@@ -122,11 +124,14 @@ describe('emails', () => {
       };
 
       const email = await renderCollaboratorRemovedEmail(app, collab, {
-        dataAccessGuide: '',
-        reviewGuide: '',
-        applyingForAccess: '',
-        revisionsRequestedGuide: '',
+        ...stub,
       });
+      console.log(email.emailMjml);
+    });
+
+    it('should render approved application closed email', async () => {
+      const app = getApprovedApplication();
+      const email = await renderClosedEmail(app, stub);
       console.log(email.emailMjml);
     });
   });
