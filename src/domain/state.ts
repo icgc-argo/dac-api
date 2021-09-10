@@ -262,16 +262,6 @@ export class ApplicationStateManager {
 
   addCollaborator(collaborator: CollaboratorDto, updatedBy: string) {
     const current = this.currentApplication;
-    const { valid, errors } = validateCollaborator(collaborator, current);
-    if (!valid) {
-      throw new BadRequest({
-        errors,
-      });
-    }
-
-    if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
-      throw new Error('Operation not allowed');
-    }
 
     const defaultCollaboratorInfo = {
       title: '',
@@ -292,6 +282,17 @@ export class ApplicationStateManager {
       ...collaborator,
       info: { ...defaultCollaboratorInfo, ...collaborator.info },
     } as Collaborator;
+
+    const { valid, errors } = validateCollaborator(createdCollaborator, current);
+    if (!valid) {
+      throw new BadRequest({
+        errors,
+      });
+    }
+
+    if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
+      throw new Error('Operation not allowed');
+    }
 
     createdCollaborator.id = new Date().getTime().toString();
     createdCollaborator.meta = {

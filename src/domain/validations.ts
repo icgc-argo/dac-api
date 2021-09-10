@@ -4,7 +4,6 @@ import {
   AgreementItem,
   Application,
   Collaborator,
-  CollaboratorDto,
   PersonalInfo,
   SectionError,
   SectionStatus,
@@ -100,7 +99,7 @@ export function validateAgreementArray(ags: AgreementItem[]) {
   return !incomplete;
 }
 
-export function validateCollaborator(collaborator: CollaboratorDto, application: Application) {
+export function validateCollaborator(collaborator: Collaborator, application: Application) {
   const errors: SectionError[] = [];
   const validations = [
     validatePersonalInfo(collaborator.info, errors),
@@ -136,7 +135,7 @@ export function validateProjectInfo(app: Application) {
 }
 
 export function validatePrimaryAffiliationMatching(
-  val: string | undefined,
+  val: string,
   referenceVal: string,
   errors: SectionError[],
 ) {
@@ -172,7 +171,7 @@ function validateUrl(val: string | undefined, name: string, errors: SectionError
   return true;
 }
 
-function validateEmail(val: string | undefined, name: string, errors: SectionError[]) {
+function validateEmail(val: string, name: string, errors: SectionError[]) {
   if (!val) {
     return true;
   }
@@ -233,7 +232,7 @@ function countWords(str: string) {
 }
 
 function validatePersonalInfo(
-  info: Partial<PersonalInfo>,
+  info: PersonalInfo,
   errors: SectionError[],
   validateGoogleEmailRequired: boolean = true,
   validateWebsiteRequired: boolean = false,
