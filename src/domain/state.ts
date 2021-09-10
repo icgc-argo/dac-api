@@ -24,6 +24,7 @@ import {
   SectionStatus,
   UploadDocumentType,
   RevisionRequestUpdate,
+  CollaboratorDto,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -259,9 +260,30 @@ export class ApplicationStateManager {
     return current;
   }
 
-  addCollaborator(collaborator: Collaborator, updatedBy: string) {
+  addCollaborator(collaborator: CollaboratorDto, updatedBy: string) {
     const current = this.currentApplication;
-    const { valid, errors } = validateCollaborator(collaborator, current);
+
+    const defaultCollaboratorInfo = {
+      title: '',
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      displayName: '',
+      suffix: '',
+      primaryAffiliation: '',
+      institutionEmail: '',
+      googleEmail: '',
+      website: '',
+      positionTitle: '',
+    };
+
+    // ensure optional fields have defaults
+    const createdCollaborator = {
+      ...collaborator,
+      info: { ...defaultCollaboratorInfo, ...collaborator.info },
+    } as Collaborator;
+
+    const { valid, errors } = validateCollaborator(createdCollaborator, current);
     if (!valid) {
       throw new BadRequest({
         errors,
@@ -272,23 +294,23 @@ export class ApplicationStateManager {
       throw new Error('Operation not allowed');
     }
 
-    collaborator.id = new Date().getTime().toString();
-    collaborator.meta = {
+    createdCollaborator.id = new Date().getTime().toString();
+    createdCollaborator.meta = {
       errorsList: [],
       status: 'COMPLETE',
     };
 
-    if (!!collaborator.info.firstName.trim() && !!collaborator.info.lastName.trim()) {
-      collaborator.info.displayName =
-        collaborator.info.firstName.trim() + ' ' + collaborator.info.lastName.trim();
+    if (!!createdCollaborator.info.firstName.trim() && !!createdCollaborator.info.lastName.trim()) {
+      createdCollaborator.info.displayName =
+        createdCollaborator.info.firstName.trim() + ' ' + createdCollaborator.info.lastName.trim();
     }
 
     // check unique collaborator
     if (
       current.sections.collaborators.list.some(
         (c) =>
-          c.info.googleEmail == collaborator.info.googleEmail ||
-          c.info.institutionEmail === collaborator.info.institutionEmail,
+          c.info.googleEmail == createdCollaborator.info.googleEmail ||
+          c.info.institutionEmail === createdCollaborator.info.institutionEmail,
       )
     ) {
       throw new ConflictError(
@@ -299,8 +321,8 @@ export class ApplicationStateManager {
 
     // check if the collaborator is same as applicant
     if (
-      current.sections.applicant.info.googleEmail == collaborator.info.googleEmail ||
-      current.sections.applicant.info.institutionEmail === collaborator.info.institutionEmail
+      current.sections.applicant.info.googleEmail == createdCollaborator.info.googleEmail ||
+      current.sections.applicant.info.institutionEmail === createdCollaborator.info.institutionEmail
     ) {
       throw new ConflictError(
         'COLLABORATOR_SAME_AS_APPLICANT',
@@ -308,7 +330,7 @@ export class ApplicationStateManager {
       );
     }
 
-    current.sections.collaborators.list.push(collaborator);
+    current.sections.collaborators.list.push(createdCollaborator);
     // since this section can be invalidated by primary affiliation change in applicant
     // we store this flag to indicate whether it was modified or not, so we can return it
     // to a correct state when it becomes valid again
