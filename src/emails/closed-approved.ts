@@ -1,8 +1,4 @@
 import {
-  ICGC_25K_URL,
-  ICGC_ARGO_URL,
-  ICGC_ARGO_PLATFORM_URL,
-  DATA_ACCESS_POLICY_URL,
   ICGC_ARGO_CONTACT_URL,
 } from '../utils/constants';
 import { AppConfig } from '../config';

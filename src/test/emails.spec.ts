@@ -5,10 +5,13 @@ import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
 import renderClosedEmail from '../emails/closed-approved';
+import rejected from '../emails/rejected';
+
 import {
   getAppInReview,
   getAppInRevisionRequested,
   getApprovedApplication,
+  getRejectedApplication,
 } from './state.spec';
 import { Collaborator } from '../domain/interface';
 
@@ -17,6 +20,7 @@ const stub = {
   reviewGuide: '',
   applyingForAccess: '',
   revisionsRequestedGuide: '',
+  approvalGuide: '',
   dacoSurvey: '',
 };
 
@@ -26,6 +30,7 @@ describe('emails', () => {
       const app = getAppInReview();
       const email = await renderSubmitted(app, {
         applyingForAccess: '',
+        approvalGuide: '',
         dataAccessGuide: '',
         reviewGuide: 'https://test.example.com',
         revisionsRequestedGuide: '',
@@ -134,5 +139,12 @@ describe('emails', () => {
       const email = await renderClosedEmail(app, stub);
       console.log(email.emailMjml);
     });
+
+    it.only('should render rejected email', async () => {
+      const app = getRejectedApplication();
+      const email = await rejected(app, stub);
+      console.log(email.emailMjml);
+    });
+
   });
 });
