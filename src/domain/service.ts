@@ -36,6 +36,8 @@ import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
 import renderApplicationClosedEmail from '../emails/closed-approved';
+import renderRejectedEmail from '../emails/rejected';
+
 import { Attachment } from 'nodemailer/lib/mailer';
 
 export async function deleteDocument(
@@ -289,6 +291,9 @@ async function onStateChange(
     await sendRevisionsRequestEmail(updatedApp, emailClient, config);
   }
 
+  if (updatedApp.state === 'REJECTED') {
+    await sendRejectedEmail(updatedApp, emailClient, config);
+  }
   if (updatedApp.state === 'APPROVED') {
     await sendApplicationApprovedEmail(updatedApp, config, emailClient);
     Promise.all(
@@ -525,6 +530,24 @@ async function sendSubmissionConfirmation(
     getApplicantEmails(updatedApp),
     `[${updatedApp.appId}] We Received your Application`,
     submittedEmail.html,
+  );
+}
+
+
+async function sendRejectedEmail(
+  updatedApp: Application,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+) {
+  const submittedEmail = await renderRejectedEmail(updatedApp, config.email.links);
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    `[${updatedApp.appId}] Your Application has been Rejected`,
+    submittedEmail.html,
+    new Set([config.email.dacoAddress])
   );
 }
 
