@@ -24,6 +24,7 @@ import {
   SectionStatus,
   UploadDocumentType,
   RevisionRequestUpdate,
+  CollaboratorDto,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -259,7 +260,7 @@ export class ApplicationStateManager {
     return current;
   }
 
-  addCollaborator(collaborator: Collaborator, updatedBy: string) {
+  addCollaborator(collaborator: CollaboratorDto, updatedBy: string) {
     const current = this.currentApplication;
     const { valid, errors } = validateCollaborator(collaborator, current);
     if (!valid) {
@@ -271,12 +272,6 @@ export class ApplicationStateManager {
     if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
       throw new Error('Operation not allowed');
     }
-
-    collaborator.id = new Date().getTime().toString();
-    collaborator.meta = {
-      errorsList: [],
-      status: 'COMPLETE',
-    };
 
     const defaultCollaboratorInfo = {
       title: '',
@@ -296,6 +291,12 @@ export class ApplicationStateManager {
     const createdCollaborator = {
       ...collaborator,
       info: { ...defaultCollaboratorInfo, ...collaborator.info },
+    } as Collaborator;
+
+    createdCollaborator.id = new Date().getTime().toString();
+    createdCollaborator.meta = {
+      errorsList: [],
+      status: 'COMPLETE',
     };
 
     if (!!createdCollaborator.info.firstName.trim() && !!createdCollaborator.info.lastName.trim()) {
