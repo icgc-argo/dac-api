@@ -394,6 +394,19 @@ export function getApprovedApplication() {
   return result;
 }
 
+export function getRejectedApplication() {
+  const app = getAppInReview();
+  const state = new ApplicationStateManager(app);
+  const updatePart: Partial<UpdateApplication> = {
+    state: 'REJECTED',
+    denialReason: 'Your plans to use the data is not accepted.'
+  };
+  const result = state.updateApp(updatePart, true, '1');
+  expect(result.state).to.eq('REJECTED');
+  expect(result.lastUpdatedAtUtc).to.not.eq(undefined);
+  return result;
+}
+
 export function getAppInRevisionRequested() {
   const app = getAppInReview();
   const state = new ApplicationStateManager(app);

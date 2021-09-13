@@ -44,6 +44,7 @@ export interface AppConfig {
       password: string | undefined;
     };
     links: {
+      approvalGuide: string;
       reviewGuide: string;
       applyingForAccess: string;
       dataAccessGuide: string;
@@ -160,6 +161,8 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
         password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
       },
       links: {
+        approvalGuide:
+          process.env.EMAIL_APPROVAL_GUIDE || 'https://docs.icgc-argo.org/docs/data-access/daco/approval',
         reviewGuide:
           process.env.EMAIL_REVIEW_GUIDE_URL ||
           'https://docs.icgc-argo.org/docs/data-access/daco/approval#review-process',
