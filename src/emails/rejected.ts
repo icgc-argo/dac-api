@@ -42,10 +42,8 @@ function messageBody(app: Application) {
       `Because your application does not meet substantive criteria set out by ICGC to access the controlled data of the Consortium, we regret to inform you that we cannot grant you access privileges at this point in time. Your application has been closed and cannot be reopened.`
       , { padding: '0px 0px 20px 0px' })}
     ${
-      rejectionReasonBox(
-        `<strong>Details from the ICGC DACO Team:</strong> ${app.denialReason}`
-      )
-    }
+       app.denialReason ? rejectionReasonBox(`<strong>Details from the ICGC DACO Team:</strong> ${app.denialReason}`) : ''
+     }
   `;
 }
 
