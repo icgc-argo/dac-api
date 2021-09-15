@@ -74,7 +74,15 @@ const stateToLockedSectionsMap: Record<
       'projectInfo',
       'signature',
     ],
-    REVIEWER: allSections,
+    REVIEWER: [
+      'appendices',
+      'dataAccessAgreement',
+      'terms',
+      'applicant',
+      'representative',
+      'projectInfo',
+      'signature',
+    ],
   },
   'REVISIONS REQUESTED': {
     APPLICANT: ['appendices', 'dataAccessAgreement', 'terms'],
