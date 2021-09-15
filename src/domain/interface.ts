@@ -65,6 +65,11 @@ export interface Collaborator {
   type: 'student' | 'personnel';
 }
 
+export type CollaboratorDto = {
+  info: Partial<PersonalInfo>;
+  type: 'student' | 'personnel';
+};
+
 interface ApplicationUpdate {
   info: any;
   type: string;
