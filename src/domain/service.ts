@@ -48,13 +48,10 @@ export async function deleteDocument(
   storageClient: Storage,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
-  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteDocument(objectId, type, identity.userId);
+  const result = stateManager.deleteDocument(objectId, type, identity.userId, isAdminOrReviewerResult);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
@@ -73,9 +70,6 @@ export async function uploadDocument(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
-  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   let existingId: string | undefined = undefined;
@@ -84,7 +78,7 @@ export async function uploadDocument(
   }
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addDocument(id, file.name, type, identity.userId);
+  const result = stateManager.addDocument(id, file.name, type, identity.userId, isAdminOrReviewerResult);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
 
@@ -148,16 +142,13 @@ export async function createCollaborator(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
-  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addCollaborator(collaborator, identity.userId);
+  const result = stateManager.addCollaborator(collaborator, identity.userId, isAdminOrReviewerResult);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
     const config = await getAppConfig();
@@ -194,16 +185,13 @@ export async function deleteCollaborator(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
-  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteCollaborator(collaboratorId, identity.userId);
+  const result = stateManager.deleteCollaborator(collaboratorId, identity.userId, isAdminOrReviewerResult);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 
   if (result.state === 'APPROVED') {

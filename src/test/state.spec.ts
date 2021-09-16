@@ -140,7 +140,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, 'user123');
+      const result = state.addCollaborator(collab, 'user123', false);
       expect(result.sections.collaborators.list[0]).to.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
@@ -174,7 +174,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, 'user123');
+      const result = state.addCollaborator(collab, 'user123', false);
       expect(result.sections.collaborators.list[0]).to.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
@@ -200,7 +200,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
       try {
-        state.addCollaborator(collab, 'user123');
+        state.addCollaborator(collab, 'user123', false);
       } catch (err) {
         if (err instanceof ConflictError) {
           return true;
@@ -240,7 +240,7 @@ describe('state manager', () => {
     };
 
     try {
-      state.addCollaborator(collab, 'user123');
+      state.addCollaborator(collab, 'user123', false);
     } catch (e) {
       expect((e as BadRequest).info.errors[0]).to.include({
         field: 'primaryAffililation',
@@ -250,7 +250,7 @@ describe('state manager', () => {
 
     // add with correct PA
     collab.info.primaryAffiliation = 'ACME';
-    const app2 = state.addCollaborator(collab, 'user123');
+    const app2 = state.addCollaborator(collab, 'user123', false);
     app2.sections.collaborators.list[0].id = 'collab-1';
     expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
 
@@ -372,7 +372,7 @@ export function getReadyToSignApp() {
 export function getAppInReview() {
   const app = getReadyToSignApp();
   const state = new ApplicationStateManager(app);
-  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', 'user123');
+  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', 'user123', false);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REVIEW',
   };
