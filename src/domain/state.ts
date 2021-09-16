@@ -75,7 +75,15 @@ const stateToLockedSectionsMap: Record<
       'projectInfo',
       'signature',
     ],
-    REVIEWER: allSections,
+    REVIEWER: [
+      'appendices',
+      'dataAccessAgreement',
+      'terms',
+      'applicant',
+      'representative',
+      'projectInfo',
+      'signature',
+    ],
   },
   'REVISIONS REQUESTED': {
     APPLICANT: ['appendices', 'dataAccessAgreement', 'terms'],
@@ -140,8 +148,11 @@ export class ApplicationStateManager {
     return this.currentApplication;
   }
 
-  deleteDocument(objectId: string, type: UploadDocumentType, updatedBy: string) {
+  deleteDocument(objectId: string, type: UploadDocumentType, updatedBy: string, isReviewer: boolean) {
     const current = this.currentApplication;
+    if (isReviewer && current.state !== 'APPROVED') {
+      throw new Error('not allowed');
+    }
     if (type == 'ETHICS') {
       return deleteEthicsLetterDocument(current, objectId, updatedBy);
     }
@@ -154,8 +165,11 @@ export class ApplicationStateManager {
     throw new BadRequest('Operation not allowed');
   }
 
-  addDocument(id: string, name: string, type: UploadDocumentType, updatedBy: string) {
+  addDocument(id: string, name: string, type: UploadDocumentType, updatedBy: string, isReviewer: boolean) {
     const current = this.currentApplication;
+    if (isReviewer && current.state !== 'APPROVED') {
+      throw new Error('not allowed');
+    }
     if (type == 'ETHICS') {
       uploadEthicsLetter(current, id, name, updatedBy);
       return current;
@@ -174,8 +188,11 @@ export class ApplicationStateManager {
     throw new BadRequest('Unknown file type');
   }
 
-  deleteCollaborator(collaboratorId: string, updatedBy: string) {
+  deleteCollaborator(collaboratorId: string, updatedBy: string, isReviewer: boolean) {
     const current = this.currentApplication;
+    if (isReviewer && current.state !== 'APPROVED') {
+      throw new Error('not allowed');
+    }
     current.sections.collaborators.list = current.sections.collaborators.list.filter(
       (c) => c.id?.toString() !== collaboratorId,
     );
@@ -260,9 +277,11 @@ export class ApplicationStateManager {
     return current;
   }
 
-  addCollaborator(collaborator: CollaboratorDto, updatedBy: string) {
+  addCollaborator(collaborator: CollaboratorDto, updatedBy: string, isReviewer: boolean) {
     const current = this.currentApplication;
-
+    if (isReviewer && current.state !== 'APPROVED') {
+      throw new Error('not allowed');
+    }
     const defaultCollaboratorInfo = {
       title: '',
       firstName: '',
