@@ -32,6 +32,7 @@ import {
   validateCollaborator,
   validateDataAccessAgreement,
   validateEthicsLetterSection,
+  validateNoMatchingApplicant,
   validatePrimaryAffiliationMatching,
   validateProjectInfo,
   validateRepresentativeSection,
@@ -127,8 +128,9 @@ export class ApplicationStateManager {
     }
 
     // calculate the value of revisions requested field for the FE to use it.
-    this.currentApplication.revisionsRequested = this.currentApplication.state == 'REVISIONS REQUESTED'
-      || wasInRevisionRequestState(this.currentApplication);
+    this.currentApplication.revisionsRequested =
+      this.currentApplication.state == 'REVISIONS REQUESTED' ||
+      wasInRevisionRequestState(this.currentApplication);
 
     return this.currentApplication;
   }
@@ -223,7 +225,7 @@ export class ApplicationStateManager {
     ) {
       throw new ConflictError(
         'COLLABORATOR_EXISTS',
-        'This collaborator has already been added to your applictaion.',
+        'This collaborator has already been added to your application.',
       );
     }
 
@@ -998,7 +1000,7 @@ function updateApplicantSection(updatePart: Partial<UpdateApplication>, current:
       updateRepresentitaveSectionState(current);
     }
 
-    // trigger a validation for collaborators section since there is a dependency on primary affiliation
+    // trigger a validation for collaborators section since there is a dependency on primary affiliation, institutionEmail and googleEmail
     // only if there is data there already
     if (current.sections.collaborators.meta.status !== 'PRISTINE') {
       validateCollaboratorsSection(current);
@@ -1009,7 +1011,9 @@ function updateApplicantSection(updatePart: Partial<UpdateApplication>, current:
 
 function validateCollaboratorsSection(app: Application) {
   const validations = app.sections.collaborators.list.map((c) => {
-    const { valid, errors } = validateCollaborator(c, app);
+    const { valid, errors } = validateCollaborator(c, app, true);
+    // will treat conflicting collab/applicant error differently when the update is to applicant, update
+    // will succeed for applicant but related collaborator will be set with an error + incomplete state
     if (valid) {
       c.meta.status = 'COMPLETE';
       c.meta.errorsList = [];
