@@ -243,7 +243,7 @@ describe('state manager', () => {
       state.addCollaborator(collab, 'user123', false);
     } catch (e) {
       expect((e as BadRequest).info.errors[0]).to.include({
-        field: 'primaryAffililation',
+        field: 'primaryAffiliation',
         message: 'Primary Affiliation must be the same as the Applicant',
       });
     }

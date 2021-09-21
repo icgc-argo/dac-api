@@ -45,6 +45,34 @@ export function validateRepresentativeSection(app: Application) {
   return { isValid, errors };
 }
 
+export const validateNoMatchingApplicant = (
+  app: Application,
+  collaborator: Collaborator,
+  errors: SectionError[],
+) => {
+  const matchesApplicantGmail =
+    collaborator.info.googleEmail === app.sections.applicant.info.googleEmail;
+  const matchesApplicantInstitutionEmail =
+    collaborator.info.institutionEmail === app.sections.applicant.info.institutionEmail;
+
+  if (matchesApplicantGmail || matchesApplicantInstitutionEmail) {
+    if (matchesApplicantGmail) {
+      errors.push({
+        field: 'googleEmail',
+        message: 'The applicant does not need to be added as a collaborator.',
+      });
+    }
+    if (matchesApplicantInstitutionEmail) {
+      errors.push({
+        field: 'institutionEmail',
+        message: 'The applicant does not need to be added as a collaborator.',
+      });
+    }
+    return false;
+  }
+  return true;
+};
+
 export function validateApplicantSection(app: Application) {
   const applicantErrors: SectionError[] = [];
   const addressResult = validateAddress(app.sections.applicant.address, applicantErrors);
@@ -99,7 +127,11 @@ export function validateAgreementArray(ags: AgreementItem[]) {
   return !incomplete;
 }
 
-export function validateCollaborator(collaborator: Collaborator, application: Application) {
+export function validateCollaborator(
+  collaborator: Collaborator,
+  application: Application,
+  shouldValidateNoMatchingApplicant: boolean = false,
+) {
   const errors: SectionError[] = [];
   const validations = [
     validatePersonalInfo(collaborator.info, errors),
@@ -109,6 +141,9 @@ export function validateCollaborator(collaborator: Collaborator, application: Ap
       application.sections.applicant.info.primaryAffiliation,
       errors,
     ),
+    shouldValidateNoMatchingApplicant
+      ? validateNoMatchingApplicant(application, collaborator, errors)
+      : true,
   ];
   const valid = !validations.some((x) => x == false);
   return { valid, errors };
@@ -147,7 +182,7 @@ export function validatePrimaryAffiliationMatching(
   }
 
   errors.push({
-    field: 'primaryAffililation',
+    field: 'primaryAffiliation',
     message: 'Primary Affiliation must be the same as the Applicant',
   });
   return false;
