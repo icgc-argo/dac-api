@@ -35,6 +35,10 @@ import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
 import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
+import renderApplicationClosedEmail from '../emails/closed-approved';
+import renderRejectedEmail from '../emails/rejected';
+
+import { Attachment } from 'nodemailer/lib/mailer';
 
 export async function deleteDocument(
   appId: string,
@@ -44,13 +48,10 @@ export async function deleteDocument(
   storageClient: Storage,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
-  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteDocument(objectId, type);
+  const result = stateManager.deleteDocument(objectId, type, identity.userId, isAdminOrReviewerResult);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
@@ -69,9 +70,6 @@ export async function uploadDocument(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
-  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   let existingId: string | undefined = undefined;
@@ -80,7 +78,7 @@ export async function uploadDocument(
   }
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addDocument(id, file.name, type);
+  const result = stateManager.addDocument(id, file.name, type, identity.userId, isAdminOrReviewerResult);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
 
@@ -105,7 +103,12 @@ export async function getApplicationAssetsAsStream(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
 
-  if (appDocObj.state !== 'REVIEW' && appDocObj.state !== 'APPROVED') {
+  if (
+    appDocObj.state !== 'REVIEW' &&
+    appDocObj.state !== 'APPROVED' &&
+    // can download assets if app is CLOSED and but was APPROVED.
+    !(appDocObj.state === 'CLOSED' && appDocObj.approvedAtUtc)
+  ) {
     throw new Error('Cannot download package in this state');
   }
 
@@ -139,13 +142,13 @@ export async function createCollaborator(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
-  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addCollaborator(collaborator);
+  const result = stateManager.addCollaborator(collaborator, identity.userId, isAdminOrReviewerResult);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
     const config = await getAppConfig();
@@ -167,8 +170,11 @@ export async function updateCollaborator(
   }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.updateCollaborator(collaborator);
+  const result = stateManager.updateCollaborator(collaborator, identity.userId);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 }
 
@@ -179,13 +185,13 @@ export async function deleteCollaborator(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
-  }
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteCollaborator(collaboratorId);
+  const result = stateManager.deleteCollaborator(collaboratorId, identity.userId, isAdminOrReviewerResult);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 
   if (result.state === 'APPROVED') {
@@ -225,8 +231,13 @@ export async function updatePartial(
   const isReviewer = await hasReviewScope(identity);
   const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
+
+  // if current state is CLOSED, modifications are not allowed
+  if (appDocObj.state === 'CLOSED') {
+    throwApplicationClosedError();
+  }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const updatedApp = stateManager.updateApp(appPart, isReviewer);
+  const updatedApp = stateManager.updateApp(appPart, isReviewer, identity.userId);
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
   const stateChanged = appDocObj.state != updatedApp.state;
   const config = await getAppConfig();
@@ -235,7 +246,7 @@ export async function updatePartial(
   }
   const deleted = checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
-  // this can be a result of applicantion getting updated :
+  // this can be a result of application getting updated :
   // - Changing selection of ethics letter from required to not required
   // - Admin requests revisions (signed app has to be uploaded again)
   // - Applicant changes a completed section when the application is in state sign & submit
@@ -268,11 +279,25 @@ async function onStateChange(
     await sendRevisionsRequestEmail(updatedApp, emailClient, config);
   }
 
+  if (updatedApp.state === 'REJECTED') {
+    await sendRejectedEmail(updatedApp, emailClient, config);
+  }
   if (updatedApp.state === 'APPROVED') {
     await sendApplicationApprovedEmail(updatedApp, config, emailClient);
     Promise.all(
       updatedApp.sections.collaborators.list.map((collab) => {
         sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
+          logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
+        );
+      }),
+    ).catch((err) => logger.error(err));
+  }
+
+  if (updatedApp.state === 'CLOSED' && oldApplication.state == 'APPROVED') {
+    await sendApplicationClosedEmail(updatedApp, config, emailClient);
+    Promise.all(
+      updatedApp.sections.collaborators.list.map((collab) => {
+        sendCollaboratorRemovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
           logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
         );
       }),
@@ -446,7 +471,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   return removedIds;
 }
 
-async function sendEmail(
+export async function sendEmail(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   fromEmail: string,
   fromName: string,
@@ -454,6 +479,7 @@ async function sendEmail(
   subject: string,
   html: string,
   bcc?: Set<string>,
+  attachments?: Attachment[],
 ) {
   const info = await emailClient.sendMail({
     from: `"${fromName}" <${fromEmail}>`, // sender address
@@ -461,6 +487,7 @@ async function sendEmail(
     subject: subject, // Subject line
     html: html, // html body
     ...(bcc && { bcc: Array.from(bcc).join(',') }), // bcc address
+    ...(attachments && { attachments }),
   });
 }
 
@@ -491,6 +518,24 @@ async function sendSubmissionConfirmation(
     getApplicantEmails(updatedApp),
     `[${updatedApp.appId}] We Received your Application`,
     submittedEmail.html,
+  );
+}
+
+
+async function sendRejectedEmail(
+  updatedApp: Application,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+) {
+  const submittedEmail = await renderRejectedEmail(updatedApp, config.email.links);
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    `[${updatedApp.appId}] Your Application has been Rejected`,
+    submittedEmail.html,
+    new Set([config.email.dacoAddress])
   );
 }
 
@@ -702,4 +747,24 @@ function getApplicantEmails(app: Application) {
     app.sections.applicant.info.googleEmail,
     app.sections.applicant.info.institutionEmail,
   ]);
+}
+
+function throwApplicationClosedError(): () => void {
+  throw new Error('Cannot modify an application in CLOSED state.');
+}
+
+async function sendApplicationClosedEmail(updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
+
+  const email = await renderApplicationClosedEmail(updatedApp, config.email.links);
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    `[${updatedApp.appId}] Your Access to ICGC Controlled Data has been Removed`,
+    email.html,
+    new Set([config.email.dacoAddress]),
+  );
 }

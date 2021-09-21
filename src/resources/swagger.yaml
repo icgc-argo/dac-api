@@ -393,15 +393,24 @@ paths:
         '400':
           description: 'Unrecognized or missing file format for export'
 
+  /jobs/export-and-email/:
+    get:
+      tags:
+        - Admin
+      summary: Trigger encrypted email of approved users to dcc mailing list
+      responses:
+        '200':
+          description: OK
+
 tags:
   - name: Health
     description: Service status monitoring
-  - name: Admin
-    description: Admin operations collected for convenience
   - name: Application
     description: Application CRUD enpoints
   - name: Lookups
     description: Lookup endpoints for data references
+  - name: Admin
+    description: Admin operations collected for convenience
 components:
   responses:
     ServiceUnavailableError:
@@ -637,6 +646,9 @@ components:
           type: string
         denialReason:
           type: string
+        revisionsRequested:
+          type: boolean
+          readOnly: true
         revisionRequests:
           type: object
           properties:

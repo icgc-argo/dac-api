@@ -38,15 +38,18 @@ export interface AppConfig {
     port: number;
     reviewerFirstName: string;
     reviewerLastName: string;
+    dccMailingList: string;
     auth: {
       user: string | undefined;
       password: string | undefined;
     };
     links: {
+      approvalGuide: string;
       reviewGuide: string;
       applyingForAccess: string;
       dataAccessGuide: string;
       revisionsRequestedGuide: string;
+      dacoSurvey: string;
     };
   };
   ui: {
@@ -58,6 +61,7 @@ export interface AppConfig {
     jwtKeyUrl: string;
     jwtKey: string;
     REVIEW_SCOPE: string;
+    DACO_ENCRYPTION_KEY: string;
   };
   storage: {
     endpoint: string;
@@ -130,6 +134,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
       REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
+      DACO_ENCRYPTION_KEY: secrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY,
     },
     ui: {
       baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org',
@@ -150,11 +155,14 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       dacoAddress: process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org',
       fromName: process.env.EMAIL_FROM_NAME || 'ICGC DACO',
       fromAddress: process.env.EMAIL_FROM_ADDRESS || 'no-reply-daco@icgc-argo.org',
+      dccMailingList: secrets.DCC_MAILING_LIST || process.env.DCC_MAILING_LIST,
       auth: {
         user: secrets.EMAIL_USER || process.env.EMAIL_USER,
         password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
       },
       links: {
+        approvalGuide:
+          process.env.EMAIL_APPROVAL_GUIDE || 'https://docs.icgc-argo.org/docs/data-access/daco/approval',
         reviewGuide:
           process.env.EMAIL_REVIEW_GUIDE_URL ||
           'https://docs.icgc-argo.org/docs/data-access/daco/approval#review-process',
@@ -167,6 +175,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
         revisionsRequestedGuide:
           process.env.REVISIONS_REQUESTED_GUIDE_URL ||
           'https://docs.icgc-argo.org/docs/data-access/daco/approval#requested-revisions',
+        dacoSurvey: process.env.DACO_SURVEY_URL || '#',
       },
       reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',

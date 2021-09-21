@@ -45,6 +45,7 @@ describe('state manager', () => {
         },
       },
       false,
+      '1',
     );
 
     expect(result.sections.terms.agreement.accepted).to.eq(true);
@@ -71,7 +72,7 @@ describe('state manager', () => {
       },
     };
 
-    const result = state.updateApp(updatePart, false);
+    const result = state.updateApp(updatePart, false, '1');
     expect(result.sections.applicant.info).to.include(updatePart.sections?.applicant?.info);
   });
 
@@ -89,7 +90,7 @@ describe('state manager', () => {
       },
     };
 
-    state.updateApp(updatePart, false);
+    state.updateApp(updatePart, false, '1');
     expect(state.currentApplication.sections.representative.address?.country).to.eq('Palestine');
 
     const updatePart2: Partial<UpdateApplication> = {
@@ -100,7 +101,7 @@ describe('state manager', () => {
       },
     };
 
-    state.updateApp(updatePart2, false);
+    state.updateApp(updatePart2, false, '1');
     expect(state.currentApplication.sections.representative.address).to.include({
       building: '',
       cityAndProvince: '',
@@ -139,7 +140,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab);
+      const result = state.addCollaborator(collab, 'user123', false);
       expect(result.sections.collaborators.list[0]).to.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
@@ -173,7 +174,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab);
+      const result = state.addCollaborator(collab, 'user123', false);
       expect(result.sections.collaborators.list[0]).to.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
@@ -199,7 +200,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
       try {
-        state.addCollaborator(collab);
+        state.addCollaborator(collab, 'user123', false);
       } catch (err) {
         if (err instanceof ConflictError) {
           return true;
@@ -239,7 +240,7 @@ describe('state manager', () => {
     };
 
     try {
-      state.addCollaborator(collab);
+      state.addCollaborator(collab, 'user123', false);
     } catch (e) {
       expect((e as BadRequest).info.errors[0]).to.include({
         field: 'primaryAffiliation',
@@ -249,7 +250,7 @@ describe('state manager', () => {
 
     // add with correct PA
     collab.info.primaryAffiliation = 'ACME';
-    const app2 = state.addCollaborator(collab);
+    const app2 = state.addCollaborator(collab, 'user123', false);
     app2.sections.collaborators.list[0].id = 'collab-1';
     expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
 
@@ -266,6 +267,7 @@ describe('state manager', () => {
         },
       },
       false,
+      '1',
     );
     expect(app3.sections.collaborators.list[0].meta.status).to.eq('INCOMPLETE');
 
@@ -273,7 +275,7 @@ describe('state manager', () => {
     collab.id = 'collab-1';
     collab.info.primaryAffiliation = 'OICR';
     const state3 = new ApplicationStateManager(app3);
-    const app4 = state3.updateCollaborator(collab);
+    const app4 = state3.updateCollaborator(collab, 'user123');
     expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
   });
 
@@ -323,6 +325,7 @@ describe('state manager', () => {
         },
       },
       true,
+      '1',
     );
 
     const userApp = state.prepareApplicantionForUser(false);
@@ -360,6 +363,7 @@ export function getReadyToSignApp() {
       sections: updatePart,
     },
     false,
+    '1',
   );
   expect(newState.state).to.eq('SIGN AND SUBMIT');
   return newState;
@@ -368,12 +372,12 @@ export function getReadyToSignApp() {
 export function getAppInReview() {
   const app = getReadyToSignApp();
   const state = new ApplicationStateManager(app);
-  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP');
+  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', 'user123', false);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REVIEW',
   };
   const state2 = new ApplicationStateManager(appAfterSign);
-  const result = state2.updateApp(updatePart, false);
+  const result = state2.updateApp(updatePart, false, '1');
   expect(result.state).to.eq('REVIEW');
   return result;
 }
@@ -384,9 +388,22 @@ export function getApprovedApplication() {
   const updatePart: Partial<UpdateApplication> = {
     state: 'APPROVED',
   };
-  const result = state.updateApp(updatePart, true);
+  const result = state.updateApp(updatePart, true, '1');
   expect(result.state).to.eq('APPROVED');
   expect(result.approvedAtUtc).to.not.eq(undefined);
+  return result;
+}
+
+export function getRejectedApplication() {
+  const app = getAppInReview();
+  const state = new ApplicationStateManager(app);
+  const updatePart: Partial<UpdateApplication> = {
+    state: 'REJECTED',
+    denialReason: 'Your plans to use the data is not accepted.'
+  };
+  const result = state.updateApp(updatePart, true, '1');
+  expect(result.state).to.eq('REJECTED');
+  expect(result.lastUpdatedAtUtc).to.not.eq(undefined);
   return result;
 }
 
@@ -418,7 +435,7 @@ export function getAppInRevisionRequested() {
     },
     state: 'REVISIONS REQUESTED',
   };
-  const result = state.updateApp(update, true);
+  const result = state.updateApp(update, true, '1');
   expect(result.state).to.eq('REVISIONS REQUESTED');
   return result;
 }
