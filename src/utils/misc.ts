@@ -2,7 +2,7 @@ import _, { uniqBy } from 'lodash';
 import { Request } from 'express';
 import { State, PersonalInfo, ApplicationSummary, CSVFileHeader } from '../domain/interface';
 import moment from 'moment';
-import { search } from '../domain/service';
+import { search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
 import { getAppConfig } from '../config';
@@ -45,12 +45,13 @@ const _mergeKnown = (a: any, b: any) => {
   });
 };
 
-export const getSearchParams = (req: Request, defaultSort?: string) => {
+export const getSearchParams = (req: Request, defaultSort?: string): SearchParams => {
   const query = (req.query.query as string | undefined) || '';
   const states = req.query.states ? ((req.query.states as string).split(',') as State[]) : [];
   const page = Number(req.query.page) || 0;
   const pageSize = Number(req.query.pageSize) || 25;
   const sort = (req.query.sort as string | undefined) || defaultSort;
+  const includeStats = Boolean(req.query.includeStats) || false;
   const sortBy = sort
     ? sort.split(',').map((s) => {
         const sortField = s.trim().split(':');
@@ -64,6 +65,7 @@ export const getSearchParams = (req: Request, defaultSort?: string) => {
     page,
     pageSize,
     sortBy,
+    includeStats
   };
 };
 
@@ -76,7 +78,7 @@ export const parseApprovedUser = (userInfo: PersonalInfo, lastUpdatedAtUtc: Date
 });
 
 const getApprovedUsers = async (req: Request) => {
-  const params = {
+  const params: SearchParams = {
     ...getSearchParams(req),
     states: ['APPROVED'] as State[],
     includeCollaborators: true,

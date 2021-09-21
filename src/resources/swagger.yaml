@@ -89,6 +89,12 @@ paths:
           schema: 
             type: number
             default: 25
+        - name: includeStats
+          required: false
+          in: query
+          schema: 
+            type: boolean
+            default: false
         - name: sort
           required: false
           in: query
@@ -108,23 +114,31 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    pagingInfo:
-                      type: object
-                      properties:
-                        totalCount:  
-                          type: number
-                        pagesCount:
-                          type: number
-                        index:
-                          type: number
+                type: object
+                properties:
+                  stats: 
+                    type: object
+                    properties:
+                      countByState: 
+                        type: object
+                        properties:
+                          "REVISIONS REQUESTED":
+                            type: number
+                          APPROVED:
+                            type: number
+                  pagingInfo:
+                    type: object
+                    properties:
+                      totalCount:  
+                        type: number
+                      pagesCount:
+                        type: number
+                      index:
+                        type: number
+                  items:
+                    type: array
                     items:
-                      type: array
-                      items:
-                        $ref: '#/components/schemas/ApplicationSummary'
+                      $ref: '#/components/schemas/ApplicationSummary'
 
   /applications/{id}/assets/{objectId}/url:
     parameters:

@@ -4,7 +4,7 @@ import { encrypt } from '../utils/misc';
 import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, IV_LENGTH } from '../utils/constants';
 
 describe('encryption', () => {
-  it.only('should encrypt and decrypt text', async () => {
+  it('should encrypt and decrypt text', async () => {
     const text = `USER NAME,OPENID,EMAIL,CHANGED,AFFILIATION
     First Tester,tester1@sample_email.com,tester1@example.com,2021-07-23T16:49,Some Institute
     string 222 string 1,collab3@sample_email.com,collab3@example.com,2021-07-23T16:58,Some Institute

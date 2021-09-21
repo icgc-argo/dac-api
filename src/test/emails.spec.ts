@@ -140,7 +140,7 @@ describe('emails', () => {
       console.log(email.emailMjml);
     });
 
-    it.only('should render rejected email', async () => {
+    it('should render rejected email', async () => {
       const app = getRejectedApplication();
       const email = await rejected(app, stub);
       console.log(email.emailMjml);
