@@ -9,6 +9,7 @@ export type State =
   | 'CLOSED'
   | 'EXPIRED';
 
+
 export type SectionStatus =
   | 'PRISTINE'
   | 'COMPLETE'
@@ -83,6 +84,11 @@ export interface SearchResult {
     index: number;
   };
   items: ApplicationSummary[];
+  stats: undefined | {
+    countByState: {
+      [k in State]: number;
+    }
+  };
 }
 
 export interface ApplicationSummary {

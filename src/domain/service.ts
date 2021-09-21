@@ -305,16 +305,19 @@ async function onStateChange(
   }
 }
 
+export type SearchParams = {
+  query: string;
+  states: State[];
+  page: number;
+  pageSize: number;
+  sortBy: { field: string; direction: string }[];
+  includeCollaborators?: boolean;
+  cursorSearch?: boolean;
+  includeStats?: boolean;
+};
+
 export async function search(
-  params: {
-    query: string;
-    states: State[];
-    page: number;
-    pageSize: number;
-    sortBy: { field: string; direction: string }[];
-    includeCollaborators?: boolean;
-    cursorSearch?: boolean;
-  },
+  params: SearchParams,
   identity: Identity,
 ): Promise<SearchResult> {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
@@ -344,6 +347,17 @@ export async function search(
 
   // separate query to get total docs
   const count = await ApplicationModel.find(query).countDocuments();
+  const countByState: {[k in State]: number} = {
+    APPROVED: 0,
+    CLOSED: 0,
+    DRAFT: 0,
+    EXPIRED: 0,
+    REJECTED: 0,
+    RENEWING: 0,
+    REVIEW: 0,
+    'REVISIONS REQUESTED': 0,
+    'SIGN AND SUBMIT': 0,
+  };
   if (count == 0) {
     return {
       pagingInfo: {
@@ -352,10 +366,14 @@ export async function search(
         index: params.page,
       },
       items: [],
+      stats: {
+        countByState
+      }
     };
   }
 
   let apps = [];
+
   if (params.cursorSearch) {
     for await (const app of await ApplicationModel.find(query).sort(sortObj)) {
       apps.push(app);
@@ -368,6 +386,21 @@ export async function search(
       .exec();
   }
 
+  if (params.includeStats) {
+    // const statsQuery = _.cloneDeep(query);
+    const aggByStateResult = await ApplicationModel.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: '$state',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    aggByStateResult.forEach(d => {
+      countByState[d._id as State] = d.count;
+    });
+  }
   const copy = apps.map(
     (app: ApplicationDocument) =>
       ({
@@ -398,6 +431,9 @@ export async function search(
       index: params.page,
     },
     items: copy,
+    stats: params.includeStats ? {
+      countByState: countByState
+    } : undefined
   };
 }
 
