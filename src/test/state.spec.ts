@@ -134,14 +134,14 @@ describe('state manager', () => {
           positionTitle: 'Manager',
           suffix: '',
           title: '',
-          displayName: '',
+          displayName: 'Bashar Allabadi',
           website: '',
         },
         type: 'personnel',
       };
 
       const result = state.addCollaborator(collab, 'user123', false);
-      expect(result.sections.collaborators.list[0]).to.include(collab);
+      expect(result.sections.collaborators.list[0]).to.deep.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
     });
@@ -168,14 +168,14 @@ describe('state manager', () => {
           positionTitle: 'Manager',
           suffix: '',
           title: '',
-          displayName: '',
+          displayName: 'Bashar Allabadi',
           website: '',
         },
         type: 'personnel',
       };
 
       const result = state.addCollaborator(collab, 'user123', false);
-      expect(result.sections.collaborators.list[0]).to.include(collab);
+      expect(result.sections.collaborators.list[0]).to.deep.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
 
