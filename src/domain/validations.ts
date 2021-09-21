@@ -130,7 +130,7 @@ export function validateAgreementArray(ags: AgreementItem[]) {
 export function validateCollaborator(
   collaborator: Collaborator,
   application: Application,
-  compareWithApplicant: boolean = false,
+  shouldValidateNoMatchingApplicant: boolean = false,
 ) {
   const errors: SectionError[] = [];
   const validations = [
@@ -141,7 +141,9 @@ export function validateCollaborator(
       application.sections.applicant.info.primaryAffiliation,
       errors,
     ),
-    compareWithApplicant ? validateNoMatchingApplicant(application, collaborator, errors) : true,
+    shouldValidateNoMatchingApplicant
+      ? validateNoMatchingApplicant(application, collaborator, errors)
+      : true,
   ];
   const valid = !validations.some((x) => x == false);
   return { valid, errors };
