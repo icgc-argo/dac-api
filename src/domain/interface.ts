@@ -103,6 +103,7 @@ export interface ApplicationSummary {
     info: PersonalInfo;
   };
   collaborators?: PersonalInfo[];
+  country: string;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;

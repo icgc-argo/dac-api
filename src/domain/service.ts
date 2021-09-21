@@ -4,7 +4,7 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
-import _, { includes, isEmpty } from 'lodash';
+import _ from 'lodash';
 import {
   ApplicationStateManager,
   getSearchFieldValues,
@@ -51,7 +51,12 @@ export async function deleteDocument(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteDocument(objectId, type, identity.userId, isAdminOrReviewerResult);
+  const result = stateManager.deleteDocument(
+    objectId,
+    type,
+    identity.userId,
+    isAdminOrReviewerResult,
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
@@ -78,7 +83,13 @@ export async function uploadDocument(
   }
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addDocument(id, file.name, type, identity.userId, isAdminOrReviewerResult);
+  const result = stateManager.addDocument(
+    id,
+    file.name,
+    type,
+    identity.userId,
+    isAdminOrReviewerResult,
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
 
@@ -148,7 +159,11 @@ export async function createCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addCollaborator(collaborator, identity.userId, isAdminOrReviewerResult);
+  const result = stateManager.addCollaborator(
+    collaborator,
+    identity.userId,
+    isAdminOrReviewerResult,
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
     const config = await getAppConfig();
@@ -191,7 +206,11 @@ export async function deleteCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteCollaborator(collaboratorId, identity.userId, isAdminOrReviewerResult);
+  const result = stateManager.deleteCollaborator(
+    collaboratorId,
+    identity.userId,
+    isAdminOrReviewerResult,
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 
   if (result.state === 'APPROVED') {
@@ -385,6 +404,7 @@ export async function search(
         },
         submittedAtUtc: app.submittedAtUtc,
         lastUpdatedAtUtc: app.lastUpdatedAtUtc,
+        country: app.sections.applicant.address.country,
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
@@ -492,7 +512,7 @@ export async function sendEmail(
 }
 
 function mapField(field: string) {
-  //  state, primaryAffiliation, displayName, googleEmail, ethicsRequired, lastUpdatedAtUtc, appId, expiresAtUtc
+  //  state, primaryAffiliation, displayName, googleEmail, ethicsRequired, lastUpdatedAtUtc, appId, expiresAtUtc, country
   switch (field) {
     case 'primaryAffiliation':
     case 'googleEmail':
@@ -500,6 +520,8 @@ function mapField(field: string) {
       return `sections.applicant.info.${field}`;
     case 'ethicsRequired':
       return `sections.ethicsLetter.declaredAsRequired`;
+    case 'country':
+      return `sections.applicant.address.country`;
     default:
       return field;
   }
@@ -521,7 +543,6 @@ async function sendSubmissionConfirmation(
   );
 }
 
-
 async function sendRejectedEmail(
   updatedApp: Application,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
@@ -535,7 +556,7 @@ async function sendRejectedEmail(
     getApplicantEmails(updatedApp),
     `[${updatedApp.appId}] Your Application has been Rejected`,
     submittedEmail.html,
-    new Set([config.email.dacoAddress])
+    new Set([config.email.dacoAddress]),
   );
 }
 
@@ -753,10 +774,11 @@ function throwApplicationClosedError(): () => void {
   throw new Error('Cannot modify an application in CLOSED state.');
 }
 
-async function sendApplicationClosedEmail(updatedApp: Application,
+async function sendApplicationClosedEmail(
+  updatedApp: Application,
   config: AppConfig,
-  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
-
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   const email = await renderApplicationClosedEmail(updatedApp, config.email.links);
   await sendEmail(
     emailClient,
