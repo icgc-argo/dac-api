@@ -50,16 +50,24 @@ export const validateNoMatchingApplicant = (
   collaborator: Collaborator,
   errors: SectionError[],
 ) => {
-  const applicantGoogleEmail = app.sections.applicant.info.googleEmail;
-  const applicantInstitutionEmail = app.sections.applicant.info.institutionEmail;
-  if (
-    collaborator.info.googleEmail === applicantGoogleEmail ||
-    collaborator.info.institutionEmail === applicantInstitutionEmail
-  ) {
-    errors.push({
-      field: 'collaborators',
-      message: 'The applicant does not need to be added as a collaborator.',
-    });
+  const matchesApplicantGmail =
+    collaborator.info.googleEmail === app.sections.applicant.info.googleEmail;
+  const matchesApplicantInstitutionEmail =
+    collaborator.info.institutionEmail === app.sections.applicant.info.institutionEmail;
+
+  if (matchesApplicantGmail || matchesApplicantInstitutionEmail) {
+    if (matchesApplicantGmail) {
+      errors.push({
+        field: 'googleEmail',
+        message: 'The applicant does not need to be added as a collaborator.',
+      });
+    }
+    if (matchesApplicantInstitutionEmail) {
+      errors.push({
+        field: 'institutionEmail',
+        message: 'The applicant does not need to be added as a collaborator.',
+      });
+    }
     return false;
   }
   return true;
