@@ -65,8 +65,13 @@ export interface Collaborator {
   type: 'student' | 'personnel';
 }
 
+export type CollaboratorDto = {
+  info: Partial<PersonalInfo>;
+  type: 'student' | 'personnel';
+};
+
 interface ApplicationUpdate {
-  details: string;
+  info: any;
   type: string;
   date: Date;
 }
@@ -188,6 +193,8 @@ export interface Application {
       signedDocName: string;
     };
   };
+  // this is intended for human auditing and wouldn't recommend using this for any application logic
+  // unless it's revised to fit the case.
   updates: ApplicationUpdate[];
 }
 
