@@ -382,6 +382,7 @@ export async function search(
     apps = await ApplicationModel.find(query)
       .skip(params.page > 0 ? params.page * params.pageSize : 0)
       .limit(params.pageSize)
+      .collation({ locale: 'en' })
       .sort(sortObj)
       .exec();
   }
