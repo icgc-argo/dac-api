@@ -51,7 +51,7 @@ export const getSearchParams = (req: Request, defaultSort?: string): SearchParam
   const page = Number(req.query.page) || 0;
   const pageSize = Number(req.query.pageSize) || 25;
   const sort = (req.query.sort as string | undefined) || defaultSort;
-  const includeStats = Boolean(req.query.includeStats) || false;
+  const includeStats = Boolean(req.query.includeStats === 'true') || false;
   const sortBy = sort
     ? sort.split(',').map((s) => {
         const sortField = s.trim().split(':');
