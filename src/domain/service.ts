@@ -391,7 +391,7 @@ export async function search(
     (app: ApplicationDocument) =>
       ({
         appId: `${app.appId}`,
-        applicant: { info: app.sections.applicant.info },
+        applicant: { info: app.sections.applicant.info, address: app.sections.applicant.address },
         submitterId: app.submitterId,
         approvedAtUtc: app.approvedAtUtc,
         closedAtUtc: app.closedAtUtc,
@@ -404,7 +404,6 @@ export async function search(
         },
         submittedAtUtc: app.submittedAtUtc,
         lastUpdatedAtUtc: app.lastUpdatedAtUtc,
-        country: app.sections.applicant.address.country,
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),

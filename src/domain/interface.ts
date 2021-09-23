@@ -101,9 +101,9 @@ export interface ApplicationSummary {
   };
   applicant: {
     info: PersonalInfo;
+    address: Address;
   };
   collaborators?: PersonalInfo[];
-  country: string;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
