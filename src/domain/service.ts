@@ -4,7 +4,7 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
-import _, { includes, isEmpty } from 'lodash';
+import _ from 'lodash';
 import {
   ApplicationStateManager,
   getSearchFieldValues,
@@ -423,7 +423,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
     (app: ApplicationDocument) =>
       ({
         appId: `${app.appId}`,
-        applicant: { info: app.sections.applicant.info },
+        applicant: { info: app.sections.applicant.info, address: app.sections.applicant.address },
         submitterId: app.submitterId,
         approvedAtUtc: app.approvedAtUtc,
         closedAtUtc: app.closedAtUtc,
@@ -548,7 +548,7 @@ export async function sendEmail(
 }
 
 function mapField(field: string) {
-  //  state, primaryAffiliation, displayName, googleEmail, ethicsRequired, lastUpdatedAtUtc, appId, expiresAtUtc
+  //  state, primaryAffiliation, displayName, googleEmail, ethicsRequired, lastUpdatedAtUtc, appId, expiresAtUtc, country
   switch (field) {
     case 'primaryAffiliation':
     case 'googleEmail':
@@ -556,6 +556,8 @@ function mapField(field: string) {
       return `sections.applicant.info.${field}`;
     case 'ethicsRequired':
       return `sections.ethicsLetter.declaredAsRequired`;
+    case 'country':
+      return `sections.applicant.address.country`;
     default:
       return field;
   }
