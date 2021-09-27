@@ -107,6 +107,7 @@ export interface ApplicationSummary {
   };
   applicant: {
     info: PersonalInfo;
+    address: Address;
   };
   collaborators?: PersonalInfo[];
 }

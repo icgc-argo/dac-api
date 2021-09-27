@@ -4,7 +4,7 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
-import _, { includes, isEmpty } from 'lodash';
+import _ from 'lodash';
 import {
   ApplicationStateManager,
   getSearchFieldValues,
@@ -51,7 +51,12 @@ export async function deleteDocument(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteDocument(objectId, type, identity.userId, isAdminOrReviewerResult);
+  const result = stateManager.deleteDocument(
+    objectId,
+    type,
+    identity.userId,
+    isAdminOrReviewerResult,
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
@@ -78,7 +83,13 @@ export async function uploadDocument(
   }
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addDocument(id, file.name, type, identity.userId, isAdminOrReviewerResult);
+  const result = stateManager.addDocument(
+    id,
+    file.name,
+    type,
+    identity.userId,
+    isAdminOrReviewerResult,
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
 
@@ -106,8 +117,9 @@ export async function getApplicationAssetsAsStream(
   if (
     appDocObj.state !== 'REVIEW' &&
     appDocObj.state !== 'APPROVED' &&
-    // can download assets if app is CLOSED and but was APPROVED.
-    !(appDocObj.state === 'CLOSED' && appDocObj.approvedAtUtc)
+    // can download assets if app is CLOSED but was APPROVED.
+    !(appDocObj.state === 'CLOSED' && appDocObj.approvedAtUtc) &&
+    appDocObj.state !== 'REJECTED'
   ) {
     throw new Error('Cannot download package in this state');
   }
@@ -148,7 +160,11 @@ export async function createCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addCollaborator(collaborator, identity.userId, isAdminOrReviewerResult);
+  const result = stateManager.addCollaborator(
+    collaborator,
+    identity.userId,
+    isAdminOrReviewerResult,
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
     const config = await getAppConfig();
@@ -191,7 +207,11 @@ export async function deleteCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteCollaborator(collaboratorId, identity.userId, isAdminOrReviewerResult);
+  const result = stateManager.deleteCollaborator(
+    collaboratorId,
+    identity.userId,
+    isAdminOrReviewerResult,
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 
   if (result.state === 'APPROVED') {
@@ -316,10 +336,7 @@ export type SearchParams = {
   includeStats?: boolean;
 };
 
-export async function search(
-  params: SearchParams,
-  identity: Identity,
-): Promise<SearchResult> {
+export async function search(params: SearchParams, identity: Identity): Promise<SearchResult> {
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
@@ -347,7 +364,7 @@ export async function search(
 
   // separate query to get total docs
   const count = await ApplicationModel.find(query).countDocuments();
-  const countByState: {[k in State]: number} = {
+  const countByState: { [k in State]: number } = {
     APPROVED: 0,
     CLOSED: 0,
     DRAFT: 0,
@@ -367,8 +384,8 @@ export async function search(
       },
       items: [],
       stats: {
-        countByState
-      }
+        countByState,
+      },
     };
   }
 
@@ -394,11 +411,11 @@ export async function search(
       {
         $group: {
           _id: '$state',
-          count: { $sum: 1 }
-        }
-      }
+          count: { $sum: 1 },
+        },
+      },
     ]);
-    aggByStateResult.forEach(d => {
+    aggByStateResult.forEach((d) => {
       countByState[d._id as State] = d.count;
     });
   }
@@ -406,7 +423,7 @@ export async function search(
     (app: ApplicationDocument) =>
       ({
         appId: `${app.appId}`,
-        applicant: { info: app.sections.applicant.info },
+        applicant: { info: app.sections.applicant.info, address: app.sections.applicant.address },
         submitterId: app.submitterId,
         approvedAtUtc: app.approvedAtUtc,
         closedAtUtc: app.closedAtUtc,
@@ -432,9 +449,11 @@ export async function search(
       index: params.page,
     },
     items: copy,
-    stats: params.includeStats ? {
-      countByState: countByState
-    } : undefined
+    stats: params.includeStats
+      ? {
+          countByState: countByState,
+        }
+      : undefined,
   };
 }
 
@@ -529,7 +548,7 @@ export async function sendEmail(
 }
 
 function mapField(field: string) {
-  //  state, primaryAffiliation, displayName, googleEmail, ethicsRequired, lastUpdatedAtUtc, appId, expiresAtUtc
+  //  state, primaryAffiliation, displayName, googleEmail, ethicsRequired, lastUpdatedAtUtc, appId, expiresAtUtc, country
   switch (field) {
     case 'primaryAffiliation':
     case 'googleEmail':
@@ -537,6 +556,8 @@ function mapField(field: string) {
       return `sections.applicant.info.${field}`;
     case 'ethicsRequired':
       return `sections.ethicsLetter.declaredAsRequired`;
+    case 'country':
+      return `sections.applicant.address.country`;
     default:
       return field;
   }
@@ -558,7 +579,6 @@ async function sendSubmissionConfirmation(
   );
 }
 
-
 async function sendRejectedEmail(
   updatedApp: Application,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
@@ -572,7 +592,7 @@ async function sendRejectedEmail(
     getApplicantEmails(updatedApp),
     `[${updatedApp.appId}] Your Application has been Rejected`,
     submittedEmail.html,
-    new Set([config.email.dacoAddress])
+    new Set([config.email.dacoAddress]),
   );
 }
 
@@ -790,10 +810,11 @@ function throwApplicationClosedError(): () => void {
   throw new Error('Cannot modify an application in CLOSED state.');
 }
 
-async function sendApplicationClosedEmail(updatedApp: Application,
+async function sendApplicationClosedEmail(
+  updatedApp: Application,
   config: AppConfig,
-  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>) {
-
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
   const email = await renderApplicationClosedEmail(updatedApp, config.email.links);
   await sendEmail(
     emailClient,

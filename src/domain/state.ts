@@ -149,7 +149,12 @@ export class ApplicationStateManager {
     return this.currentApplication;
   }
 
-  deleteDocument(objectId: string, type: UploadDocumentType, updatedBy: string, isReviewer: boolean) {
+  deleteDocument(
+    objectId: string,
+    type: UploadDocumentType,
+    updatedBy: string,
+    isReviewer: boolean,
+  ) {
     const current = this.currentApplication;
     if (isReviewer && current.state !== 'APPROVED') {
       throw new Error('not allowed');
@@ -166,7 +171,13 @@ export class ApplicationStateManager {
     throw new BadRequest('Operation not allowed');
   }
 
-  addDocument(id: string, name: string, type: UploadDocumentType, updatedBy: string, isReviewer: boolean) {
+  addDocument(
+    id: string,
+    name: string,
+    type: UploadDocumentType,
+    updatedBy: string,
+    isReviewer: boolean,
+  ) {
     const current = this.currentApplication;
     if (isReviewer && current.state !== 'APPROVED') {
       throw new Error('not allowed');
@@ -466,6 +477,7 @@ export function getSearchFieldValues(appDoc: Application) {
     appDoc.sections.applicant.info.displayName,
     appDoc.sections.applicant.info.googleEmail,
     appDoc.sections.applicant.info.primaryAffiliation,
+    appDoc.sections.applicant.address.country,
   ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
 }
 
