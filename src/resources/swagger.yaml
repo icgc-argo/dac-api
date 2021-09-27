@@ -607,6 +607,9 @@ components:
         closedBy:
           readOnly: true
           type: string
+        revisionsRequested:
+          type: boolean
+          readOnly: true
 
     Application:
       type: object

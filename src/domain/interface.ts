@@ -110,6 +110,7 @@ export interface ApplicationSummary {
     address: Address;
   };
   collaborators?: PersonalInfo[];
+  revisionsRequested: boolean;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
