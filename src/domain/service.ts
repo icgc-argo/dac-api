@@ -344,14 +344,28 @@ export async function search(params: SearchParams, identity: Identity): Promise<
   }
 
   if (params.states.length > 0) {
-    query.state = {
-      $in: params.states as State[],
-    };
+    if (isAdminOrReviewerResult && params.states.includes('CLOSED')) {
+      query.$or = [];
+      query.$or.push({
+        state: {
+          $in: params.states.filter(s => s !== 'CLOSED')
+        },
+      });
+      query.$or.push({
+        state: 'CLOSED',
+        approvedAtUtc: {
+          $exists: true
+        }
+      });
+    } else {
+      query.state = {
+        $in: params.states as State[],
+      };
+    }
   }
 
   if (!!params.query) {
-    query.$or = [];
-    query.$or.push({ searchValues: new RegExp(params.query, 'gi') });
+    query.searchValues = new RegExp(params.query, 'gi');
   }
 
   // default sort by appId
