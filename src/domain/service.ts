@@ -439,6 +439,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
+        revisionsRequested: wasInRevisionRequestState(app),
       } as ApplicationSummary),
   );
 
