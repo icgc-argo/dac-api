@@ -458,6 +458,24 @@ export async function search(params: SearchParams, identity: Identity): Promise<
   };
 }
 
+export const searchCollaboratorApplications = async (identity: Identity) => {
+  // find all applications on which the logged-in user has collaborator access
+  // using ego token email matched against collaborator googleEmail
+  const apps = await ApplicationModel.find({
+    state: 'APPROVED',
+    'sections.collaborators.list.info.googleEmail': identity.tokenInfo.context.user.email,
+  });
+
+  return apps.map(
+    (app: ApplicationDocument) =>
+      ({
+        appId: `${app.appId}`,
+        applicant: { info: app.sections.applicant.info },
+        expiresAtUtc: app.expiresAtUtc,
+      } as Partial<ApplicationSummary>),
+  );
+};
+
 export async function deleteApp(id: string, identity: Identity) {
   await ApplicationModel.deleteOne({
     appId: id,
