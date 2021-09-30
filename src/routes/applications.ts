@@ -13,6 +13,7 @@ import {
   deleteDocument,
   getApplicationAssetsAsStream,
   sendEmail,
+  searchCollaboratorApplications,
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
@@ -106,7 +107,11 @@ const createApplicationsRouter = (
           });
       } catch (error) {
         logger.error(`Error downloading zip file for ${appId}: ${error}`);
-        res.status(400).send(error.message || error.details || 'An unknown error occurred.');
+        // https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-0.html#unknown-on-catch-clause-bindings
+        if (error instanceof Error) {
+          return res.status(400).send(error.message);
+        }
+        return res.status(400).send('An unknown error occurred.');
       }
     }),
   );
@@ -331,6 +336,16 @@ const createApplicationsRouter = (
         emailClient,
       );
       return res.status(200).send(updated);
+    }),
+  );
+
+  router.get(
+    '/collaborators/applications',
+    authFilter([]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const user = (req as IRequest).identity;
+      const applications = await searchCollaboratorApplications(user);
+      return res.status(200).send(applications);
     }),
   );
 
