@@ -123,7 +123,7 @@ export class ApplicationStateManager {
     this.currentApplication = _.cloneDeep(application);
   }
 
-  prepareApplicantionForUser(isReviewer: boolean) {
+  prepareApplicationForUser(isReviewer: boolean) {
     allSections.forEach((s) => {
       this.currentApplication.sections[s].meta.status = calculateViewableSectionStatus(
         this.currentApplication,

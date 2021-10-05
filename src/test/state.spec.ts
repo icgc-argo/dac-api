@@ -328,7 +328,7 @@ describe('state manager', () => {
       '1',
     );
 
-    const userApp = state.prepareApplicantionForUser(false);
+    const userApp = state.prepareApplicationForUser(false);
     expect(userApp.sections.representative.meta.status).to.eq('REVISIONS REQUESTED');
   });
 });
@@ -399,7 +399,7 @@ export function getRejectedApplication() {
   const state = new ApplicationStateManager(app);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REJECTED',
-    denialReason: 'Your plans to use the data is not accepted.'
+    denialReason: 'Your plans to use the data is not accepted.',
   };
   const result = state.updateApp(updatePart, true, '1');
   expect(result.state).to.eq('REJECTED');

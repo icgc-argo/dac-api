@@ -62,7 +62,7 @@ export async function deleteDocument(
   const updated = await findApplication(c(result.appId), identity);
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
-  ).prepareApplicantionForUser(false);
+  ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
 
@@ -102,7 +102,7 @@ export async function uploadDocument(
 
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
-  ).prepareApplicantionForUser(false);
+  ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
 
@@ -275,7 +275,7 @@ export async function updatePartial(
   );
   const updated = await findApplication(c(updatedApp.appId), identity);
   const updatedObj = updated.toObject();
-  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicantionForUser(
+  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
     isReviewer,
   );
   return viewAbleApplication;
@@ -348,14 +348,14 @@ export async function search(params: SearchParams, identity: Identity): Promise<
       query.$or = [];
       query.$or.push({
         state: {
-          $in: params.states.filter(s => s !== 'CLOSED')
+          $in: params.states.filter((s) => s !== 'CLOSED'),
         },
       });
       query.$or.push({
         state: 'CLOSED',
         approvedAtUtc: {
-          $exists: true
-        }
+          $exists: true,
+        },
       });
     } else {
       query.state = {
@@ -510,7 +510,7 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicantionForUser(
+  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
   return viewAbleApplication;
