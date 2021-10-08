@@ -77,10 +77,17 @@ export async function uploadDocument(
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+
   let existingId: string | undefined = undefined;
   if (type == 'SIGNED_APP') {
     existingId = appDocObj.sections.signature.signedAppDocObjId;
   }
+  if (type === 'APPROVED_PDF') {
+    existingId = appDocObj.approvedAppDoc
+      ? appDocObj.approvedAppDoc.approvedAppDocObjId
+      : undefined;
+  }
+
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.addDocument(
@@ -133,6 +140,13 @@ export async function getApplicationAssetsAsStream(
     name: appDocObj.sections.signature.signedDocName,
     id: appDocObj.sections.signature.signedAppDocObjId,
   });
+
+  if (appDocObj.approvedAppDoc?.approvedAppDocObjId) {
+    docs.push({
+      name: appDocObj.approvedAppDoc.approvedAppDocName,
+      id: appDocObj.approvedAppDoc.approvedAppDocObjId,
+    });
+  }
 
   // get the assets as streams from the response bodies
   const downloaded = docs.map(async (d) => {

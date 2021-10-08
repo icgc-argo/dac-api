@@ -20,7 +20,7 @@ import logger from '../logger';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import crypto from 'crypto';
 
-import { FileFormat, UpdateApplication } from '../domain/interface';
+import { FileFormat, UpdateApplication, UploadDocumentType } from '../domain/interface';
 import { AppConfig, getAppConfig } from '../config';
 import _ from 'lodash';
 import { Storage } from '../storage';
@@ -50,7 +50,7 @@ const createApplicationsRouter = (
     authFilter([]),
     wrapAsync(async (req: Request, res: Response) => {
       const appId = validateId(req.params.id);
-      const type = validateType(req.params.type) as 'ETHICS' | 'SIGNED_APP';
+      const type = validateType(req.params.type) as UploadDocumentType;
       const objectId = req.params.assetId;
       logger.info(
         `delete document [app: ${appId}, type: ${type}, assetId: ${objectId}, user Id:${
@@ -128,7 +128,7 @@ const createApplicationsRouter = (
         throw new BadRequest('Only one file');
       }
       const appId = validateId(req.params.id);
-      const type = validateType(req.params.type) as 'ETHICS' | 'SIGNED_APP';
+      const type = validateType(req.params.type) as UploadDocumentType;
       logger.info(
         `upload app file [app: ${appId}, type: ${type}, file: ${uploadedFile.name}, user Id:${
           (req as IRequest).identity.userId
@@ -363,8 +363,12 @@ function validateId(id: string) {
 }
 
 function validateType(type: string) {
-  if (!['ETHICS', 'SIGNED_APP', 'ethics', 'signed_app'].includes(type)) {
-    throw new BadRequest('unknow document type, should be ETHICS or SIGNED_APP');
+  if (
+    !['ETHICS', 'SIGNED_APP', 'APPROVED_PDF', 'ethics', 'signed_app', 'approved_pdf'].includes(type)
+  ) {
+    throw new BadRequest(
+      'unknown document type, should be one of ETHICS, SIGNED_APP or APPROVED_PDF',
+    );
   }
   return type.toUpperCase();
 }

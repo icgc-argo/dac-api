@@ -37,9 +37,12 @@ export class Storage {
         })
         .promise();
     } catch (err) {
-      if (err.name == 'TimeoutError') {
-        console.error("couldn't connect to S3", err);
-        return;
+      // https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-0.html#unknown-on-catch-clause-bindings
+      if (err instanceof Error) {
+        if (err.name == 'TimeoutError') {
+          console.error("couldn't connect to S3", err);
+          return;
+        }
       }
       console.error(`heading bucket: ${err}`, err);
       await this.s3Client
