@@ -571,6 +571,13 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
     removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
   }
 
+  if (
+    appDocObj.approvedAppDoc.approvedAppDocObjId &&
+    appDocObj.approvedAppDoc.approvedAppDocObjId !== result.approvedAppDoc.approvedAppDocObjId
+  ) {
+    removedIds.push(appDocObj.approvedAppDoc.approvedAppDocObjId);
+  }
+
   return removedIds;
 }
 
