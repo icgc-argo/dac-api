@@ -572,7 +572,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   }
 
   if (
-    appDocObj.approvedAppDoc.approvedAppDocObjId &&
+    appDocObj.approvedAppDoc?.approvedAppDocObjId &&
     appDocObj.approvedAppDoc.approvedAppDocObjId !== result.approvedAppDoc.approvedAppDocObjId
   ) {
     removedIds.push(appDocObj.approvedAppDoc.approvedAppDocObjId);
