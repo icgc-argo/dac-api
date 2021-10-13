@@ -62,7 +62,7 @@ export async function deleteDocument(
   const updated = await findApplication(c(result.appId), identity);
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
-  ).prepareApplicantionForUser(false);
+  ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
 
@@ -77,10 +77,17 @@ export async function uploadDocument(
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+
   let existingId: string | undefined = undefined;
   if (type == 'SIGNED_APP') {
     existingId = appDocObj.sections.signature.signedAppDocObjId;
   }
+  if (type === 'APPROVED_PDF') {
+    existingId = appDocObj.approvedAppDoc
+      ? appDocObj.approvedAppDoc.approvedAppDocObjId
+      : undefined;
+  }
+
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.addDocument(
@@ -102,7 +109,7 @@ export async function uploadDocument(
 
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
-  ).prepareApplicantionForUser(false);
+  ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
 
@@ -133,6 +140,13 @@ export async function getApplicationAssetsAsStream(
     name: appDocObj.sections.signature.signedDocName,
     id: appDocObj.sections.signature.signedAppDocObjId,
   });
+
+  if (appDocObj.approvedAppDoc?.approvedAppDocObjId) {
+    docs.push({
+      name: appDocObj.approvedAppDoc.approvedAppDocName,
+      id: appDocObj.approvedAppDoc.approvedAppDocObjId,
+    });
+  }
 
   // get the assets as streams from the response bodies
   const downloaded = docs.map(async (d) => {
@@ -275,7 +289,7 @@ export async function updatePartial(
   );
   const updated = await findApplication(c(updatedApp.appId), identity);
   const updatedObj = updated.toObject();
-  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicantionForUser(
+  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
     isReviewer,
   );
   return viewAbleApplication;
@@ -348,14 +362,14 @@ export async function search(params: SearchParams, identity: Identity): Promise<
       query.$or = [];
       query.$or.push({
         state: {
-          $in: params.states.filter(s => s !== 'CLOSED')
+          $in: params.states.filter((s) => s !== 'CLOSED'),
         },
       });
       query.$or.push({
         state: 'CLOSED',
         approvedAtUtc: {
-          $exists: true
-        }
+          $exists: true,
+        },
       });
     } else {
       query.state = {
@@ -510,7 +524,7 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicantionForUser(
+  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
   return viewAbleApplication;
@@ -555,6 +569,13 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
     appDocObj.sections.signature.signedAppDocObjId != result.sections.signature.signedAppDocObjId
   ) {
     removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
+  }
+
+  if (
+    appDocObj.approvedAppDoc.approvedAppDocObjId &&
+    appDocObj.approvedAppDoc.approvedAppDocObjId !== result.approvedAppDoc.approvedAppDocObjId
+  ) {
+    removedIds.push(appDocObj.approvedAppDoc.approvedAppDocObjId);
   }
 
   return removedIds;

@@ -123,7 +123,7 @@ export class ApplicationStateManager {
     this.currentApplication = _.cloneDeep(application);
   }
 
-  prepareApplicantionForUser(isReviewer: boolean) {
+  prepareApplicationForUser(isReviewer: boolean) {
     allSections.forEach((s) => {
       this.currentApplication.sections[s].meta.status = calculateViewableSectionStatus(
         this.currentApplication,
@@ -168,6 +168,11 @@ export class ApplicationStateManager {
       current.sections.signature.meta.status = 'INCOMPLETE';
       return current;
     }
+
+    if (type === 'APPROVED_PDF' && isReviewer && current.state === 'APPROVED') {
+      resetApprovedAppDocument(current);
+      return current;
+    }
     throw new BadRequest('Operation not allowed');
   }
 
@@ -182,6 +187,7 @@ export class ApplicationStateManager {
     if (isReviewer && current.state !== 'APPROVED') {
       throw new Error('not allowed');
     }
+
     if (type == 'ETHICS') {
       uploadEthicsLetter(current, id, name, updatedBy);
       return current;
@@ -196,6 +202,18 @@ export class ApplicationStateManager {
         return current;
       }
       throw new BadRequest('Cannot upload signed application in this state');
+    }
+
+    if (type === 'APPROVED_PDF') {
+      if (current.state === 'APPROVED' && isReviewer) {
+        current.approvedAppDoc = {
+          approvedAppDocObjId: id,
+          uploadedAtUtc: new Date(),
+          approvedAppDocName: name,
+        };
+        return current;
+      }
+      throw new Error('Not allowed');
     }
     throw new BadRequest('Unknown file type');
   }
@@ -706,6 +724,12 @@ function resetSignedDocument(current: Application) {
   current.sections.signature.signedAppDocObjId = '';
   current.sections.signature.uploadedAtUtc = undefined;
   current.sections.signature.signedDocName = '';
+}
+
+function resetApprovedAppDocument(current: Application) {
+  current.approvedAppDoc.approvedAppDocObjId = '';
+  current.approvedAppDoc.approvedAppDocName = '';
+  current.approvedAppDoc.uploadedAtUtc = undefined;
 }
 
 function transitionToRejected(
