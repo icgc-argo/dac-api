@@ -639,17 +639,21 @@ function uploadEthicsLetter(current: Application, id: string, name: string, upda
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
   }
+
   const updatePart: Partial<UpdateApplication> = {
     sections: {
       ethicsLetter: {
         // we need to provide the existing items as well for the merge logic to work correctly and not delete array items
-        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.concat([
-          {
-            name,
-            objectId: id,
-            uploadedAtUtc: new Date(),
-          },
-        ]),
+        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs
+          // remove any current docs that have new docs name
+          .filter((doc) => doc.name !== name)
+          .concat([
+            {
+              name,
+              objectId: id,
+              uploadedAtUtc: new Date(),
+            },
+          ]),
       },
     },
   };
