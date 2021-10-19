@@ -122,6 +122,15 @@ export type SectionError = {
   message: string;
   code?: string;
 };
+
+type ApprovedAppDocument = {
+  approvedAppDocObjId: string;
+  uploadedAtUtc?: Date;
+  approvedAppDocName: string;
+  isCurrent: boolean;
+  approvedAtUtc: Date;
+};
+
 export interface Application {
   appId: string;
   appNumber: number;
@@ -206,11 +215,7 @@ export interface Application {
   // this is intended for human auditing and wouldn't recommend using this for any application logic
   // unless it's revised to fit the case.
   updates: ApplicationUpdate[];
-  approvedAppDoc: {
-    approvedAppDocObjId: string;
-    uploadedAtUtc?: Date;
-    approvedAppDocName: string;
-  };
+  approvedAppDocs: ApprovedAppDocument[];
 }
 
 export type AppSections = keyof Application['sections'];

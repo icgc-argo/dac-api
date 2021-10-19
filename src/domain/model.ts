@@ -91,6 +91,8 @@ const ApprovedAppDocument = new mongoose.Schema(
     approvedAppDocObjId: { type: String, required: false },
     uploadedAtUtc: { type: Date, required: false },
     approvedAppDocName: { type: String, required: false },
+    isCurrent: { type: Boolean, required: false },
+    approvedAtUtc: { type: Date, required: false },
   },
   { _id: false },
 );
@@ -169,7 +171,7 @@ const ApplicationSchema = new mongoose.Schema(
       },
     },
     updates: [ApplicationUpdate],
-    approvedAppDoc: { type: ApprovedAppDocument, required: false },
+    approvedAppDocs: [ApprovedAppDocument],
   },
   {
     timestamps: {
