@@ -15,12 +15,13 @@ import {
   Application,
   ApplicationSummary,
   Collaborator,
+  DacoRole,
   SearchResult,
   State,
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { c } from '../utils/misc';
+import { c, getUpdateAuthor } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
@@ -190,7 +191,10 @@ export async function updateCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.updateCollaborator(collaborator, identity.userId);
+  const result = stateManager.updateCollaborator(
+    collaborator,
+    getUpdateAuthor(identity.userId, isAdminOrReviewerResult),
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 }
 
@@ -257,7 +261,11 @@ export async function updatePartial(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const updatedApp = stateManager.updateApp(appPart, isReviewer, identity.userId);
+  const updatedApp = stateManager.updateApp(
+    appPart,
+    isReviewer,
+    getUpdateAuthor(identity.userId, isReviewer),
+  );
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
   const stateChanged = appDocObj.state != updatedApp.state;
   const config = await getAppConfig();
@@ -348,14 +356,14 @@ export async function search(params: SearchParams, identity: Identity): Promise<
       query.$or = [];
       query.$or.push({
         state: {
-          $in: params.states.filter(s => s !== 'CLOSED')
+          $in: params.states.filter((s) => s !== 'CLOSED'),
         },
       });
       query.$or.push({
         state: 'CLOSED',
         approvedAtUtc: {
-          $exists: true
-        }
+          $exists: true,
+        },
       });
     } else {
       query.state = {
@@ -384,7 +392,6 @@ export async function search(params: SearchParams, identity: Identity): Promise<
     DRAFT: 0,
     EXPIRED: 0,
     REJECTED: 0,
-    RENEWING: 0,
     REVIEW: 0,
     'REVISIONS REQUESTED': 0,
     'SIGN AND SUBMIT': 0,

@@ -599,7 +599,6 @@ components:
             - REVISIONS REQUESTED
             - REJECTED
             - APPROVED
-            - RENEWING
             - CLOSED
             - EXPIRED
         applicant:
@@ -665,7 +664,6 @@ components:
             - REVISIONS REQUESTED
             - REJECTED
             - APPROVED
-            - RENEWING
             - CLOSED
             - EXPIRED
         submitterId:

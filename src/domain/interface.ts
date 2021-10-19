@@ -4,11 +4,9 @@ export type State =
   | 'REVIEW'
   | 'REVISIONS REQUESTED'
   | 'APPROVED'
-  | 'RENEWING'
   | 'REJECTED'
   | 'CLOSED'
   | 'EXPIRED';
-
 
 export type SectionStatus =
   | 'PRISTINE'
@@ -71,10 +69,45 @@ export type CollaboratorDto = {
   type: 'student' | 'personnel';
 };
 
-interface ApplicationUpdate {
-  info: any;
-  type: string;
+export enum DacoRole {
+  SUBMITTER = 'SUBMITTER',
+  ADMIN = 'ADMIN',
+}
+
+export type UpdateAuthor = {
+  id: string;
+  role: DacoRole;
+};
+
+export enum AppType {
+  NEW = 'NEW',
+  RENEWAL = 'RENEWAL',
+}
+
+// to differentiate update events from app State
+export enum EventType {
+  CREATED = 'CREATED',
+  SUBMITTED = 'SUBMITTED',
+  PAUSED = 'PAUSED',
+  REVISIONS_REQUESTED = 'REVISIONS_REQUESTED',
+  ATTESTED = 'ATTESTED',
+  APPROVED = 'APPROVED',
+  EXPIRED = 'EXPIRED',
+  REJECTED = 'REJECTED',
+  CLOSED = 'CLOSED',
+}
+
+export interface ApplicationUpdate {
+  author: UpdateAuthor;
+  status: EventType;
   date: Date;
+  appType: AppType;
+  daysElapsed: number;
+  institution: string;
+  country: string;
+  applicant: string;
+  projectTitle: string;
+  ethicsLetterRequired: boolean | null;
 }
 
 export interface SearchResult {
@@ -84,11 +117,13 @@ export interface SearchResult {
     index: number;
   };
   items: ApplicationSummary[];
-  stats: undefined | {
-    countByState: {
-      [k in State]: number;
-    }
-  };
+  stats:
+    | undefined
+    | {
+        countByState: {
+          [k in State]: number;
+        };
+      };
 }
 
 export interface ApplicationSummary {
@@ -111,6 +146,7 @@ export interface ApplicationSummary {
   };
   collaborators?: PersonalInfo[];
   revisionsRequested: boolean;
+  isRenewal: boolean;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -135,6 +171,8 @@ export interface Application {
   lastUpdatedAtUtc?: Date;
   createdAtUtc?: Date;
   searchValues: string[];
+  isRenewal: boolean;
+  ableToRenew: boolean;
   // calculated flag to indicate that revisions are being requested if any of the revisionRequest sections is true
   // and this flag will be reset before each review since we do reset the revision request portion.
   revisionsRequested: boolean;

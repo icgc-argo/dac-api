@@ -1,4 +1,4 @@
-import { mergeKnown } from '../utils/misc';
+import { getUpdateAuthor, mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
 import _ from 'lodash';
@@ -25,6 +25,11 @@ import {
   UploadDocumentType,
   RevisionRequestUpdate,
   CollaboratorDto,
+  DacoRole,
+  UpdateAuthor,
+  AppType,
+  ApplicationUpdate,
+  EventType,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -110,10 +115,6 @@ const stateToLockedSectionsMap: Record<
     APPLICANT: allSections,
     REVIEWER: allSections,
   },
-  RENEWING: {
-    APPLICANT: [],
-    REVIEWER: [],
-  },
 };
 
 export class ApplicationStateManager {
@@ -160,7 +161,7 @@ export class ApplicationStateManager {
       throw new Error('not allowed');
     }
     if (type == 'ETHICS') {
-      return deleteEthicsLetterDocument(current, objectId, updatedBy);
+      return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(updatedBy, isReviewer));
     }
 
     if (type == 'SIGNED_APP' && current.state == 'SIGN AND SUBMIT') {
@@ -183,7 +184,7 @@ export class ApplicationStateManager {
       throw new Error('not allowed');
     }
     if (type == 'ETHICS') {
-      uploadEthicsLetter(current, id, name, updatedBy);
+      uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
       return current;
     }
 
@@ -217,14 +218,14 @@ export class ApplicationStateManager {
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
-      updateAppStateForReturnedApplication(current, {}, updatedBy);
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
     }
 
     onAppUpdate(current);
     return current;
   }
 
-  updateCollaborator(collaborator: Collaborator, updatedBy: string) {
+  updateCollaborator(collaborator: Collaborator, updatedBy: UpdateAuthor) {
     const current = this.currentApplication;
     // collaborators updating is only allowed in these three states
     if (!canUpdateCollaborators(current)) {
@@ -378,14 +379,14 @@ export class ApplicationStateManager {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
       // trigger transition in application state and sign and submit check
-      updateAppStateForReturnedApplication(current, {}, updatedBy);
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
     }
 
     onAppUpdate(current);
     return current;
   }
 
-  updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean, updatedBy: string) {
+  updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean, updatedBy: UpdateAuthor) {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
@@ -430,7 +431,11 @@ function canUpdateCollaborators(current: Application) {
   );
 }
 
-function deleteEthicsLetterDocument(current: Application, objectId: string, updatedBy: string) {
+function deleteEthicsLetterDocument(
+  current: Application,
+  objectId: string,
+  updatedBy: UpdateAuthor,
+) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
   }
@@ -580,6 +585,8 @@ export function newApplication(identity: Identity): Partial<Application> {
       },
     },
     updates: [],
+    isRenewal: false,
+    ableToRenew: false,
   };
   return app;
 }
@@ -617,7 +624,12 @@ export function emptyRevisionRequest() {
   };
 }
 
-function uploadEthicsLetter(current: Application, id: string, name: string, updatedBy: string) {
+function uploadEthicsLetter(
+  current: Application,
+  id: string,
+  name: string,
+  updatedBy: UpdateAuthor,
+) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
   }
@@ -655,7 +667,7 @@ function uploadEthicsLetter(current: Application, id: string, name: string, upda
 function updateAppStateForReviewApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
 ) {
   // if the admin has chosen a custom expiry date and asked to save
   if (updatePart.expiresAtUtc) {
@@ -708,29 +720,41 @@ function resetSignedDocument(current: Application) {
   current.sections.signature.signedDocName = '';
 }
 
+const createUpdateEvent: (
+  app: Application,
+  author: UpdateAuthor,
+  updateEvent: EventType,
+) => ApplicationUpdate = (app, author, updateEvent) => {
+  // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot at the time the event occurred
+  return {
+    date: new Date(),
+    status: updateEvent,
+    author,
+    appType: app.isRenewal ? AppType.RENEWAL : AppType.NEW,
+    daysElapsed: 0, // TODO real calculation func
+    institution: app.sections.applicant.info.primaryAffiliation,
+    country: app.sections.applicant.address.country,
+    applicant: app.sections.applicant.info.displayName,
+    projectTitle: app.sections.projectInfo.title,
+    ethicsLetterRequired: app.sections.ethicsLetter.declaredAsRequired || null,
+  };
+};
+
 function transitionToRejected(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  rejectedBy: string,
+  rejectedBy: UpdateAuthor,
 ) {
   current.state = 'REJECTED';
   current.denialReason = updatePart.denialReason || '';
-  current.updates.push({
-    date: new Date(),
-    type: 'REJECTED',
-    info: { rejectedBy },
-  });
+  current.updates.push(createUpdateEvent(current, rejectedBy, EventType.REJECTED));
   return current;
 }
 
-function transitionToApproved(current: Application, approvedBy: string) {
+function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
-  current.updates.push({
-    date: new Date(),
-    type: 'APPROVED',
-    info: { approvedBy },
-  });
+  current.updates.push(createUpdateEvent(current, approvedBy, EventType.APPROVED));
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
     current.expiresAtUtc = moment().add(2, 'year').toDate();
@@ -738,14 +762,15 @@ function transitionToApproved(current: Application, approvedBy: string) {
   return current;
 }
 
-const transitionToClosed: (current: Application, closedBy: string) => Application = (
+const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Application = (
   current,
   closedBy,
 ) => {
   current.state = 'CLOSED';
-  current.closedBy = closedBy;
+  current.closedBy = closedBy.id;
   const closedDate = moment().toDate();
   current.closedAtUtc = closedDate;
+  current.updates.push(createUpdateEvent(current, closedBy, EventType.CLOSED));
   // if expiresAtUtc exists, set to date app was closed
   if (current.expiresAtUtc) {
     current.expiresAtUtc = closedDate;
@@ -795,7 +820,7 @@ function markSectionsForReview(current: Application) {
 function updateAppStateForSignAndSubmit(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -853,7 +878,7 @@ function updateAppStateForApprovedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
   isReviewer: boolean,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -868,7 +893,7 @@ function updateAppStateForApprovedApplication(
 function updateAppStateForReturnedApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -906,7 +931,7 @@ function updateAppStateForReturnedApplication(
 function updateAppStateForDraftApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
