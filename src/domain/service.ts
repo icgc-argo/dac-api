@@ -82,10 +82,15 @@ export async function uploadDocument(
   if (type == 'SIGNED_APP') {
     existingId = appDocObj.sections.signature.signedAppDocObjId;
   }
+
   if (type === 'APPROVED_PDF') {
-    existingId = appDocObj.approvedAppDoc
-      ? appDocObj.approvedAppDoc.approvedAppDocObjId
-      : undefined;
+    const currentDoc = appDocObj.approvedAppDocs.find((doc) => doc.isCurrent);
+    // if the approvedAtUtc of the doc that is marked isCurrent matches the app-level approvedAtUtc,
+    // the assumption is that this uploaded doc should replace the current approved doc
+    existingId =
+      currentDoc && currentDoc.approvedAtUtc === appDocObj.approvedAtUtc
+        ? currentDoc.approvedAppDocObjId
+        : undefined;
   }
 
   const id = await storageClient.upload(file, existingId);
@@ -141,10 +146,11 @@ export async function getApplicationAssetsAsStream(
     id: appDocObj.sections.signature.signedAppDocObjId,
   });
 
-  if (appDocObj.approvedAppDoc?.approvedAppDocObjId) {
+  const currentApprovedAppDoc = appDocObj.approvedAppDocs.find((pdfDoc) => pdfDoc.isCurrent);
+  if (currentApprovedAppDoc) {
     docs.push({
-      name: appDocObj.approvedAppDoc.approvedAppDocName,
-      id: appDocObj.approvedAppDoc.approvedAppDocObjId,
+      name: currentApprovedAppDoc.approvedAppDocName,
+      id: currentApprovedAppDoc.approvedAppDocObjId,
     });
   }
 
@@ -561,8 +567,8 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const ethicsArrayAfter = result.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
-  const diff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
-  diff.forEach((o) => removedIds.push(o));
+  const ethicsDiff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
+  ethicsDiff.forEach((o) => removedIds.push(o));
 
   if (
     appDocObj.sections.signature.signedAppDocObjId &&
@@ -571,13 +577,16 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
     removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
   }
 
-  if (
-    appDocObj.approvedAppDoc?.approvedAppDocObjId &&
-    appDocObj.approvedAppDoc.approvedAppDocObjId !== result.approvedAppDoc.approvedAppDocObjId
-  ) {
-    removedIds.push(appDocObj.approvedAppDoc.approvedAppDocObjId);
-  }
+  const approvedArrayBefore = appDocObj.approvedAppDocs
+    .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
+    .map((e) => e.approvedAppDocObjId);
+  const approvedArrayAfter = result.approvedAppDocs
+    .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
+    .map((e) => e.approvedAppDocObjId);
+  const approvedDiff = _.difference(approvedArrayBefore, approvedArrayAfter);
+  approvedDiff.forEach((o) => removedIds.push(o));
 
+  console.log('removing docs: ', removedIds);
   return removedIds;
 }
 
