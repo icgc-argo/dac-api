@@ -849,13 +849,20 @@ components:
                 meta:
                   $ref: '#/components/schemas/Meta'
 
-            approvedAppDoc:
-              type: object
-              properties:
-                approvedAppDocObjId:
-                  type: string
-                approvedAppDocName:
-                  type: string
-                uploadedAtUtc:
-                  type: string
-                  format: date
+            approvedAppDocs:
+              type: array
+              items:
+                type: object
+                properties:
+                  approvedAppDocObjId:
+                    type: string
+                  approvedAppDocName:
+                    type: string
+                  uploadedAtUtc:
+                    type: string
+                    format: date
+                  approvedAtUtc:
+                    type: string
+                    format: date
+                  isCurrent:
+                    type: boolean
