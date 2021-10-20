@@ -9,7 +9,6 @@ export type State =
   | 'CLOSED'
   | 'EXPIRED';
 
-
 export type SectionStatus =
   | 'PRISTINE'
   | 'COMPLETE'
@@ -21,7 +20,8 @@ export type SectionStatus =
   | 'REVISIONS MADE'
   | 'AMMENDABLE';
 
-export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP';
+export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP' | 'APPROVED_PDF';
+
 interface Meta {
   updated?: boolean;
   status: SectionStatus;
@@ -84,11 +84,13 @@ export interface SearchResult {
     index: number;
   };
   items: ApplicationSummary[];
-  stats: undefined | {
-    countByState: {
-      [k in State]: number;
-    }
-  };
+  stats:
+    | undefined
+    | {
+        countByState: {
+          [k in State]: number;
+        };
+      };
 }
 
 export interface ApplicationSummary {
@@ -120,6 +122,15 @@ export type SectionError = {
   message: string;
   code?: string;
 };
+
+type ApprovedAppDocument = {
+  approvedAppDocObjId: string;
+  uploadedAtUtc?: Date;
+  approvedAppDocName: string;
+  isCurrent: boolean;
+  approvedAtUtc: Date;
+};
+
 export interface Application {
   appId: string;
   appNumber: number;
@@ -204,6 +215,7 @@ export interface Application {
   // this is intended for human auditing and wouldn't recommend using this for any application logic
   // unless it's revised to fit the case.
   updates: ApplicationUpdate[];
+  approvedAppDocs: ApprovedAppDocument[];
 }
 
 export type AppSections = keyof Application['sections'];

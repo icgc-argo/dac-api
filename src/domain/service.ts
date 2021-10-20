@@ -62,7 +62,7 @@ export async function deleteDocument(
   const updated = await findApplication(c(result.appId), identity);
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
-  ).prepareApplicantionForUser(false);
+  ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
 
@@ -77,10 +77,22 @@ export async function uploadDocument(
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
+
   let existingId: string | undefined = undefined;
   if (type == 'SIGNED_APP') {
     existingId = appDocObj.sections.signature.signedAppDocObjId;
   }
+
+  if (type === 'APPROVED_PDF') {
+    const currentDoc = appDocObj.approvedAppDocs.find((doc) => doc.isCurrent);
+    // if the approvedAtUtc of the doc that is marked isCurrent matches the app-level approvedAtUtc,
+    // the assumption is that this uploaded doc should replace the current approved doc
+    existingId =
+      currentDoc && currentDoc.approvedAtUtc === appDocObj.approvedAtUtc
+        ? currentDoc.approvedAppDocObjId
+        : undefined;
+  }
+
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.addDocument(
@@ -102,7 +114,7 @@ export async function uploadDocument(
 
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
-  ).prepareApplicantionForUser(false);
+  ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
 
@@ -133,6 +145,14 @@ export async function getApplicationAssetsAsStream(
     name: appDocObj.sections.signature.signedDocName,
     id: appDocObj.sections.signature.signedAppDocObjId,
   });
+
+  const currentApprovedAppDoc = appDocObj.approvedAppDocs.find((pdfDoc) => pdfDoc.isCurrent);
+  if (currentApprovedAppDoc) {
+    docs.push({
+      name: currentApprovedAppDoc.approvedAppDocName,
+      id: currentApprovedAppDoc.approvedAppDocObjId,
+    });
+  }
 
   // get the assets as streams from the response bodies
   const downloaded = docs.map(async (d) => {
@@ -275,7 +295,7 @@ export async function updatePartial(
   );
   const updated = await findApplication(c(updatedApp.appId), identity);
   const updatedObj = updated.toObject();
-  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicantionForUser(
+  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
     isReviewer,
   );
   return viewAbleApplication;
@@ -348,14 +368,14 @@ export async function search(params: SearchParams, identity: Identity): Promise<
       query.$or = [];
       query.$or.push({
         state: {
-          $in: params.states.filter(s => s !== 'CLOSED')
+          $in: params.states.filter((s) => s !== 'CLOSED'),
         },
       });
       query.$or.push({
         state: 'CLOSED',
         approvedAtUtc: {
-          $exists: true
-        }
+          $exists: true,
+        },
       });
     } else {
       query.state = {
@@ -510,7 +530,7 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicantionForUser(
+  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
   return viewAbleApplication;
@@ -547,8 +567,8 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const ethicsArrayAfter = result.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
-  const diff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
-  diff.forEach((o) => removedIds.push(o));
+  const ethicsDiff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
+  ethicsDiff.forEach((o) => removedIds.push(o));
 
   if (
     appDocObj.sections.signature.signedAppDocObjId &&
@@ -557,6 +577,16 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
     removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
   }
 
+  const approvedArrayBefore = appDocObj.approvedAppDocs
+    .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
+    .map((e) => e.approvedAppDocObjId);
+  const approvedArrayAfter = result.approvedAppDocs
+    .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
+    .map((e) => e.approvedAppDocObjId);
+  const approvedDiff = _.difference(approvedArrayBefore, approvedArrayAfter);
+  approvedDiff.forEach((o) => removedIds.push(o));
+
+  console.log('removing docs: ', removedIds);
   return removedIds;
 }
 

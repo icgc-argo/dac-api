@@ -59,7 +59,7 @@ function bulletPoints() {
       <mj-raw>
         <ol style="padding:0 0 0 19; font-family: 'Work Sans', Helvetica, Arial, sans-serif; font-size: 14px;font-weight:400;line-height:24px;color:#000">
           <li style="padding-left: 10px; margin-bottom: 20px">
-            A copy of the application signed by the Data Access Officer will be sent to you shortly.
+          A copy of the application, signed by the Data Access Officer, will be available within the next 5 business days for your records. Download the document using the <span style="font-family: 'Work Sans', Helvetica, Arial, sans-serif; font-size: 14px;font-weight:bold;line-height:24px;color:#000">APPROVED PDF</span> button in the top header of your application.
           </li>
           <li style="padding-left: 10px; margin-bottom: 20px">
             You can access ICGC Controlled Data in the following data portals:

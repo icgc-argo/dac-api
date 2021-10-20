@@ -187,7 +187,7 @@ paths:
       summary: Download application package
       responses:
         '200':
-          description: zip archive includes uploaded signed pdf and any ethics letters associated with the application
+          description: zip archive includes uploaded signed pdf, any ethics letters and any approved pdfs associated with the application
           content:
             application/zip:
               schema:
@@ -201,7 +201,7 @@ paths:
         in: path
         schema:
           type: string
-          enum: ['ETHICS', 'SIGNED_APP']
+          enum: ['ETHICS', 'SIGNED_APP', 'APPROVED_PDF']
       - name: id
         required: true
         in: path
@@ -231,7 +231,7 @@ paths:
         in: path
         schema:
           type: string
-          enum: ['ETHICS', 'SIGNED_APP']
+          enum: ['ETHICS', 'SIGNED_APP', 'APPROVED_PDF']
       - name: id
         required: true
         in: path
@@ -848,3 +848,21 @@ components:
                   format: date
                 meta:
                   $ref: '#/components/schemas/Meta'
+
+            approvedAppDocs:
+              type: array
+              items:
+                type: object
+                properties:
+                  approvedAppDocObjId:
+                    type: string
+                  approvedAppDocName:
+                    type: string
+                  uploadedAtUtc:
+                    type: string
+                    format: date
+                  approvedAtUtc:
+                    type: string
+                    format: date
+                  isCurrent:
+                    type: boolean
