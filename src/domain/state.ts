@@ -29,7 +29,7 @@ import {
   UpdateAuthor,
   AppType,
   ApplicationUpdate,
-  EventType,
+  UpdateEvent,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -685,7 +685,7 @@ function updateAppStateForReviewApplication(
   }
 
   if (updatePart.state == 'REVISIONS REQUESTED') {
-    return transitionToRevisionsRequested(current, updatePart);
+    return transitionToRevisionsRequested(current, updatePart, updatedBy);
   }
 
   if (updatePart.state === 'CLOSED') {
@@ -696,6 +696,7 @@ function updateAppStateForReviewApplication(
 function transitionToRevisionsRequested(
   current: Application,
   updatePart: Partial<UpdateApplication>,
+  updateAuthor: UpdateAuthor,
 ) {
   if (updatePart.revisionRequest == undefined) {
     throw new BadRequest('you need to select at least one specific section');
@@ -711,6 +712,7 @@ function transitionToRevisionsRequested(
   // empty the signature (need to delete the document too.)
   resetSignedDocument(current);
   current.state = 'REVISIONS REQUESTED';
+  current.updates.push(createUpdateEvent(current, updateAuthor, UpdateEvent.REVISIONS_REQUESTED));
   return current;
 }
 
@@ -723,7 +725,7 @@ function resetSignedDocument(current: Application) {
 const createUpdateEvent: (
   app: Application,
   author: UpdateAuthor,
-  updateEvent: EventType,
+  updateEvent: UpdateEvent,
 ) => ApplicationUpdate = (app, author, updateEvent) => {
   // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot at the time the event occurred
   return {
@@ -747,14 +749,14 @@ function transitionToRejected(
 ) {
   current.state = 'REJECTED';
   current.denialReason = updatePart.denialReason || '';
-  current.updates.push(createUpdateEvent(current, rejectedBy, EventType.REJECTED));
+  current.updates.push(createUpdateEvent(current, rejectedBy, UpdateEvent.REJECTED));
   return current;
 }
 
 function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
-  current.updates.push(createUpdateEvent(current, approvedBy, EventType.APPROVED));
+  current.updates.push(createUpdateEvent(current, approvedBy, UpdateEvent.APPROVED));
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
     current.expiresAtUtc = moment().add(2, 'year').toDate();
@@ -770,7 +772,7 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
   current.closedBy = closedBy.id;
   const closedDate = moment().toDate();
   current.closedAtUtc = closedDate;
-  current.updates.push(createUpdateEvent(current, closedBy, EventType.CLOSED));
+  current.updates.push(createUpdateEvent(current, closedBy, UpdateEvent.CLOSED));
   // if expiresAtUtc exists, set to date app was closed
   if (current.expiresAtUtc) {
     current.expiresAtUtc = closedDate;

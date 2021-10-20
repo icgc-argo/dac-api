@@ -85,7 +85,7 @@ export enum AppType {
 }
 
 // to differentiate update events from app State
-export enum EventType {
+export enum UpdateEvent {
   CREATED = 'CREATED',
   SUBMITTED = 'SUBMITTED',
   PAUSED = 'PAUSED',
@@ -99,7 +99,7 @@ export enum EventType {
 
 export interface ApplicationUpdate {
   author: UpdateAuthor;
-  status: EventType;
+  status: UpdateEvent;
   date: Date;
   appType: AppType;
   daysElapsed: number;
