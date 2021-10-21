@@ -588,6 +588,11 @@ export function newApplication(identity: Identity): Partial<Application> {
     isRenewal: false,
     ableToRenew: false,
   };
+
+  const author = getUpdateAuthor(identity.userId, false); // set to false as we already know user scopes have been checked
+  const createdEvent = createUpdateEvent(app as Application, author, UpdateEvent.CREATED);
+  app.updates?.push(createdEvent);
+
   return app;
 }
 
@@ -727,18 +732,20 @@ const createUpdateEvent: (
   author: UpdateAuthor,
   updateEvent: UpdateEvent,
 ) => ApplicationUpdate = (app, author, updateEvent) => {
-  // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot at the time the event occurred
+  const currentDate = moment();
+  const daysElapsed = currentDate.diff(app.lastUpdatedAtUtc, 'days');
+  // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot of these at the time the event occurred
   return {
-    date: new Date(),
+    date: currentDate.toDate(),
     status: updateEvent,
     author,
     appType: app.isRenewal ? AppType.RENEWAL : AppType.NEW,
-    daysElapsed: 0, // TODO real calculation func
+    daysElapsed,
     institution: app.sections.applicant.info.primaryAffiliation,
     country: app.sections.applicant.address.country,
     applicant: app.sections.applicant.info.displayName,
     projectTitle: app.sections.projectInfo.title,
-    ethicsLetterRequired: app.sections.ethicsLetter.declaredAsRequired || null,
+    ethicsLetterRequired: app.sections.ethicsLetter.declaredAsRequired,
   };
 };
 
@@ -836,6 +843,7 @@ function updateAppStateForSignAndSubmit(
       current.submittedAtUtc = new Date();
       // reset revision request section
       current.revisionRequest = emptyRevisionRequest();
+      current.updates.push(createUpdateEvent(current, updatedBy, UpdateEvent.SUBMITTED));
       resetSectionUpdatedFlag(current);
     }
     return current;
