@@ -329,7 +329,7 @@ describe('state manager', () => {
       { id: '1', role: DacoRole.ADMIN },
     );
 
-    const userApp = state.prepareApplicantionForUser(false);
+    const userApp = state.prepareApplicationForUser(false);
     expect(userApp.sections.representative.meta.status).to.eq('REVISIONS REQUESTED');
   });
 });

@@ -124,7 +124,7 @@ export class ApplicationStateManager {
     this.currentApplication = _.cloneDeep(application);
   }
 
-  prepareApplicantionForUser(isReviewer: boolean) {
+  prepareApplicationForUser(isReviewer: boolean) {
     allSections.forEach((s) => {
       this.currentApplication.sections[s].meta.status = calculateViewableSectionStatus(
         this.currentApplication,
@@ -164,6 +164,11 @@ export class ApplicationStateManager {
       current.sections.signature.meta.status = 'INCOMPLETE';
       return current;
     }
+
+    if (type === 'APPROVED_PDF' && isReviewer && current.state === 'APPROVED') {
+      deleteApprovedAppDocument(current, objectId);
+      return current;
+    }
     throw new BadRequest('Operation not allowed');
   }
 
@@ -178,6 +183,7 @@ export class ApplicationStateManager {
     if (isReviewer && current.state !== 'APPROVED') {
       throw new Error('not allowed');
     }
+
     if (type == 'ETHICS') {
       uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
       return current;
@@ -192,6 +198,40 @@ export class ApplicationStateManager {
         return current;
       }
       throw new BadRequest('Cannot upload signed application in this state');
+    }
+
+    if (type === 'APPROVED_PDF') {
+      if (current.state === 'APPROVED' && isReviewer) {
+        const currentApprovedDoc = current.approvedAppDocs.find((doc) => doc.isCurrent);
+        if (currentApprovedDoc) {
+          // if there is an existing approved doc marked isCurrent: true, we remove it and replace with latest upload
+          // this is just a simpler version of updating an doc in the array
+          current.approvedAppDocs = current.approvedAppDocs.filter((doc) => !doc.isCurrent);
+          // if the currentApprovedDoc approval date does not match the app level approval date, we assume it is no longer the most recent approved doc
+          // this is just a safeguard, as the renewal process should reset any current approved doc to isCurrent: false
+          if (currentApprovedDoc.approvedAtUtc.getTime() !== current.approvedAtUtc.getTime()) {
+            currentApprovedDoc.isCurrent = false;
+            current.approvedAppDocs.push(currentApprovedDoc);
+          }
+        }
+        // Add the new uploaded doc to the approved doc list, and mark it as isCurrent: true + app's approvedAtUtc date
+        // this covers:
+        // a) there is no existing approved doc, so we are just adding it
+        // b) there is an existing current approved doc, but the approval date does not match, so the existing doc is demoted and
+        // the new upload becomes the current doc
+        // c) there is an existing current approved doc with the same approval date, and we are just replacing it (this assumes the
+        // admin is uploading a new version)
+        current.approvedAppDocs.push({
+          approvedAppDocObjId: id,
+          uploadedAtUtc: new Date(),
+          approvedAppDocName: name,
+          isCurrent: true,
+          approvedAtUtc: current.approvedAtUtc,
+        });
+
+        return current;
+      }
+      throw new Error('Not allowed');
     }
     throw new BadRequest('Unknown file type');
   }
@@ -634,17 +674,21 @@ function uploadEthicsLetter(
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
   }
+
   const updatePart: Partial<UpdateApplication> = {
     sections: {
       ethicsLetter: {
         // we need to provide the existing items as well for the merge logic to work correctly and not delete array items
-        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs.concat([
-          {
-            name,
-            objectId: id,
-            uploadedAtUtc: new Date(),
-          },
-        ]),
+        approvalLetterDocs: current.sections.ethicsLetter.approvalLetterDocs
+          // remove any current docs that have new docs name
+          .filter((doc) => doc.name !== name)
+          .concat([
+            {
+              name,
+              objectId: id,
+              uploadedAtUtc: new Date(),
+            },
+          ]),
       },
     },
   };
@@ -744,6 +788,15 @@ const createUpdateEvent: (
     ethicsLetterRequired: app.sections.ethicsLetter.declaredAsRequired,
   };
 };
+
+function deleteApprovedAppDocument(current: Application, objectId: string) {
+  if (!current.approvedAppDocs.some((doc) => doc.approvedAppDocObjId === objectId)) {
+    throw new Error(`This id doesn't exist`);
+  }
+  const updatedDocs = current.approvedAppDocs.filter((doc) => doc.approvedAppDocObjId !== objectId);
+  current.approvedAppDocs = updatedDocs;
+  return current;
+}
 
 function transitionToRejected(
   current: Application,

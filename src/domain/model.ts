@@ -93,6 +93,17 @@ const EthicsLetterDocument = new mongoose.Schema(
   { _id: false },
 );
 
+const ApprovedAppDocument = new mongoose.Schema(
+  {
+    approvedAppDocObjId: { type: String, required: false },
+    uploadedAtUtc: { type: Date, required: false },
+    approvedAppDocName: { type: String, required: false },
+    isCurrent: { type: Boolean, required: false },
+    approvedAtUtc: { type: Date, required: false },
+  },
+  { _id: false },
+);
+
 const ApplicationSchema = new mongoose.Schema(
   {
     appNumber: { type: Number, unique: true },
@@ -169,6 +180,7 @@ const ApplicationSchema = new mongoose.Schema(
       },
     },
     updates: [ApplicationUpdate],
+    approvedAppDocs: [ApprovedAppDocument],
   },
   {
     timestamps: {
