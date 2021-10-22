@@ -352,7 +352,8 @@ export function getReadyToSignApp() {
     aims: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     background: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     methodology: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
-    summary: 'aaa bb cc',
+    summary:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum in ex tellus. Vestibulum blandit egestas pharetra. Proin porttitor hendrerit ligula. Aliquam mattis in elit nec dictum. Nam ante neque, cursus ac tortor sit amet, faucibus lacinia metus. Integer vestibulum nulla mauris, a iaculis nisl auctor et. Suspendisse potenti. Nulla porttitor orci ac sapien feugiat, eu rhoncus ante iaculis. Vestibulum id neque sit amet mauris molestie dictum in sit amet odio. Integer mattis enim non ultrices aliquet. Aenean maximus leo lacus, in fringilla ex suscipit eget. Nam felis dolor, bibendum et lobortis sit amet, sodales eu orci. Nunc at elementum ex.',
     title: 'title title title',
     website: 'http://www.institutionWebsite.web',
     publicationsURLs: ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs'],
@@ -399,7 +400,7 @@ export function getRejectedApplication() {
   const state = new ApplicationStateManager(app);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REJECTED',
-    denialReason: 'Your plans to use the data is not accepted.'
+    denialReason: 'Your plans to use the data is not accepted.',
   };
   const result = state.updateApp(updatePart, true, '1');
   expect(result.state).to.eq('REJECTED');
