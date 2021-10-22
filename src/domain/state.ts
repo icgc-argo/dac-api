@@ -133,11 +133,6 @@ export class ApplicationStateManager {
       );
     });
 
-    // if not reviewer don't show audit data
-    if (!isReviewer) {
-      this.currentApplication.updates = [];
-    }
-
     if (this.currentApplication.sections.representative.addressSameAsApplicant) {
       this.currentApplication.sections.representative.address = undefined;
     }

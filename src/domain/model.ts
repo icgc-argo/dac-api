@@ -70,11 +70,11 @@ const RevisionRequest = {
 
 const ApplicationUpdate = new mongoose.Schema(
   {
-    date: { type: Date, required: false }, // calculated
+    date: { type: Date, required: false },
     status: { type: String, required: false },
-    appType: { type: String, required: false }, // renewal or new. calculated
+    appType: { type: String, required: false },
     author: { id: { type: String, required: false }, role: { type: String, required: false } },
-    daysElapsed: { type: Number, required: false }, // calculated
+    daysElapsed: { type: Number, required: false },
     institution: { type: String, required: false },
     country: { type: String, required: false },
     applicant: { type: String, required: false },
