@@ -584,6 +584,50 @@ components:
         country:
           type: string
 
+    UpdateEvent:
+      type: object
+      properties:
+        author:
+          type: object
+          properties:
+            id:
+              type: string
+            role:
+              type: string
+              enum: ['ADMIN', 'SUBMITTER']
+        status:
+          type: string
+          enum:
+            [
+              'CREATED',
+              'SUBMITTED',
+              'PAUSED',
+              'REVISIONS_REQUESTED',
+              'ATTESTED',
+              'APPROVED',
+              'EXPIRED',
+              'REJECTED',
+              'CLOSED',
+            ]
+        date:
+          type: string
+          format: data-time
+        appType:
+          type: string
+          enum: ['NEW', 'RENEWAL']
+        daysElapsed:
+          type: number
+        institution:
+          type: string
+        country:
+          type: string
+        applicant:
+          type: string
+        projectTitle:
+          type: string
+        ethicsLetterRequired:
+          type: boolean
+
     ApplicationSummary:
       type: object
       properties:
@@ -703,6 +747,12 @@ components:
         revisionsRequested:
           type: boolean
           readOnly: true
+        isRenewal:
+          type: boolean
+          readOnly: true
+        ableToRenew:
+          type: boolean
+          readOnly: true
         revisionRequests:
           type: object
           properties:
@@ -721,6 +771,10 @@ components:
             general:
               $ref: '#/components/schemas/RevisionRequest'
 
+        updates:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpdateEvent'
         sections:
           type: object
           properties:

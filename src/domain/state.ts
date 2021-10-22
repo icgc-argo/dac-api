@@ -483,6 +483,7 @@ export function getSearchFieldValues(appDoc: Application) {
     appDoc.sections.applicant.info.googleEmail,
     appDoc.sections.applicant.info.primaryAffiliation,
     appDoc.sections.applicant.address.country,
+    appDoc.isRenewal ? AppType.RENEWAL : AppType.NEW,
   ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
 }
 
@@ -732,7 +733,7 @@ const createUpdateEvent: (
   author: UpdateAuthor,
   updateEvent: UpdateEvent,
 ) => ApplicationUpdate = (app, author, updateEvent) => {
-  const currentDate = moment();
+  const currentDate = moment.utc();
   const daysElapsed = currentDate.diff(app.lastUpdatedAtUtc, 'days');
   // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot of these at the time the event occurred
   return {

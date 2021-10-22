@@ -15,7 +15,6 @@ import {
   Application,
   ApplicationSummary,
   Collaborator,
-  DacoRole,
   SearchResult,
   State,
   UpdateApplication,
