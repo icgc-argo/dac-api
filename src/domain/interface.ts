@@ -113,6 +113,7 @@ export interface ApplicationSummary {
   };
   collaborators?: PersonalInfo[];
   revisionsRequested: boolean;
+  currentApprovedAppDoc: boolean;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
