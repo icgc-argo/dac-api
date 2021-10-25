@@ -98,17 +98,28 @@ export enum UpdateEvent {
   CLOSED = 'CLOSED',
 }
 
-export interface ApplicationUpdate {
-  author: UpdateAuthor;
-  status: UpdateEvent;
-  date: Date;
+interface ApplicationInfo {
   appType: AppType;
-  daysElapsed: number;
   institution: string;
   country: string;
   applicant: string;
   projectTitle: string;
   ethicsLetterRequired: boolean | null;
+}
+
+export interface ApplicationUpdate {
+  author: UpdateAuthor;
+  eventType: UpdateEvent;
+  date: Date;
+  daysElapsed: number;
+  applicationInfo: ApplicationInfo;
+}
+
+export interface UserViewApplicationUpdate {
+  author: Partial<UpdateAuthor>;
+  eventType: UpdateEvent;
+  date: Date;
+  applicationInfo: Partial<ApplicationInfo>;
 }
 
 export interface SearchResult {
@@ -251,7 +262,7 @@ export interface Application {
   };
   // this is intended for human auditing and wouldn't recommend using this for any application logic
   // unless it's revised to fit the case.
-  updates: ApplicationUpdate[];
+  updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
 }
 

@@ -595,7 +595,7 @@ components:
             role:
               type: string
               enum: ['ADMIN', 'SUBMITTER']
-        status:
+        eventType:
           type: string
           enum:
             [
@@ -612,21 +612,24 @@ components:
         date:
           type: string
           format: data-time
-        appType:
-          type: string
-          enum: ['NEW', 'RENEWAL']
         daysElapsed:
           type: number
-        institution:
-          type: string
-        country:
-          type: string
-        applicant:
-          type: string
-        projectTitle:
-          type: string
-        ethicsLetterRequired:
-          type: boolean
+        applicationInfo:
+          type: object
+          properties:
+            appType:
+              type: string
+              enum: ['NEW', 'RENEWAL']
+            institution:
+              type: string
+            country:
+              type: string
+            applicant:
+              type: string
+            projectTitle:
+              type: string
+            ethicsLetterRequired:
+              type: boolean
 
     ApplicationSummary:
       type: object

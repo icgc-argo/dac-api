@@ -261,7 +261,10 @@ export async function create(identity: Identity) {
   appDoc.searchValues = getSearchFieldValues(appDoc);
   await appDoc.save();
   const copy = appDoc.toObject();
-  return copy;
+  const viewableApp = new ApplicationStateManager(copy).prepareApplicationForUser(
+    isAdminOrReviewerResult,
+  );
+  return viewableApp;
 }
 
 export async function updatePartial(

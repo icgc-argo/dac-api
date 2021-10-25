@@ -71,15 +71,17 @@ const RevisionRequest = {
 const ApplicationUpdate = new mongoose.Schema(
   {
     date: { type: Date, required: false },
-    status: { type: String, required: false },
-    appType: { type: String, required: false },
+    eventType: { type: String, required: false },
     author: { id: { type: String, required: false }, role: { type: String, required: false } },
     daysElapsed: { type: Number, required: false },
-    institution: { type: String, required: false },
-    country: { type: String, required: false },
-    applicant: { type: String, required: false },
-    projectTitle: { type: String, required: false },
-    ethicsLetterRequired: { type: Boolean, required: false },
+    applicationInfo: {
+      appType: { type: String, required: false },
+      institution: { type: String, required: false },
+      country: { type: String, required: false },
+      applicant: { type: String, required: false },
+      projectTitle: { type: String, required: false },
+      ethicsLetterRequired: { type: Boolean, required: false },
+    },
   },
   { _id: false },
 );

@@ -30,6 +30,7 @@ import {
   AppType,
   ApplicationUpdate,
   UpdateEvent,
+  UserViewApplicationUpdate,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -137,6 +138,16 @@ export class ApplicationStateManager {
       this.currentApplication.sections.representative.address = undefined;
     }
 
+    if (!isReviewer) {
+      this.currentApplication.updates = this.currentApplication.updates.map(
+        (update: UserViewApplicationUpdate) => ({
+          applicationInfo: { appType: update.applicationInfo.appType },
+          date: update.date,
+          eventType: update.eventType,
+          author: { role: update.author?.role },
+        }),
+      );
+    }
     // calculate the value of revisions requested field for the FE to use it.
     this.currentApplication.revisionsRequested =
       this.currentApplication.state == 'REVISIONS REQUESTED' ||
@@ -777,15 +788,17 @@ const createUpdateEvent: (
   // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot of these at the time the event occurred
   return {
     date: currentDate.toDate(),
-    status: updateEvent,
+    eventType: updateEvent,
     author,
-    appType: app.isRenewal ? AppType.RENEWAL : AppType.NEW,
     daysElapsed,
-    institution: app.sections.applicant.info.primaryAffiliation,
-    country: app.sections.applicant.address.country,
-    applicant: app.sections.applicant.info.displayName,
-    projectTitle: app.sections.projectInfo.title,
-    ethicsLetterRequired: app.sections.ethicsLetter.declaredAsRequired,
+    applicationInfo: {
+      appType: app.isRenewal ? AppType.RENEWAL : AppType.NEW,
+      institution: app.sections.applicant.info.primaryAffiliation,
+      country: app.sections.applicant.address.country,
+      applicant: app.sections.applicant.info.displayName,
+      projectTitle: app.sections.projectInfo.title,
+      ethicsLetterRequired: app.sections.ethicsLetter.declaredAsRequired,
+    },
   };
 };
 
