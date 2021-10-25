@@ -260,8 +260,6 @@ export interface Application {
       signedDocName: string;
     };
   };
-  // this is intended for human auditing and wouldn't recommend using this for any application logic
-  // unless it's revised to fit the case.
   updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
 }
