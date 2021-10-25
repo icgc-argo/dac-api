@@ -20,7 +20,7 @@ import {
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { c } from '../utils/misc';
+import { c, getUpdateAuthor } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
@@ -210,7 +210,10 @@ export async function updateCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.updateCollaborator(collaborator, identity.userId);
+  const result = stateManager.updateCollaborator(
+    collaborator,
+    getUpdateAuthor(identity.userId, isAdminOrReviewerResult),
+  );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 }
 
@@ -258,7 +261,10 @@ export async function create(identity: Identity) {
   appDoc.searchValues = getSearchFieldValues(appDoc);
   await appDoc.save();
   const copy = appDoc.toObject();
-  return copy;
+  const viewableApp = new ApplicationStateManager(copy).prepareApplicationForUser(
+    isAdminOrReviewerResult,
+  );
+  return viewableApp;
 }
 
 export async function updatePartial(
@@ -277,7 +283,11 @@ export async function updatePartial(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const updatedApp = stateManager.updateApp(appPart, isReviewer, identity.userId);
+  const updatedApp = stateManager.updateApp(
+    appPart,
+    isReviewer,
+    getUpdateAuthor(identity.userId, isReviewer),
+  );
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
   const stateChanged = appDocObj.state != updatedApp.state;
   const config = await getAppConfig();
@@ -404,7 +414,6 @@ export async function search(params: SearchParams, identity: Identity): Promise<
     DRAFT: 0,
     EXPIRED: 0,
     REJECTED: 0,
-    RENEWING: 0,
     REVIEW: 0,
     'REVISIONS REQUESTED': 0,
     'SIGN AND SUBMIT': 0,

@@ -584,6 +584,53 @@ components:
         country:
           type: string
 
+    UpdateEvent:
+      type: object
+      properties:
+        author:
+          type: object
+          properties:
+            id:
+              type: string
+            role:
+              type: string
+              enum: ['ADMIN', 'SUBMITTER']
+        eventType:
+          type: string
+          enum:
+            [
+              'CREATED',
+              'SUBMITTED',
+              'PAUSED',
+              'REVISIONS_REQUESTED',
+              'ATTESTED',
+              'APPROVED',
+              'EXPIRED',
+              'REJECTED',
+              'CLOSED',
+            ]
+        date:
+          type: string
+          format: data-time
+        daysElapsed:
+          type: number
+        applicationInfo:
+          type: object
+          properties:
+            appType:
+              type: string
+              enum: ['NEW', 'RENEWAL']
+            institution:
+              type: string
+            country:
+              type: string
+            applicant:
+              type: string
+            projectTitle:
+              type: string
+            ethicsLetterRequired:
+              type: boolean
+
     ApplicationSummary:
       type: object
       properties:
@@ -599,7 +646,6 @@ components:
             - REVISIONS REQUESTED
             - REJECTED
             - APPROVED
-            - RENEWING
             - CLOSED
             - EXPIRED
         applicant:
@@ -665,7 +711,6 @@ components:
             - REVISIONS REQUESTED
             - REJECTED
             - APPROVED
-            - RENEWING
             - CLOSED
             - EXPIRED
         submitterId:
@@ -705,6 +750,12 @@ components:
         revisionsRequested:
           type: boolean
           readOnly: true
+        isRenewal:
+          type: boolean
+          readOnly: true
+        ableToRenew:
+          type: boolean
+          readOnly: true
         revisionRequests:
           type: object
           properties:
@@ -723,6 +774,10 @@ components:
             general:
               $ref: '#/components/schemas/RevisionRequest'
 
+        updates:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpdateEvent'
         sections:
           type: object
           properties:
