@@ -1,4 +1,4 @@
-import { mergeKnown } from '../utils/misc';
+import { getUpdateAuthor, mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
 import _ from 'lodash';
@@ -25,6 +25,12 @@ import {
   UploadDocumentType,
   RevisionRequestUpdate,
   CollaboratorDto,
+  DacoRole,
+  UpdateAuthor,
+  AppType,
+  ApplicationUpdate,
+  UpdateEvent,
+  UserViewApplicationUpdate,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -110,10 +116,6 @@ const stateToLockedSectionsMap: Record<
     APPLICANT: allSections,
     REVIEWER: allSections,
   },
-  RENEWING: {
-    APPLICANT: [],
-    REVIEWER: [],
-  },
 };
 
 export class ApplicationStateManager {
@@ -132,15 +134,20 @@ export class ApplicationStateManager {
       );
     });
 
-    // if not reviewer don't show audit data
-    if (!isReviewer) {
-      this.currentApplication.updates = [];
-    }
-
     if (this.currentApplication.sections.representative.addressSameAsApplicant) {
       this.currentApplication.sections.representative.address = undefined;
     }
 
+    if (!isReviewer) {
+      this.currentApplication.updates = this.currentApplication.updates.map(
+        (update: UserViewApplicationUpdate) => ({
+          applicationInfo: { appType: update.applicationInfo.appType },
+          date: update.date,
+          eventType: update.eventType,
+          author: { role: update.author?.role },
+        }),
+      );
+    }
     // calculate the value of revisions requested field for the FE to use it.
     this.currentApplication.revisionsRequested =
       this.currentApplication.state == 'REVISIONS REQUESTED' ||
@@ -160,7 +167,7 @@ export class ApplicationStateManager {
       throw new Error('not allowed');
     }
     if (type == 'ETHICS') {
-      return deleteEthicsLetterDocument(current, objectId, updatedBy);
+      return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(updatedBy, isReviewer));
     }
 
     if (type == 'SIGNED_APP' && current.state == 'SIGN AND SUBMIT') {
@@ -189,7 +196,7 @@ export class ApplicationStateManager {
     }
 
     if (type == 'ETHICS') {
-      uploadEthicsLetter(current, id, name, updatedBy);
+      uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
       return current;
     }
 
@@ -257,14 +264,14 @@ export class ApplicationStateManager {
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
-      updateAppStateForReturnedApplication(current, {}, updatedBy);
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
     }
 
     onAppUpdate(current);
     return current;
   }
 
-  updateCollaborator(collaborator: Collaborator, updatedBy: string) {
+  updateCollaborator(collaborator: Collaborator, updatedBy: UpdateAuthor) {
     const current = this.currentApplication;
     // collaborators updating is only allowed in these three states
     if (!canUpdateCollaborators(current)) {
@@ -418,14 +425,14 @@ export class ApplicationStateManager {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
       // trigger transition in application state and sign and submit check
-      updateAppStateForReturnedApplication(current, {}, updatedBy);
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
     }
 
     onAppUpdate(current);
     return current;
   }
 
-  updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean, updatedBy: string) {
+  updateApp(updatePart: Partial<UpdateApplication>, isReviewer: boolean, updatedBy: UpdateAuthor) {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
@@ -470,7 +477,11 @@ function canUpdateCollaborators(current: Application) {
   );
 }
 
-function deleteEthicsLetterDocument(current: Application, objectId: string, updatedBy: string) {
+function deleteEthicsLetterDocument(
+  current: Application,
+  objectId: string,
+  updatedBy: UpdateAuthor,
+) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
   }
@@ -518,6 +529,7 @@ export function getSearchFieldValues(appDoc: Application) {
     appDoc.sections.applicant.info.googleEmail,
     appDoc.sections.applicant.info.primaryAffiliation,
     appDoc.sections.applicant.address.country,
+    appDoc.isRenewal ? AppType.RENEWAL : AppType.NEW,
   ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
 }
 
@@ -620,7 +632,14 @@ export function newApplication(identity: Identity): Partial<Application> {
       },
     },
     updates: [],
+    isRenewal: false,
+    ableToRenew: false,
   };
+
+  const author = getUpdateAuthor(identity.userId, false); // set to false as we already know user scopes have been checked
+  const createdEvent = createUpdateEvent(app as Application, author, UpdateEvent.CREATED);
+  app.updates?.push(createdEvent);
+
   return app;
 }
 
@@ -657,7 +676,12 @@ export function emptyRevisionRequest() {
   };
 }
 
-function uploadEthicsLetter(current: Application, id: string, name: string, updatedBy: string) {
+function uploadEthicsLetter(
+  current: Application,
+  id: string,
+  name: string,
+  updatedBy: UpdateAuthor,
+) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
   }
@@ -699,7 +723,7 @@ function uploadEthicsLetter(current: Application, id: string, name: string, upda
 function updateAppStateForReviewApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
 ) {
   // if the admin has chosen a custom expiry date and asked to save
   if (updatePart.expiresAtUtc) {
@@ -717,7 +741,7 @@ function updateAppStateForReviewApplication(
   }
 
   if (updatePart.state == 'REVISIONS REQUESTED') {
-    return transitionToRevisionsRequested(current, updatePart);
+    return transitionToRevisionsRequested(current, updatePart, updatedBy);
   }
 
   if (updatePart.state === 'CLOSED') {
@@ -728,6 +752,7 @@ function updateAppStateForReviewApplication(
 function transitionToRevisionsRequested(
   current: Application,
   updatePart: Partial<UpdateApplication>,
+  updateAuthor: UpdateAuthor,
 ) {
   if (updatePart.revisionRequest == undefined) {
     throw new BadRequest('you need to select at least one specific section');
@@ -743,6 +768,7 @@ function transitionToRevisionsRequested(
   // empty the signature (need to delete the document too.)
   resetSignedDocument(current);
   current.state = 'REVISIONS REQUESTED';
+  current.updates.push(createUpdateEvent(current, updateAuthor, UpdateEvent.REVISIONS_REQUESTED));
   return current;
 }
 
@@ -751,6 +777,30 @@ function resetSignedDocument(current: Application) {
   current.sections.signature.uploadedAtUtc = undefined;
   current.sections.signature.signedDocName = '';
 }
+
+const createUpdateEvent: (
+  app: Application,
+  author: UpdateAuthor,
+  updateEvent: UpdateEvent,
+) => ApplicationUpdate = (app, author, updateEvent) => {
+  const currentDate = moment.utc();
+  const daysElapsed = currentDate.diff(app.lastUpdatedAtUtc, 'days');
+  // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot of these at the time the event occurred
+  return {
+    date: currentDate.toDate(),
+    eventType: updateEvent,
+    author,
+    daysElapsed,
+    applicationInfo: {
+      appType: app.isRenewal ? AppType.RENEWAL : AppType.NEW,
+      institution: app.sections.applicant.info.primaryAffiliation,
+      country: app.sections.applicant.address.country,
+      applicant: app.sections.applicant.info.displayName,
+      projectTitle: app.sections.projectInfo.title,
+      ethicsLetterRequired: app.sections.ethicsLetter.declaredAsRequired,
+    },
+  };
+};
 
 function deleteApprovedAppDocument(current: Application, objectId: string) {
   if (!current.approvedAppDocs.some((doc) => doc.approvedAppDocObjId === objectId)) {
@@ -764,26 +814,18 @@ function deleteApprovedAppDocument(current: Application, objectId: string) {
 function transitionToRejected(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  rejectedBy: string,
+  rejectedBy: UpdateAuthor,
 ) {
   current.state = 'REJECTED';
   current.denialReason = updatePart.denialReason || '';
-  current.updates.push({
-    date: new Date(),
-    type: 'REJECTED',
-    info: { rejectedBy },
-  });
+  current.updates.push(createUpdateEvent(current, rejectedBy, UpdateEvent.REJECTED));
   return current;
 }
 
-function transitionToApproved(current: Application, approvedBy: string) {
+function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
-  current.updates.push({
-    date: new Date(),
-    type: 'APPROVED',
-    info: { approvedBy },
-  });
+  current.updates.push(createUpdateEvent(current, approvedBy, UpdateEvent.APPROVED));
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
     current.expiresAtUtc = moment().add(2, 'year').toDate();
@@ -791,14 +833,15 @@ function transitionToApproved(current: Application, approvedBy: string) {
   return current;
 }
 
-const transitionToClosed: (current: Application, closedBy: string) => Application = (
+const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Application = (
   current,
   closedBy,
 ) => {
   current.state = 'CLOSED';
-  current.closedBy = closedBy;
+  current.closedBy = closedBy.id;
   const closedDate = moment().toDate();
   current.closedAtUtc = closedDate;
+  current.updates.push(createUpdateEvent(current, closedBy, UpdateEvent.CLOSED));
   // if expiresAtUtc exists, set to date app was closed
   if (current.expiresAtUtc) {
     current.expiresAtUtc = closedDate;
@@ -848,7 +891,7 @@ function markSectionsForReview(current: Application) {
 function updateAppStateForSignAndSubmit(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -862,6 +905,7 @@ function updateAppStateForSignAndSubmit(
       current.submittedAtUtc = new Date();
       // reset revision request section
       current.revisionRequest = emptyRevisionRequest();
+      current.updates.push(createUpdateEvent(current, updatedBy, UpdateEvent.SUBMITTED));
       resetSectionUpdatedFlag(current);
     }
     return current;
@@ -906,7 +950,7 @@ function updateAppStateForApprovedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
   isReviewer: boolean,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -921,7 +965,7 @@ function updateAppStateForApprovedApplication(
 function updateAppStateForReturnedApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -959,7 +1003,7 @@ function updateAppStateForReturnedApplication(
 function updateAppStateForDraftApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
-  updatedBy: string,
+  updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {

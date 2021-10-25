@@ -70,9 +70,18 @@ const RevisionRequest = {
 
 const ApplicationUpdate = new mongoose.Schema(
   {
-    info: { type: {}, required: false },
-    type: { type: String, required: false },
     date: { type: Date, required: false },
+    eventType: { type: String, required: false },
+    author: { id: { type: String, required: false }, role: { type: String, required: false } },
+    daysElapsed: { type: Number, required: false },
+    applicationInfo: {
+      appType: { type: String, required: false },
+      institution: { type: String, required: false },
+      country: { type: String, required: false },
+      applicant: { type: String, required: false },
+      projectTitle: { type: String, required: false },
+      ethicsLetterRequired: { type: Boolean, required: false },
+    },
   },
   { _id: false },
 );
@@ -111,6 +120,8 @@ const ApplicationSchema = new mongoose.Schema(
     closedBy: { type: String, required: false },
     denialReason: { type: String, required: false },
     searchValues: { type: [String], index: true, required: false },
+    isRenewal: { type: Boolean, required: true },
+    ableToRenew: { type: Boolean, required: true },
     revisionRequest: {
       applicant: RevisionRequest,
       representative: RevisionRequest,
