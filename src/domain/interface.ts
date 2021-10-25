@@ -158,6 +158,7 @@ export interface ApplicationSummary {
   };
   collaborators?: PersonalInfo[];
   revisionsRequested: boolean;
+  currentApprovedAppDoc: boolean;
   isRenewal: boolean;
 }
 

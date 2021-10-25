@@ -695,6 +695,9 @@ components:
         revisionsRequested:
           type: boolean
           readOnly: true
+        currentApprovedAppDoc:
+          type: boolean
+          readOnly: true
 
     Application:
       type: object

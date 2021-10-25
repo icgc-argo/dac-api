@@ -483,6 +483,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
         revisionsRequested: wasInRevisionRequestState(app),
+        currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
       } as ApplicationSummary),
   );
 
@@ -630,6 +631,8 @@ function mapField(field: string) {
       return `sections.ethicsLetter.declaredAsRequired`;
     case 'country':
       return `sections.applicant.address.country`;
+    case 'currentApprovedAppDoc':
+      return 'approvedAppDocs.isCurrent';
     default:
       return field;
   }
