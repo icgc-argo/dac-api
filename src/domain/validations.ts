@@ -155,13 +155,14 @@ export function validateProjectInfo(app: Application) {
     validateRequired(app.sections.projectInfo.title, 'title', errors),
     validateUrl(app.sections.projectInfo.website, 'website', errors),
     validateRequired(app.sections.projectInfo.background, 'background', errors),
-    validateWordLength(app.sections.projectInfo.background, 200, 'background', errors),
+    validateWordMax(app.sections.projectInfo.background, 200, 'background', errors),
     validateRequired(app.sections.projectInfo.aims, 'aims', errors),
-    validateWordLength(app.sections.projectInfo.aims, 200, 'aims', errors),
+    validateWordMax(app.sections.projectInfo.aims, 200, 'aims', errors),
     validateRequired(app.sections.projectInfo.summary, 'summary', errors),
-    validateWordLength(app.sections.projectInfo.summary, 200, 'summary', errors),
+    validateWordMax(app.sections.projectInfo.summary, 200, 'summary', errors),
+    validateWordMin(app.sections.projectInfo.summary, 100, 'summary', errors),
     validateRequired(app.sections.projectInfo.methodology, 'methodology', errors),
-    validateWordLength(app.sections.projectInfo.methodology, 200, 'methodology', errors),
+    validateWordMax(app.sections.projectInfo.methodology, 200, 'methodology', errors),
     validatePublications(app.sections.projectInfo.publicationsURLs, errors),
   ];
   const valid = !validations.some((x) => x == false);
@@ -248,11 +249,22 @@ function validatePublications(publications: string[], errors: SectionError[]) {
   return !validations.some((x) => !x);
 }
 
-function validateWordLength(val: string, length: number, name: string, errors: SectionError[]) {
+function validateWordMax(val: string, length: number, name: string, errors: SectionError[]) {
   if (val && countWords(val) > length) {
     errors.push({
       field: name,
       message: `field ${name} exceeded allowed number of words`,
+    });
+    return false;
+  }
+  return true;
+}
+
+function validateWordMin(val: string, length: number, name: string, errors: SectionError[]) {
+  if (val && countWords(val) < length) {
+    errors.push({
+      field: name,
+      message: `field ${name} didn't meet minimum number of words`,
     });
     return false;
   }
