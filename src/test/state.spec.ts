@@ -3,6 +3,7 @@ import {
   Address,
   Application,
   Collaborator,
+  DacoRole,
   TERMS_AGREEMENT_NAME,
   UpdateApplication,
 } from '../domain/interface';
@@ -45,7 +46,7 @@ describe('state manager', () => {
         },
       },
       false,
-      '1',
+      { id: '1', role: DacoRole.SUBMITTER },
     );
 
     expect(result.sections.terms.agreement.accepted).to.eq(true);
@@ -72,7 +73,7 @@ describe('state manager', () => {
       },
     };
 
-    const result = state.updateApp(updatePart, false, '1');
+    const result = state.updateApp(updatePart, false, { id: '1', role: DacoRole.SUBMITTER });
     expect(result.sections.applicant.info).to.include(updatePart.sections?.applicant?.info);
   });
 
@@ -90,7 +91,7 @@ describe('state manager', () => {
       },
     };
 
-    state.updateApp(updatePart, false, '1');
+    state.updateApp(updatePart, false, { id: '1', role: DacoRole.SUBMITTER });
     expect(state.currentApplication.sections.representative.address?.country).to.eq('Palestine');
 
     const updatePart2: Partial<UpdateApplication> = {
@@ -101,7 +102,7 @@ describe('state manager', () => {
       },
     };
 
-    state.updateApp(updatePart2, false, '1');
+    state.updateApp(updatePart2, false, { id: '1', role: DacoRole.SUBMITTER });
     expect(state.currentApplication.sections.representative.address).to.include({
       building: '',
       cityAndProvince: '',
@@ -267,7 +268,7 @@ describe('state manager', () => {
         },
       },
       false,
-      '1',
+      { id: '1', role: DacoRole.SUBMITTER },
     );
     expect(app3.sections.collaborators.list[0].meta.status).to.eq('INCOMPLETE');
 
@@ -275,7 +276,7 @@ describe('state manager', () => {
     collab.id = 'collab-1';
     collab.info.primaryAffiliation = 'OICR';
     const state3 = new ApplicationStateManager(app3);
-    const app4 = state3.updateCollaborator(collab, 'user123');
+    const app4 = state3.updateCollaborator(collab, { id: 'user123', role: DacoRole.SUBMITTER });
     expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
   });
 
@@ -325,7 +326,7 @@ describe('state manager', () => {
         },
       },
       true,
-      '1',
+      { id: '1', role: DacoRole.ADMIN },
     );
 
     const userApp = state.prepareApplicationForUser(false);
@@ -352,7 +353,8 @@ export function getReadyToSignApp() {
     aims: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     background: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
     methodology: 'paspd apsd ]a]]eromad  lsad lasd llaal  asdld  aslld',
-    summary: 'aaa bb cc',
+    summary:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum in ex tellus. Vestibulum blandit egestas pharetra. Proin porttitor hendrerit ligula. Aliquam mattis in elit nec dictum. Nam ante neque, cursus ac tortor sit amet, faucibus lacinia metus. Integer vestibulum nulla mauris, a iaculis nisl auctor et. Suspendisse potenti. Nulla porttitor orci ac sapien feugiat, eu rhoncus ante iaculis. Vestibulum id neque sit amet mauris molestie dictum in sit amet odio. Integer mattis enim non ultrices aliquet. Aenean maximus leo lacus, in fringilla ex suscipit eget. Nam felis dolor, bibendum et lobortis sit amet, sodales eu orci. Nunc at elementum ex.',
     title: 'title title title',
     website: 'http://www.institutionWebsite.web',
     publicationsURLs: ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs'],
@@ -363,7 +365,7 @@ export function getReadyToSignApp() {
       sections: updatePart,
     },
     false,
-    '1',
+    { id: '1', role: DacoRole.SUBMITTER },
   );
   expect(newState.state).to.eq('SIGN AND SUBMIT');
   return newState;
@@ -377,7 +379,7 @@ export function getAppInReview() {
     state: 'REVIEW',
   };
   const state2 = new ApplicationStateManager(appAfterSign);
-  const result = state2.updateApp(updatePart, false, '1');
+  const result = state2.updateApp(updatePart, false, { id: '1', role: DacoRole.SUBMITTER });
   expect(result.state).to.eq('REVIEW');
   return result;
 }
@@ -388,7 +390,7 @@ export function getApprovedApplication() {
   const updatePart: Partial<UpdateApplication> = {
     state: 'APPROVED',
   };
-  const result = state.updateApp(updatePart, true, '1');
+  const result = state.updateApp(updatePart, true, { id: '1', role: DacoRole.ADMIN });
   expect(result.state).to.eq('APPROVED');
   expect(result.approvedAtUtc).to.not.eq(undefined);
   return result;
@@ -401,7 +403,7 @@ export function getRejectedApplication() {
     state: 'REJECTED',
     denialReason: 'Your plans to use the data is not accepted.',
   };
-  const result = state.updateApp(updatePart, true, '1');
+  const result = state.updateApp(updatePart, true, { id: '1', role: DacoRole.ADMIN });
   expect(result.state).to.eq('REJECTED');
   expect(result.lastUpdatedAtUtc).to.not.eq(undefined);
   return result;
@@ -435,7 +437,7 @@ export function getAppInRevisionRequested() {
     },
     state: 'REVISIONS REQUESTED',
   };
-  const result = state.updateApp(update, true, '1');
+  const result = state.updateApp(update, true, { id: '1', role: DacoRole.ADMIN });
   expect(result.state).to.eq('REVISIONS REQUESTED');
   return result;
 }

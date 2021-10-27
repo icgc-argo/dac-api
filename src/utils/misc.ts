@@ -1,6 +1,13 @@
 import _, { uniqBy } from 'lodash';
 import { Request } from 'express';
-import { State, PersonalInfo, ApplicationSummary, CSVFileHeader } from '../domain/interface';
+import {
+  State,
+  PersonalInfo,
+  ApplicationSummary,
+  CSVFileHeader,
+  DacoRole,
+  UpdateAuthor,
+} from '../domain/interface';
 import moment from 'moment';
 import { search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
@@ -65,7 +72,7 @@ export const getSearchParams = (req: Request, defaultSort?: string): SearchParam
     page,
     pageSize,
     sortBy,
-    includeStats
+    includeStats,
   };
 };
 
@@ -138,3 +145,11 @@ export const encrypt: (
     console.warn('Encryption failure: ', err);
   }
 };
+
+export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor = (
+  id,
+  isReviewer,
+) => ({
+  id,
+  role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
+});

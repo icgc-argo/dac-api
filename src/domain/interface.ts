@@ -4,7 +4,6 @@ export type State =
   | 'REVIEW'
   | 'REVISIONS REQUESTED'
   | 'APPROVED'
-  | 'RENEWING'
   | 'REJECTED'
   | 'CLOSED'
   | 'EXPIRED';
@@ -71,10 +70,56 @@ export type CollaboratorDto = {
   type: 'student' | 'personnel';
 };
 
-interface ApplicationUpdate {
-  info: any;
-  type: string;
+export enum DacoRole {
+  SUBMITTER = 'SUBMITTER',
+  ADMIN = 'ADMIN',
+}
+
+export type UpdateAuthor = {
+  id: string;
+  role: DacoRole;
+};
+
+export enum AppType {
+  NEW = 'NEW',
+  RENEWAL = 'RENEWAL',
+}
+
+// to differentiate update events from app State
+export enum UpdateEvent {
+  CREATED = 'CREATED',
+  SUBMITTED = 'SUBMITTED',
+  PAUSED = 'PAUSED',
+  REVISIONS_REQUESTED = 'REVISIONS_REQUESTED',
+  ATTESTED = 'ATTESTED',
+  APPROVED = 'APPROVED',
+  EXPIRED = 'EXPIRED',
+  REJECTED = 'REJECTED',
+  CLOSED = 'CLOSED',
+}
+
+interface ApplicationInfo {
+  appType: AppType;
+  institution: string;
+  country: string;
+  applicant: string;
+  projectTitle: string;
+  ethicsLetterRequired: boolean | null;
+}
+
+export interface ApplicationUpdate {
+  author: UpdateAuthor;
+  eventType: UpdateEvent;
   date: Date;
+  daysElapsed: number;
+  applicationInfo: ApplicationInfo;
+}
+
+export interface UserViewApplicationUpdate {
+  author: Partial<UpdateAuthor>;
+  eventType: UpdateEvent;
+  date: Date;
+  applicationInfo: Partial<ApplicationInfo>;
 }
 
 export interface SearchResult {
@@ -113,6 +158,8 @@ export interface ApplicationSummary {
   };
   collaborators?: PersonalInfo[];
   revisionsRequested: boolean;
+  currentApprovedAppDoc: boolean;
+  isRenewal: boolean;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -146,6 +193,8 @@ export interface Application {
   lastUpdatedAtUtc?: Date;
   createdAtUtc?: Date;
   searchValues: string[];
+  isRenewal: boolean;
+  ableToRenew: boolean;
   // calculated flag to indicate that revisions are being requested if any of the revisionRequest sections is true
   // and this flag will be reset before each review since we do reset the revision request portion.
   revisionsRequested: boolean;
@@ -212,9 +261,7 @@ export interface Application {
       signedDocName: string;
     };
   };
-  // this is intended for human auditing and wouldn't recommend using this for any application logic
-  // unless it's revised to fit the case.
-  updates: ApplicationUpdate[];
+  updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
 }
 
