@@ -4,16 +4,17 @@ import {
   State,
   PersonalInfo,
   ApplicationSummary,
-  CSVFileHeader,
+  ColumnHeader,
   DacoRole,
   UpdateAuthor,
+  ApplicationUpdate,
 } from '../domain/interface';
 import moment from 'moment';
 import { search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
-import { getAppConfig } from '../config';
 import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, IV_LENGTH } from './constants';
+import { ApplicationDocument } from '../domain/model';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -109,7 +110,7 @@ export const createDacoCSVFile = async (req: Request) => {
     })
     .flat();
 
-  const fileHeaders: CSVFileHeader[] = [
+  const fileHeaders: ColumnHeader[] = [
     { accessor: 'userName', name: 'USER NAME' },
     { accessor: 'openId', name: 'OPENID' },
     { accessor: 'email', name: 'EMAIL' },
@@ -153,3 +154,66 @@ export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor 
   id,
   role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
 });
+
+const appHistoryTSVColumns: ColumnHeader[] = [
+  { name: 'Application #', accessor: 'appId' },
+  {
+    name: 'Date of Status Change',
+    accessor: 'date',
+    format: (value: string) => moment(value).format('YYYY-MM-DD'),
+  },
+  { name: 'Application Status', accessor: 'eventType' },
+  { name: 'Application Type', accessor: 'appType' },
+  { name: 'Action Performed By', accessor: 'role' },
+  { name: 'Days Since Last Status Change', accessor: 'daysElapsed' },
+  { name: 'Institution', accessor: 'institution' },
+  { name: 'Country', accessor: 'country' },
+  { name: 'Applicant', accessor: 'applicant' },
+  { name: 'Project Title', accessor: 'projectTitle' },
+  { name: 'Ethics Letter', accessor: 'ethicsLetterRequired' },
+];
+
+const sortByDate = (a: any, b: any) => {
+  return b.date.getTime() - a.date.getTime();
+};
+
+export const createAppHistoryTSV = (results: ApplicationDocument[]) => {
+  const sortedUpdates = results
+    .map((app: ApplicationDocument) => {
+      return (app.updates as ApplicationUpdate[]).map((update: ApplicationUpdate) => {
+        return {
+          appId: app.appId,
+          daysElapsed: update.daysElapsed,
+          institution: update.applicationInfo.institution,
+          country: update.applicationInfo.country,
+          applicant: update.applicationInfo.applicant,
+          projectTitle: update.applicationInfo.projectTitle,
+          appType: update.applicationInfo.appType,
+          ethicsLetterRequired:
+            update.applicationInfo.ethicsLetterRequired === null
+              ? ''
+              : update.applicationInfo.ethicsLetterRequired
+              ? 'Yes'
+              : 'No',
+          eventType: update.eventType,
+          role: update.author.role,
+          date: update.date,
+        };
+      });
+    })
+    .flat()
+    .sort(sortByDate);
+
+  const headerRow: string = appHistoryTSVColumns.map((header) => header.name).join('\t');
+  const tsvRows = sortedUpdates.map((row: any) => {
+    const dataRow: string[] = appHistoryTSVColumns.map((header) => {
+      if (header.format) {
+        return header.format(row[header.accessor as string]);
+      }
+      return row[header.accessor as string];
+    });
+    return dataRow.join('\t');
+  });
+
+  return [headerRow, ...tsvRows].join('\n');
+};

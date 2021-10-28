@@ -520,6 +520,17 @@ export const searchCollaboratorApplications = async (identity: Identity) => {
   );
 };
 
+export const getApplicationUpdates = async () => {
+  // do not return empty arrays. this is for apps existing before reset_updates_list migration
+  // this state should not be possible for applications created after this migration
+  const apps = await ApplicationModel.find(
+    { updates: { $ne: [] } },
+    { appId: 1, updates: 1 },
+  ).exec();
+
+  return apps;
+};
+
 export async function deleteApp(id: string, identity: Identity) {
   await ApplicationModel.deleteOne({
     appId: id,
