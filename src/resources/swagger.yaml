@@ -455,8 +455,9 @@ paths:
             text/tsv:
               schema:
                 type: string
-              example: 'Application #  Date of Status Change  Application Status  Application Type  Action Performed By  Days Since Last Status Change  Institution Country Applicant Project Title Ethics Letter'
-
+              example: |
+                "Application #  Date of Status Change  Application Status  Application Type  Action Performed By  Days Since Last Status Change  Institution Country Applicant Project Title Ethics Letter
+                DACO-1  2021-10-21  CREATED NEW SUBMITTER 0 OICR  Canada  Johnny Applicant  Research Title  Yes"
 tags:
   - name: Health
     description: Service status monitoring
