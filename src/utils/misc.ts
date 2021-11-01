@@ -155,7 +155,7 @@ export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor 
   role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
 });
 
-const appHistoryTSVColumns: ColumnHeader[] = [
+export const appHistoryTSVColumns: ColumnHeader[] = [
   { name: 'Application #', accessor: 'appId' },
   {
     name: 'Date of Status Change',
@@ -173,47 +173,6 @@ const appHistoryTSVColumns: ColumnHeader[] = [
   { name: 'Ethics Letter', accessor: 'ethicsLetterRequired' },
 ];
 
-const sortByDate = (a: any, b: any) => {
+export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();
-};
-
-export const createAppHistoryTSV = (results: ApplicationDocument[]) => {
-  const sortedUpdates = results
-    .map((app: ApplicationDocument) => {
-      return (app.updates as ApplicationUpdate[]).map((update: ApplicationUpdate) => {
-        return {
-          appId: app.appId,
-          daysElapsed: update.daysElapsed,
-          institution: update.applicationInfo.institution,
-          country: update.applicationInfo.country,
-          applicant: update.applicationInfo.applicant,
-          projectTitle: update.applicationInfo.projectTitle,
-          appType: update.applicationInfo.appType,
-          ethicsLetterRequired:
-            update.applicationInfo.ethicsLetterRequired === null
-              ? ''
-              : update.applicationInfo.ethicsLetterRequired
-              ? 'Yes'
-              : 'No',
-          eventType: update.eventType,
-          role: update.author.role,
-          date: update.date,
-        };
-      });
-    })
-    .flat()
-    .sort(sortByDate);
-
-  const headerRow: string = appHistoryTSVColumns.map((header) => header.name).join('\t');
-  const tsvRows = sortedUpdates.map((row: any) => {
-    const dataRow: string[] = appHistoryTSVColumns.map((header) => {
-      if (header.format) {
-        return header.format(row[header.accessor as string]);
-      }
-      return row[header.accessor as string];
-    });
-    return dataRow.join('\t');
-  });
-
-  return [headerRow, ...tsvRows].join('\n');
 };

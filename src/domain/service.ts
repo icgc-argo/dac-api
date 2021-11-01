@@ -14,13 +14,14 @@ import {
 import {
   Application,
   ApplicationSummary,
+  ApplicationUpdate,
   Collaborator,
   SearchResult,
   State,
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { c, getUpdateAuthor } from '../utils/misc';
+import { appHistoryTSVColumns, c, getUpdateAuthor, sortByDate } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
@@ -610,6 +611,47 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   console.log('removing docs: ', removedIds);
   return removedIds;
 }
+
+export const createAppHistoryTSV = (results: ApplicationDocument[]) => {
+  const sortedUpdates = results
+    .map((app: ApplicationDocument) => {
+      return (app.updates as ApplicationUpdate[]).map((update: ApplicationUpdate) => {
+        return {
+          appId: app.appId,
+          daysElapsed: update.daysElapsed,
+          institution: update.applicationInfo.institution,
+          country: update.applicationInfo.country,
+          applicant: update.applicationInfo.applicant,
+          projectTitle: update.applicationInfo.projectTitle,
+          appType: update.applicationInfo.appType,
+          ethicsLetterRequired:
+            update.applicationInfo.ethicsLetterRequired === null
+              ? ''
+              : update.applicationInfo.ethicsLetterRequired
+              ? 'Yes'
+              : 'No',
+          eventType: update.eventType,
+          role: update.author.role,
+          date: update.date,
+        };
+      });
+    })
+    .flat()
+    .sort(sortByDate);
+
+  const headerRow: string = appHistoryTSVColumns.map((header) => header.name).join('\t');
+  const tsvRows = sortedUpdates.map((row: any) => {
+    const dataRow: string[] = appHistoryTSVColumns.map((header) => {
+      if (header.format) {
+        return header.format(row[header.accessor as string]);
+      }
+      return row[header.accessor as string];
+    });
+    return dataRow.join('\t');
+  });
+
+  return [headerRow, ...tsvRows].join('\n');
+};
 
 export async function sendEmail(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
