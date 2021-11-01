@@ -7,14 +7,12 @@ import {
   ColumnHeader,
   DacoRole,
   UpdateAuthor,
-  ApplicationUpdate,
 } from '../domain/interface';
 import moment from 'moment';
 import { search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
 import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, IV_LENGTH } from './constants';
-import { ApplicationDocument } from '../domain/model';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -154,24 +152,6 @@ export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor 
   id,
   role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
 });
-
-export const appHistoryTSVColumns: ColumnHeader[] = [
-  { name: 'Application #', accessor: 'appId' },
-  {
-    name: 'Date of Status Change',
-    accessor: 'date',
-    format: (value: string) => moment(value).format('YYYY-MM-DD'),
-  },
-  { name: 'Application Status', accessor: 'eventType' },
-  { name: 'Application Type', accessor: 'appType' },
-  { name: 'Action Performed By', accessor: 'role' },
-  { name: 'Days Since Last Status Change', accessor: 'daysElapsed' },
-  { name: 'Institution', accessor: 'institution' },
-  { name: 'Country', accessor: 'country' },
-  { name: 'Applicant', accessor: 'applicant' },
-  { name: 'Project Title', accessor: 'projectTitle' },
-  { name: 'Ethics Letter', accessor: 'ethicsLetterRequired' },
-];
 
 export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();

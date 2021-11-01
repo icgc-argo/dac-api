@@ -4,6 +4,7 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
+import moment from 'moment';
 import _ from 'lodash';
 import {
   ApplicationStateManager,
@@ -16,12 +17,13 @@ import {
   ApplicationSummary,
   ApplicationUpdate,
   Collaborator,
+  ColumnHeader,
   SearchResult,
   State,
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { appHistoryTSVColumns, c, getUpdateAuthor, sortByDate } from '../utils/misc';
+import { c, getUpdateAuthor, sortByDate } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
@@ -612,7 +614,8 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   return removedIds;
 }
 
-export const createAppHistoryTSV = (results: ApplicationDocument[]) => {
+export const createAppHistoryTSV = async () => {
+  const results = await getApplicationUpdates();
   const sortedUpdates = results
     .map((app: ApplicationDocument) => {
       return (app.updates as ApplicationUpdate[]).map((update: ApplicationUpdate) => {
@@ -638,6 +641,24 @@ export const createAppHistoryTSV = (results: ApplicationDocument[]) => {
     })
     .flat()
     .sort(sortByDate);
+
+  const appHistoryTSVColumns: ColumnHeader[] = [
+    { name: 'Application #', accessor: 'appId' },
+    {
+      name: 'Date of Status Change',
+      accessor: 'date',
+      format: (value: string) => moment(value).format('YYYY-MM-DD'),
+    },
+    { name: 'Application Status', accessor: 'eventType' },
+    { name: 'Application Type', accessor: 'appType' },
+    { name: 'Action Performed By', accessor: 'role' },
+    { name: 'Days Since Last Status Change', accessor: 'daysElapsed' },
+    { name: 'Institution', accessor: 'institution' },
+    { name: 'Country', accessor: 'country' },
+    { name: 'Applicant', accessor: 'applicant' },
+    { name: 'Project Title', accessor: 'projectTitle' },
+    { name: 'Ethics Letter', accessor: 'ethicsLetterRequired' },
+  ];
 
   const headerRow: string = appHistoryTSVColumns.map((header) => header.name).join('\t');
   const tsvRows = sortedUpdates.map((row: any) => {

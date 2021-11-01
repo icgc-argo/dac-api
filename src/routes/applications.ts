@@ -14,7 +14,6 @@ import {
   getApplicationAssetsAsStream,
   sendEmail,
   searchCollaboratorApplications,
-  getApplicationUpdates,
   createAppHistoryTSV,
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
@@ -290,8 +289,7 @@ const createApplicationsRouter = (
     '/export/application-history/',
     authFilter([config.auth.REVIEW_SCOPE]),
     wrapAsync(async (req: Request, res: Response) => {
-      const apps = await getApplicationUpdates();
-      const tsv = createAppHistoryTSV(apps);
+      const tsv = await createAppHistoryTSV();
       const currentDate = moment().tz('America/Toronto').format(`YYYY-MM-DD`);
       res.set('Content-Type', 'text/tsv');
       res.status(200).attachment(`daco-app-history-${currentDate}.tsv`).send(tsv);
