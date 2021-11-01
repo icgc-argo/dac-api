@@ -332,9 +332,10 @@ export enum FileFormat {
   DACO_FILE_FORMAT = 'daco-file-format',
 }
 
-export type CSVFileHeader = {
+export type ColumnHeader = {
   accessor?: string;
   name: string;
+  format?: (value: any) => any;
 };
 
 export const TERMS_AGREEMENT_NAME = 'introduction_agree_to_terms';

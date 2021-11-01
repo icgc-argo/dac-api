@@ -14,11 +14,11 @@ import {
   getApplicationAssetsAsStream,
   sendEmail,
   searchCollaboratorApplications,
+  createAppHistoryTSV,
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import { Identity } from '@overture-stack/ego-token-middleware';
-import crypto from 'crypto';
 
 import { FileFormat, UpdateApplication, UploadDocumentType } from '../domain/interface';
 import { AppConfig, getAppConfig } from '../config';
@@ -27,9 +27,7 @@ import { Storage } from '../storage';
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 // https://www.archiverjs.com/docs/quickstart
-import archiver from 'archiver';
 import moment from 'moment';
-import { Readable } from 'stream';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
 import JSZip from 'jszip';
 
@@ -284,6 +282,17 @@ const createApplicationsRouter = (
       } else {
         res.status(400).send('An unknown error occurred.');
       }
+    }),
+  );
+
+  router.get(
+    '/export/application-history/',
+    authFilter([config.auth.REVIEW_SCOPE]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const tsv = await createAppHistoryTSV();
+      const currentDate = moment().tz('America/Toronto').format(`YYYY-MM-DD`);
+      res.set('Content-Type', 'text/tsv');
+      res.status(200).attachment(`daco-app-history-${currentDate}.tsv`).send(tsv);
     }),
   );
 
