@@ -4,6 +4,7 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
+import moment from 'moment';
 import _ from 'lodash';
 import {
   ApplicationStateManager,
@@ -14,13 +15,15 @@ import {
 import {
   Application,
   ApplicationSummary,
+  ApplicationUpdate,
   Collaborator,
+  ColumnHeader,
   SearchResult,
   State,
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { c, getUpdateAuthor } from '../utils/misc';
+import { c, getUpdateAuthor, sortByDate } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
@@ -520,6 +523,17 @@ export const searchCollaboratorApplications = async (identity: Identity) => {
   );
 };
 
+export const getApplicationUpdates = async () => {
+  // do not return empty arrays. this is for apps existing before reset_updates_list migration
+  // this state should not be possible for applications created after this migration
+  const apps = await ApplicationModel.find(
+    { updates: { $ne: [] } },
+    { appId: 1, updates: 1 },
+  ).exec();
+
+  return apps;
+};
+
 export async function deleteApp(id: string, identity: Identity) {
   await ApplicationModel.deleteOne({
     appId: id,
@@ -599,6 +613,66 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   console.log('removing docs: ', removedIds);
   return removedIds;
 }
+
+export const createAppHistoryTSV = async () => {
+  const results = await getApplicationUpdates();
+  const sortedUpdates = results
+    .map((app: ApplicationDocument) => {
+      return (app.updates as ApplicationUpdate[]).map((update: ApplicationUpdate) => {
+        return {
+          appId: app.appId,
+          daysElapsed: update.daysElapsed,
+          institution: update.applicationInfo.institution,
+          country: update.applicationInfo.country,
+          applicant: update.applicationInfo.applicant,
+          projectTitle: update.applicationInfo.projectTitle,
+          appType: update.applicationInfo.appType,
+          ethicsLetterRequired:
+            update.applicationInfo.ethicsLetterRequired === null
+              ? ''
+              : update.applicationInfo.ethicsLetterRequired
+              ? 'Yes'
+              : 'No',
+          eventType: update.eventType,
+          role: update.author.role,
+          date: update.date,
+        };
+      });
+    })
+    .flat()
+    .sort(sortByDate);
+
+  const appHistoryTSVColumns: ColumnHeader[] = [
+    { name: 'Application #', accessor: 'appId' },
+    {
+      name: 'Date of Status Change',
+      accessor: 'date',
+      format: (value: string) => moment(value).format('YYYY-MM-DD'),
+    },
+    { name: 'Status', accessor: 'eventType' },
+    { name: 'Type', accessor: 'appType' },
+    { name: 'Action Performed By', accessor: 'role' },
+    { name: 'Days Since Last Status Change', accessor: 'daysElapsed' },
+    { name: 'Institution', accessor: 'institution' },
+    { name: 'Country', accessor: 'country' },
+    { name: 'Applicant', accessor: 'applicant' },
+    { name: 'Project Title', accessor: 'projectTitle' },
+    { name: 'Ethics Letter', accessor: 'ethicsLetterRequired' },
+  ];
+
+  const headerRow: string = appHistoryTSVColumns.map((header) => header.name).join('\t');
+  const tsvRows = sortedUpdates.map((row: any) => {
+    const dataRow: string[] = appHistoryTSVColumns.map((header) => {
+      if (header.format) {
+        return header.format(row[header.accessor as string]);
+      }
+      return row[header.accessor as string];
+    });
+    return dataRow.join('\t');
+  });
+
+  return [headerRow, ...tsvRows].join('\n');
+};
 
 export async function sendEmail(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,

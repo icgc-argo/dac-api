@@ -39,8 +39,6 @@ import {
   validateCollaborator,
   validateDataAccessAgreement,
   validateEthicsLetterSection,
-  validateNoMatchingApplicant,
-  validatePrimaryAffiliationMatching,
   validateProjectInfo,
   validateRepresentativeSection,
 } from './validations';

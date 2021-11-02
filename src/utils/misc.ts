@@ -4,7 +4,7 @@ import {
   State,
   PersonalInfo,
   ApplicationSummary,
-  CSVFileHeader,
+  ColumnHeader,
   DacoRole,
   UpdateAuthor,
 } from '../domain/interface';
@@ -12,7 +12,6 @@ import moment from 'moment';
 import { search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
-import { getAppConfig } from '../config';
 import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, IV_LENGTH } from './constants';
 
 export function c<T>(val: T | undefined | null): T {
@@ -109,7 +108,7 @@ export const createDacoCSVFile = async (req: Request) => {
     })
     .flat();
 
-  const fileHeaders: CSVFileHeader[] = [
+  const fileHeaders: ColumnHeader[] = [
     { accessor: 'userName', name: 'USER NAME' },
     { accessor: 'openId', name: 'OPENID' },
     { accessor: 'email', name: 'EMAIL' },
@@ -153,3 +152,7 @@ export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor 
   id,
   role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
 });
+
+export const sortByDate = (a: any, b: any) => {
+  return b.date.getTime() - a.date.getTime();
+};
