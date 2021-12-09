@@ -1,7 +1,7 @@
 import { getUpdateAuthor, mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
-import _ from 'lodash';
+import { cloneDeep, last } from 'lodash';
 import {
   Application,
   TERMS_AGREEMENT_NAME,
@@ -120,7 +120,7 @@ export class ApplicationStateManager {
   public readonly currentApplication: Application;
 
   constructor(application: Application) {
-    this.currentApplication = _.cloneDeep(application);
+    this.currentApplication = cloneDeep(application);
   }
 
   prepareApplicationForUser(isReviewer: boolean) {
@@ -781,11 +781,24 @@ const createUpdateEvent: (
   author: UpdateAuthor,
   updateEvent: UpdateEvent,
 ) => ApplicationUpdate = (app, author, updateEvent) => {
-  const currentDate = moment.utc();
-  const daysElapsed = currentDate.diff(app.lastUpdatedAtUtc, 'days');
+  // lastUpdatedUtc won't work for the purpose of the daysElapsed value, as it tracks ANY change to the app, not our specified event types
+  // we are looking for the diff between this new update and whatever the last update event was
+  const currentDate = moment.utc().toDate();
+  // get most recent event
+  const lastUpdateEvent = last(app.updates);
+  // daysElapsed will be 0 if there is no previous update event
+  let daysElapsed = 0;
+  if (lastUpdateEvent) {
+    // create new moment values so currentDate is not mutated
+    // convert to start of day to ignore the time when calculating the diff: https://stackoverflow.com/a/9130040
+    const begin = moment.utc(currentDate).startOf('day');
+    const end = moment.utc(lastUpdateEvent.date).startOf('day');
+    daysElapsed = begin.diff(end, 'days');
+  }
+
   // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot of these at the time the event occurred
   return {
-    date: currentDate.toDate(),
+    date: currentDate,
     eventType: updateEvent,
     author,
     daysElapsed,
