@@ -1,4 +1,11 @@
 import { Router, Request, Response, RequestHandler } from 'express';
+import { Transporter } from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import moment from 'moment';
+import { Identity } from '@overture-stack/ego-token-middleware';
+import JSZip from 'jszip';
+import _ from 'lodash';
+
 import wrapAsync from '../utils/wrapAsync';
 import {
   create,
@@ -18,18 +25,10 @@ import {
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
-import { Identity } from '@overture-stack/ego-token-middleware';
-
 import { FileFormat, UpdateApplication, UploadDocumentType } from '../domain/interface';
 import { AppConfig, getAppConfig } from '../config';
-import _ from 'lodash';
 import { Storage } from '../storage';
-import { Transporter } from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
-// https://www.archiverjs.com/docs/quickstart
-import moment from 'moment';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
-import JSZip from 'jszip';
 
 export interface IRequest extends Request {
   identity: Identity;
