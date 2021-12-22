@@ -7,6 +7,7 @@ const Meta = new mongoose.Schema(
   {
     status: { type: String, required: false },
     updated: { type: Boolean, required: false },
+    lastUpdatedAtUtc: { type: Date, required: false },
     errorsList: [
       {
         field: { type: String, required: false },

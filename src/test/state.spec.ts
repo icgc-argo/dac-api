@@ -124,6 +124,7 @@ describe('state manager', () => {
         meta: {
           errorsList: [],
           status: 'COMPLETE',
+          lastUpdatedAtUtc: new Date(),
         },
         info: {
           firstName: 'Bashar',
@@ -158,6 +159,7 @@ describe('state manager', () => {
         meta: {
           errorsList: [],
           status: 'COMPLETE',
+          lastUpdatedAtUtc: new Date(),
         },
         info: {
           firstName: 'Bashar',
@@ -184,6 +186,7 @@ describe('state manager', () => {
         meta: {
           errorsList: [],
           status: 'COMPLETE',
+          lastUpdatedAtUtc: new Date(),
         },
         info: {
           firstName: 'Bashar1',
@@ -223,6 +226,7 @@ describe('state manager', () => {
       meta: {
         errorsList: [],
         status: 'COMPLETE',
+        lastUpdatedAtUtc: new Date(),
       },
       info: {
         firstName: 'Bashar',
