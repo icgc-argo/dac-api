@@ -332,6 +332,52 @@ describe('state manager', () => {
     const userApp = state.prepareApplicationForUser(false);
     expect(userApp.sections.representative.meta.status).to.eq('REVISIONS REQUESTED');
   });
+
+  it('should change to sign and submit when revisions requested on signature section only', () => {
+    const app: Application = getAppInReview();
+    const state = new ApplicationStateManager(app);
+    const updated = state.updateApp(
+      {
+        state: 'REVISIONS REQUESTED',
+        revisionRequest: {
+          applicant: {
+            requested: false,
+            details: '',
+          },
+          representative: {
+            requested: false,
+            details: '',
+          },
+          projectInfo: {
+            requested: false,
+            details: '',
+          },
+          collaborators: {
+            requested: false,
+            details: '',
+          },
+          ethicsLetter: {
+            requested: false,
+            details: '',
+          },
+          signature: {
+            requested: true,
+            details: 'signature needs to be signed',
+          },
+          general: {
+            requested: false,
+            details: '',
+          },
+        },
+      },
+      true,
+      { id: '1', role: DacoRole.ADMIN },
+    );
+
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.sections.signature.meta.status).to.eq('REVISIONS REQUESTED');
+    expect(userApp.state).to.eq('SIGN AND SUBMIT');
+  });
 });
 
 export function getReadyToSignApp() {
