@@ -82,6 +82,7 @@ describe('emails', () => {
         meta: {
           errorsList: [],
           status: 'COMPLETE',
+          lastUpdatedAtUtc: new Date(),
         },
         info: {
           firstName: 'Bashar',
@@ -111,6 +112,7 @@ describe('emails', () => {
         meta: {
           errorsList: [],
           status: 'COMPLETE',
+          lastUpdatedAtUtc: new Date(),
         },
         info: {
           firstName: 'Bashar',
@@ -145,6 +147,5 @@ describe('emails', () => {
       const email = await rejected(app, stub);
       console.log(email.emailMjml);
     });
-
   });
 });

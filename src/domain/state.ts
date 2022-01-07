@@ -25,12 +25,13 @@ import {
   UploadDocumentType,
   RevisionRequestUpdate,
   CollaboratorDto,
-  DacoRole,
   UpdateAuthor,
   AppType,
   ApplicationUpdate,
   UpdateEvent,
   UserViewApplicationUpdate,
+  Meta,
+  Sections,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -204,6 +205,7 @@ export class ApplicationStateManager {
         current.sections.signature.uploadedAtUtc = new Date();
         current.sections.signature.signedDocName = name;
         current.sections.signature.meta.status = 'COMPLETE';
+        updateSectionLastUpdatedAt(current, 'signature');
         return current;
       }
       throw new BadRequest('Cannot upload signed application in this state');
@@ -264,7 +266,7 @@ export class ApplicationStateManager {
     } else if (current.state == 'REVISIONS REQUESTED') {
       updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
     }
-
+    updateSectionLastUpdatedAt(current, 'collaborators');
     onAppUpdate(current);
     return current;
   }
@@ -323,6 +325,7 @@ export class ApplicationStateManager {
     updated.meta.errorsList = [];
     current.sections.collaborators.list.push(updated);
     current.sections.collaborators.meta.updated = true;
+    updateSectionLastUpdatedAt(current, 'collaborators');
     updateCollaboratorsSectionState(current);
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
@@ -412,12 +415,13 @@ export class ApplicationStateManager {
     // to a correct state when it becomes valid again
     // example:
     // application is in REVISIONS REQUESTED and Collaborators.status = 'REVISIONS REQUESTED'
-    // applicant modifes primary affiliation in Applicant section.
+    // applicant modifies primary affiliation in Applicant section.
     // collaborators section becomes 'INCOMPLETE'
     // applicant reverts change of primary affiliation in applicant section
     // collaborators section goes back to REVISIONS REQUESTED if updated = false, and goes to REVISIONS MADE if updated = true
     // same logic applies for representative and any cross section dependency that may be implemented later.
     current.sections.collaborators.meta.updated = true;
+    updateSectionLastUpdatedAt(current, 'collaborators');
     updateCollaboratorsSectionState(current);
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
@@ -509,6 +513,7 @@ function deleteEthicsLetterDocument(
     throw new Error('Cannot delete ethics letter in this application state');
   }
 
+  updateSectionLastUpdatedAt(current, 'ethicsLetter');
   onAppUpdate(current);
   return current;
 }
@@ -532,6 +537,11 @@ export function getSearchFieldValues(appDoc: Application) {
 }
 
 export function newApplication(identity: Identity): Partial<Application> {
+  const pristineMeta = {
+    status: 'PRISTINE' as SectionStatus,
+    errorsList: [],
+  } as Meta;
+
   const app: Partial<Application> = {
     state: 'DRAFT',
     submitterId: identity.userId,
@@ -539,26 +549,26 @@ export function newApplication(identity: Identity): Partial<Application> {
     revisionRequest: emptyRevisionRequest(),
     sections: {
       collaborators: {
-        meta: { status: 'PRISTINE', errorsList: [] },
+        meta: pristineMeta,
         list: [],
       },
       appendices: {
-        meta: { status: 'PRISTINE', errorsList: [] },
+        meta: pristineMeta,
         agreements: getAppendixAgreements(),
       },
       dataAccessAgreement: {
-        meta: { status: 'PRISTINE', errorsList: [] },
+        meta: pristineMeta,
         agreements: getDataAccessAgreement(),
       },
       terms: {
-        meta: { status: 'PRISTINE', errorsList: [] },
+        meta: pristineMeta,
         agreement: {
           accepted: false,
           name: TERMS_AGREEMENT_NAME,
         },
       },
       applicant: {
-        meta: { status: 'PRISTINE', errorsList: [] },
+        meta: pristineMeta,
         address: {
           building: '',
           cityAndProvince: '',
@@ -588,13 +598,13 @@ export function newApplication(identity: Identity): Partial<Application> {
         title: '',
         summary: '',
         publicationsURLs: [],
-        meta: { status: 'PRISTINE', errorsList: [] },
+        meta: pristineMeta,
       },
       ethicsLetter: {
         // tslint:disable-next-line:no-null-keyword
         declaredAsRequired: null,
         approvalLetterDocs: [],
-        meta: { status: 'PRISTINE', errorsList: [] },
+        meta: pristineMeta,
       },
       representative: {
         address: {
@@ -618,7 +628,7 @@ export function newApplication(identity: Identity): Partial<Application> {
           suffix: '',
           title: '',
         },
-        meta: { status: 'PRISTINE', errorsList: [] },
+        meta: pristineMeta,
       },
       signature: {
         meta: {
@@ -713,6 +723,7 @@ function uploadEthicsLetter(
   } else {
     throw new Error('cannot update ethics letter at this state');
   }
+  updateSectionLastUpdatedAt(current, 'ethicsLetter');
   onAppUpdate(current);
 
   return current;
@@ -765,12 +776,25 @@ function transitionToRevisionsRequested(
 
   // empty the signature (need to delete the document too.)
   resetSignedDocument(current);
-  current.state = 'REVISIONS REQUESTED';
+
+  const sectionsWithRevisions = Object.keys(current.revisionRequest).filter(
+    (section) => current.revisionRequest[section as keyof RevisionRequestUpdate].requested,
+  );
+  const revisionsOnSignatureSectionOnly =
+    sectionsWithRevisions.length === 1 && sectionsWithRevisions[0] === 'signature';
+
+  // put into SIGN AND SUBMIT state when just the signature section has revisions requested to allow user to upload a new signed doc
+  current.state = revisionsOnSignatureSectionOnly ? 'SIGN AND SUBMIT' : 'REVISIONS REQUESTED';
   current.updates.push(createUpdateEvent(current, updateAuthor, UpdateEvent.REVISIONS_REQUESTED));
   return current;
 }
 
 function resetSignedDocument(current: Application) {
+  // only update this date if there is an existing signed doc to reset.
+  // prevents the update from happening before the signature section is touched
+  if (current.sections.signature.signedAppDocObjId) {
+    updateSectionLastUpdatedAt(current, 'signature');
+  }
   current.sections.signature.signedAppDocObjId = '';
   current.sections.signature.uploadedAtUtc = undefined;
   current.sections.signature.signedDocName = '';
@@ -874,7 +898,7 @@ function validateRevisionRequest(revisionRequest: RevisionRequestUpdate) {
 }
 
 function markSectionsForReview(current: Application) {
-  const atleastOneNonSignatureRequeted = Object.keys(current.revisionRequest)
+  const atleastOneNonSignatureRequested = Object.keys(current.revisionRequest)
     .map((k) => k as keyof RevisionRequestUpdate)
     .filter((k) => k != 'general' && k != 'signature')
     .some((k) => current.revisionRequest[k]?.requested);
@@ -891,7 +915,7 @@ function markSectionsForReview(current: Application) {
   // special handling for the signature section since it should be done last thing
   // and we want to disable it until other sections are updated.
   if (current.revisionRequest.signature.requested) {
-    current.sections.signature.meta.status = atleastOneNonSignatureRequeted
+    current.sections.signature.meta.status = atleastOneNonSignatureRequested
       ? 'REVISIONS REQUESTED DISABLED'
       : 'REVISIONS REQUESTED';
   } else {
@@ -1059,12 +1083,18 @@ function toSignAndSubmit(current: Application, signatureSectionState: SectionSta
   current.state = 'SIGN AND SUBMIT';
 }
 
+function updateSectionLastUpdatedAt(app: Application, sectionName: keyof Sections) {
+  app.sections[sectionName].meta.lastUpdatedAtUtc = new Date();
+  return app;
+}
+
 function updateAppendices(updatePart: Partial<UpdateApplication>, current: Application) {
   if (updatePart.sections?.appendices?.agreements) {
     mergeAgreementArray(
       current.sections.appendices.agreements,
       updatePart.sections.appendices.agreements,
     );
+    updateSectionLastUpdatedAt(current, 'appendices');
     validateAppendices(current);
   }
 }
@@ -1075,6 +1105,7 @@ function updateDataAccessAgreements(updatePart: Partial<UpdateApplication>, curr
       current.sections.dataAccessAgreement.agreements,
       updatePart.sections.dataAccessAgreement.agreements,
     );
+    updateSectionLastUpdatedAt(current, 'dataAccessAgreement');
     validateDataAccessAgreement(current);
   }
 }
@@ -1098,6 +1129,7 @@ function updateEthics(
     if (!current.sections.ethicsLetter.declaredAsRequired) {
       current.sections.ethicsLetter.approvalLetterDocs = [];
     }
+    updateSectionLastUpdatedAt(current, 'ethicsLetter');
     validateEthicsLetterSection(current);
   }
 }
@@ -1108,6 +1140,7 @@ function updateProjectInfo(updatePart: Partial<UpdateApplication>, current: Appl
       current.sections.projectInfo,
       updatePart.sections.projectInfo,
     );
+    updateSectionLastUpdatedAt(current, 'projectInfo');
     validateProjectInfo(current);
   }
 }
@@ -1120,6 +1153,7 @@ function updateTerms(updatePart: Partial<UpdateApplication>, current: Applicatio
     } else {
       current.sections.terms.meta.status = 'INCOMPLETE';
     }
+    updateSectionLastUpdatedAt(current, 'terms');
   }
 }
 
@@ -1152,11 +1186,12 @@ function updateRepresentative(updatePart: Partial<UpdateApplication>, current: A
     }
     const currentState = current.sections.representative.meta.status;
     current.sections.representative.meta.updated = true;
-    updateRepresentitaveSectionState(current);
+    updateSectionLastUpdatedAt(current, 'representative');
+    updateRepresentativeSectionState(current);
   }
 }
 
-function updateRepresentitaveSectionState(app: Application) {
+function updateRepresentativeSectionState(app: Application) {
   const { isValid, errors } = validateRepresentativeSection(app);
   app.sections.representative.meta.errorsList = errors;
   const revRequested = app.revisionRequest.representative.requested;
@@ -1204,12 +1239,13 @@ function updateApplicantSection(updatePart: Partial<UpdateApplication>, current:
       current.sections.applicant.info.displayName =
         info.firstName.trim() + ' ' + info.lastName.trim();
     }
+    updateSectionLastUpdatedAt(current, 'applicant');
     validateApplicantSection(current);
 
     // trigger a validation for representative section since there is a dependency on primary affiliation
     // only if there is data there already
     if (current.sections.representative.meta.status !== 'PRISTINE') {
-      updateRepresentitaveSectionState(current);
+      updateRepresentativeSectionState(current);
     }
 
     // trigger a validation for collaborators section since there is a dependency on primary affiliation, institutionEmail and googleEmail

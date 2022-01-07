@@ -21,11 +21,13 @@ export type SectionStatus =
 
 export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP' | 'APPROVED_PDF';
 
-interface Meta {
+export interface Meta {
   updated?: boolean;
   status: SectionStatus;
   errorsList: SectionError[];
+  lastUpdatedAtUtc?: Date;
 }
+
 export interface RevisionRequest {
   details: string;
   requested: boolean;
@@ -178,6 +180,60 @@ type ApprovedAppDocument = {
   approvedAtUtc: Date;
 };
 
+export interface Sections {
+  terms: {
+    meta: Meta;
+    agreement: AgreementItem;
+  };
+  applicant: {
+    meta: Meta;
+    info: PersonalInfo;
+    address: Address;
+  };
+  representative: {
+    meta: Meta;
+    info: PersonalInfo;
+    addressSameAsApplicant: boolean;
+    address: Address | undefined;
+  };
+  collaborators: {
+    meta: Meta;
+    list: Collaborator[];
+  };
+  projectInfo: {
+    meta: Meta;
+    title: string;
+    website: string;
+    background: string;
+    aims: string;
+    summary: string;
+    methodology: string;
+    publicationsURLs: string[];
+  };
+  ethicsLetter: {
+    meta: Meta;
+    declaredAsRequired: boolean | null;
+    approvalLetterDocs: {
+      objectId: string;
+      uploadedAtUtc: Date;
+      name: string;
+    }[];
+  };
+  dataAccessAgreement: {
+    meta: Meta;
+    agreements: AgreementItem[];
+  };
+  appendices: {
+    meta: Meta;
+    agreements: AgreementItem[];
+  };
+  signature: {
+    meta: Meta;
+    signedAppDocObjId: string;
+    uploadedAtUtc?: Date;
+    signedDocName: string;
+  };
+}
 export interface Application {
   appId: string;
   appNumber: number;
@@ -207,60 +263,7 @@ export interface Application {
     ethicsLetter: RevisionRequest;
     general: RevisionRequest;
   };
-  sections: {
-    terms: {
-      meta: Meta;
-      agreement: AgreementItem;
-    };
-    applicant: {
-      meta: Meta;
-      info: PersonalInfo;
-      address: Address;
-    };
-    representative: {
-      meta: Meta;
-      info: PersonalInfo;
-      addressSameAsApplicant: boolean;
-      address: Address | undefined;
-    };
-    collaborators: {
-      meta: Meta;
-      list: Collaborator[];
-    };
-    projectInfo: {
-      meta: Meta;
-      title: string;
-      website: string;
-      background: string;
-      aims: string;
-      summary: string;
-      methodology: string;
-      publicationsURLs: string[];
-    };
-    ethicsLetter: {
-      meta: Meta;
-      declaredAsRequired: boolean | null;
-      approvalLetterDocs: {
-        objectId: string;
-        uploadedAtUtc: Date;
-        name: string;
-      }[];
-    };
-    dataAccessAgreement: {
-      meta: Meta;
-      agreements: AgreementItem[];
-    };
-    appendices: {
-      meta: Meta;
-      agreements: AgreementItem[];
-    };
-    signature: {
-      meta: Meta;
-      signedAppDocObjId: string;
-      uploadedAtUtc?: Date;
-      signedDocName: string;
-    };
-  };
+  sections: Sections;
   updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
 }
