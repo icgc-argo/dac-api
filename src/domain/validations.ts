@@ -226,27 +226,78 @@ function validateEmail(val: string, name: string, errors: SectionError[]) {
 }
 
 function validatePublications(publications: string[], errors: SectionError[]) {
-  if (publications.length < 3) {
-    errors.push({
-      field: 'publications',
-      message: 'you need at least 3 unique publications URLs',
+  const minPublicationsURLs = 3;
+  const fieldErrors = {
+    duplicate: 'Publications URLs must be unique.',
+    empty: 'This field is required.',
+    invalid: 'Invalid publication URL.',
+    none: '',
+  };
+  const sectionErrors = {
+    duplicate: 'Publications URLs must be unique.',
+    empty: 'Publication URL fields are required.',
+    incomplete: `You need at least ${minPublicationsURLs} valid, unique publications URLs.`,
+    invalid: 'Publications URLs must be valid URLs.',
+    none: '',
+    other: 'There was a problem with your submission.',
+  };
+
+  // handle individual field errors
+
+  const fieldValidations = publications.map((publication: string, index: number) => {
+    const isInvalidURL: boolean = !!validator.single(publication, {
+      url: true,
     });
-    return false;
-  }
-  const hasDuplicatePubs =
-    uniq(publications.filter((v) => !!v?.trim())).length < publications.length;
-  if (hasDuplicatePubs) {
-    errors.push({
-      field: 'publications',
-      message: 'Publication URLS must be unique',
-    });
-    return false;
-  }
-  const validations = publications.map((p: string, index: number) => {
-    return validateUrl(p, `publications.${index}`, errors);
+    const isDuplicate: boolean = publications.filter((p) => p === publication).length > 1;
+
+    const message =
+      publication === ''
+        ? fieldErrors.empty
+        : isInvalidURL
+        ? fieldErrors.invalid
+        : isDuplicate
+        ? fieldErrors.duplicate
+        : fieldErrors.none;
+
+    if (message) {
+      errors.push({
+        field: `publications.${index}`,
+        message,
+      });
+    }
+
+    return message;
   });
 
-  return !validations.some((x) => !x);
+  // handle publications URLs section errors
+
+  const isIncomplete =
+    fieldValidations.filter((f) => f === fieldErrors.none).length < minPublicationsURLs;
+  const hasEmptyFields = fieldValidations.some((f) => f === fieldErrors.empty);
+  const hasInvalidURLs = fieldValidations.some((f) => f === fieldErrors.invalid);
+  const hasDuplicates = fieldValidations.some((f) => f === fieldErrors.duplicate);
+  const hasErrors = fieldValidations.some((f) => f !== fieldErrors.none);
+
+  const message = isIncomplete
+    ? sectionErrors.incomplete
+    : hasEmptyFields
+    ? sectionErrors.empty
+    : hasInvalidURLs
+    ? sectionErrors.invalid
+    : hasDuplicates
+    ? sectionErrors.duplicate
+    : hasErrors
+    ? sectionErrors.other
+    : sectionErrors.none;
+
+  if (message) {
+    errors.push({
+      field: 'publications',
+      message,
+    });
+  }
+
+  return !message;
 }
 
 function validateWordMax(val: string, length: number, name: string, errors: SectionError[]) {
