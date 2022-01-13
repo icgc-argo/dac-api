@@ -6,10 +6,9 @@ import {
   Collaborator,
   PersonalInfo,
   SectionError,
-  SectionStatus,
 } from './interface';
 import validator from 'validate.js';
-import _, { uniq } from 'lodash';
+import _ from 'lodash';
 import { countriesList } from '../utils/constants';
 import { c } from '../utils/misc';
 
@@ -189,7 +188,12 @@ export function validatePrimaryAffiliationMatching(
   return false;
 }
 
-function validateUrl(val: string | undefined, name: string, errors: SectionError[]) {
+function validateUrl(
+  val: string | undefined,
+  name: string,
+  errors: SectionError[],
+  customMessage?: string,
+) {
   if (!val) {
     return true;
   }
@@ -200,7 +204,7 @@ function validateUrl(val: string | undefined, name: string, errors: SectionError
   if (error) {
     errors.push({
       field: name,
-      message: 'Value is not a valid URL',
+      message: customMessage || 'Value is not a valid URL',
     });
     return false;
   }
@@ -226,27 +230,37 @@ function validateEmail(val: string, name: string, errors: SectionError[]) {
 }
 
 function validatePublications(publications: string[], errors: SectionError[]) {
-  if (publications.length < 3) {
+  if (publications.filter((v) => !!v?.trim()).length < 3) {
     errors.push({
       field: 'publications',
       message: 'you need at least 3 unique publications URLs',
     });
-    return false;
   }
-  const hasDuplicatePubs =
-    uniq(publications.filter((v) => !!v?.trim())).length < publications.length;
-  if (hasDuplicatePubs) {
-    errors.push({
-      field: 'publications',
-      message: 'Publication URLS must be unique',
+
+  const duplicateUrls = publications
+    .map((field: any) => field.trim())
+    .filter((value, index, array) => value && array.indexOf(value) !== index);
+
+  if (duplicateUrls.length > 0) {
+    publications.map((pub, i) => {
+      if (duplicateUrls.includes(pub)) {
+        errors.push({
+          field: `publications.${i}`,
+          message: 'Publication URLs must be unique.',
+        });
+      }
     });
-    return false;
   }
   const validations = publications.map((p: string, index: number) => {
-    return validateUrl(p, `publications.${index}`, errors);
+    return validateUrl(
+      p,
+      `publications.${index}`,
+      errors,
+      'Please enter a valid url. Must begin with http:// or https://, for example, https://platform.icgc-argo.org/.',
+    );
   });
 
-  return !validations.some((x) => !x);
+  return errors.length === 0 && !validations.some((x) => !x);
 }
 
 function validateWordMax(val: string, length: number, name: string, errors: SectionError[]) {
