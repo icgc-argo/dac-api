@@ -50,6 +50,7 @@ export interface AppConfig {
       dataAccessGuide: string;
       revisionsRequestedGuide: string;
       dacoSurvey: string;
+      accessRenewalGuide: string;
     };
   };
   ui: {
@@ -70,6 +71,11 @@ export interface AppConfig {
     secret: string;
     bucket: string;
     timeout: number;
+  };
+  durations: {
+    daysToExpiry1: number;
+    daysToExpiry2: number;
+    daysPostExpiry: number;
   };
 }
 
@@ -162,7 +168,8 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       },
       links: {
         approvalGuide:
-          process.env.EMAIL_APPROVAL_GUIDE || 'https://docs.icgc-argo.org/docs/data-access/daco/approval',
+          process.env.EMAIL_APPROVAL_GUIDE ||
+          'https://docs.icgc-argo.org/docs/data-access/daco/approval',
         reviewGuide:
           process.env.EMAIL_REVIEW_GUIDE_URL ||
           'https://docs.icgc-argo.org/docs/data-access/daco/approval#review-process',
@@ -176,9 +183,17 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
           process.env.REVISIONS_REQUESTED_GUIDE_URL ||
           'https://docs.icgc-argo.org/docs/data-access/daco/approval#requested-revisions',
         dacoSurvey: process.env.DACO_SURVEY_URL || '#',
+        accessRenewalGuide:
+          process.env.ACCESS_RENEWAL_GUIDE ||
+          'https://docs.icgc-argo.org/docs/data-access/daco/renew-close#renewing-an-application',
       },
       reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',
+    },
+    durations: {
+      daysToExpiry1: Number(process.env.DAYS_TO_EXPIRY_1) || 90,
+      daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
+      daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
     },
   };
   return config;
