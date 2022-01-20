@@ -29,7 +29,6 @@ const expiryStub = {
   daysToExpiry1: 90,
   daysToExpiry2: 45,
   daysPostExpiry: 90,
-  applicationPeriodInYears: 2,
 };
 
 const uiLinksStub = {

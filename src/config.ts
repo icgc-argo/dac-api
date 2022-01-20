@@ -76,7 +76,6 @@ export interface AppConfig {
     daysToExpiry1: number;
     daysToExpiry2: number;
     daysPostExpiry: number;
-    applicationPeriodInYears: number;
   };
 }
 
@@ -195,7 +194,6 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       daysToExpiry1: Number(process.env.DAYS_TO_EXPIRY_1) || 90,
       daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
       daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
-      applicationPeriodInYears: Number(process.env.APP_PERIOD_IN_YEARS) || 2,
     },
   };
   return config;
