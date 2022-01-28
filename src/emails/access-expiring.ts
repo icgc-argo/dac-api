@@ -58,7 +58,11 @@ function messageBody(
       { padding: '0px 0px 20px 0px' },
     )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-    ${approvalDetailsBox(app, app.sections.applicant.info.googleEmail)}
+    ${approvalDetailsBox(
+      app,
+      app.sections.applicant.info.googleEmail,
+      'The following are your access details:',
+    )}
     ${textParagraphSection(
       `You have <strong>${daysLeftForRenewal} days to renew</strong> your project team’s access privileges for another two years.`,
       { padding: '0px 0px 20px 0px' },

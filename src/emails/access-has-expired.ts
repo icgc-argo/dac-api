@@ -3,8 +3,9 @@ import { Application } from '../domain/interface';
 import {
   actionGetStarted,
   appInfoBox,
-  approvalDetailsBox,
+  approvalDetailsContent,
   compose,
+  formatDate,
   textParagraphSection,
   UILinksInfo,
 } from './common';
@@ -51,13 +52,27 @@ function messageBody(
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
   const daysLeftForRenewal = durationConfigs.daysPostExpiry;
+  const expiryData = [
+    {
+      label: 'Title of Project',
+      value: app.sections.projectInfo.title,
+    },
+    {
+      label: 'Access Email',
+      value: app.sections.applicant.info.googleEmail,
+    },
+    {
+      label: 'Access Expired on',
+      value: formatDate(app.expiresAtUtc),
+    },
+  ];
   return `
     ${textParagraphSection(
       `Access to ICGC Controlled Data has expired for the following project team. Kindly note, it may take up to 24 hours for this status change to take effect.`,
       { padding: '0px 0px 20px 0px' },
     )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-    ${approvalDetailsBox(app, app.sections.applicant.info.googleEmail)}
+    ${approvalDetailsContent(expiryData, 'Access has expired for:')}
     ${textParagraphSection(
       `You have <strong>${daysLeftForRenewal} days to renew</strong> your project team’s access privileges for another two years.`,
       { padding: '0px 0px 20px 0px' },

@@ -275,7 +275,11 @@ export function infoBox(
   `;
 }
 
-export function approvalDetailsBox(app: Application, accessEmail: string) {
+export function approvalDetailsBox(
+  app: Application,
+  accessEmail: string,
+  accessDetailsSubtitle?: string,
+) {
   const data = [
     {
       label: 'Title of Project',
@@ -291,19 +295,19 @@ export function approvalDetailsBox(app: Application, accessEmail: string) {
     },
   ];
 
-  return approvalDetailsContent(data);
+  return approvalDetailsContent(data, accessDetailsSubtitle);
 }
 
 export const approvalDetailsContent = (
   data: { label: string; value: string }[],
-  userHasAccess: boolean = true,
+  accessDetailsSubtitle?: string,
 ) => {
   return `
   <mj-section padding="0px 0px 20px 0px">
       <mj-column border="1px #dcdde1 solid" border-top="0px" padding="0" >
      ${
-       userHasAccess
-         ? `<mj-text font-size="14px" padding="10px 0px 5px 85px">The following are your access details:</mj-text>`
+       accessDetailsSubtitle
+         ? `<mj-text font-size="14px" padding="10px 0px 5px 85px">${accessDetailsSubtitle}</mj-text>`
          : `<mj-text padding="5px 0px 5px 85px" />`
      }
         <mj-table font-weight="400"

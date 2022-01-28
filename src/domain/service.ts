@@ -41,6 +41,7 @@ import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
 import renderApplicationClosedEmail from '../emails/closed-approved';
 import renderRejectedEmail from '../emails/rejected';
 import renderAccessExpiringEmail from '../emails/access-expiring';
+import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 
 import { Attachment } from 'nodemailer/lib/mailer';
 
@@ -964,6 +965,34 @@ async function sendAccessExpiringEmail(
     },
     config.durations,
     daysToExpiry,
+  );
+  const emailContent = notificationEmail.html;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    subject,
+    emailContent,
+  );
+}
+
+async function sendAccessHasExpiredEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const title = `Your Access to ICGC Controlled Data has Expired`;
+  const notificationEmail = await renderAccessHasExpiredEmail(
+    updatedApp,
+    config.email.links,
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+    config.durations,
   );
   const emailContent = notificationEmail.html;
   const subject = `[${updatedApp.appId}] ${title}`;
