@@ -7,6 +7,7 @@ import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
 import renderClosedEmail from '../emails/closed-approved';
 import rejected from '../emails/rejected';
 import renderAccessExpiringEmail from '../emails/access-expiring';
+import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 
 import {
   getAppInReview,
@@ -164,6 +165,12 @@ describe('emails', () => {
     it('should render an access expiring in 90 days email', async () => {
       const app = getApprovedApplication();
       const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, expiryStub, 90);
+      console.log(email.emailMjml);
+    });
+
+    it('should render an access has expired email', async () => {
+      const app = getApprovedApplication();
+      const email = await renderAccessHasExpiredEmail(app, stub, uiLinksStub, expiryStub);
       console.log(email.emailMjml);
     });
   });

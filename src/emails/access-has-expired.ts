@@ -15,12 +15,11 @@ export default async function (
   linksConfigs: AppConfig['email']['links'],
   uiLinksInfo: UILinksInfo,
   durationConfigs: AppConfig['durations'],
-  daysToExpiry: number,
 ) {
   const info = app.sections.applicant.info;
   const emailMjml = compose(
     {
-      message: messageBody(app, uiLinksInfo, durationConfigs, daysToExpiry),
+      message: messageBody(app, uiLinksInfo, durationConfigs, linksConfigs.dacoSurvey),
       receiver: {
         first: info.firstName,
         last: info.lastName,
@@ -32,7 +31,7 @@ export default async function (
         guideText: 'Help Guides for Access Renewal',
       },
     },
-    `Your Access is Expiring in ${daysToExpiry} days`,
+    `Your Access to ICGC Controlled Data has Expired`,
   );
 
   const htmlOutput = await compileMjmlInPromise(emailMjml);
@@ -47,14 +46,14 @@ function messageBody(
   app: Application,
   uiLinksInfo: UILinksInfo,
   durationConfigs: AppConfig['durations'],
-  daysToExpiry: number,
+  surveyUrl: string,
 ) {
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
-  const daysLeftForRenewal = daysToExpiry + durationConfigs.daysPostExpiry;
+  const daysLeftForRenewal = durationConfigs.daysPostExpiry;
   return `
     ${textParagraphSection(
-      `<strong>The following application is expiring in ${daysToExpiry} days.</strong> On the date of expiry, all project members will lose access to ICGC Controlled Data.`,
+      `Access to ICGC Controlled Data has expired for the following project team. Kindly note, it may take up to 24 hours for this status change to take effect.`,
       { padding: '0px 0px 20px 0px' },
     )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
@@ -68,5 +67,9 @@ function messageBody(
       { padding: '0px 0px 20px 0px' },
     )}
     ${actionGetStarted(`Get Started:`, `RENEW YOUR ACCESS`, link)}
+    ${textParagraphSection(
+      `You are required to complete a final report as per the conditions of the Data Access Agreement. <a href="${surveyUrl}">Click here to fill out the report</a>, describing your successes and challenges with accessing ICGC Controlled Data and the outcomes of your research project.`,
+      { padding: '20px 0px 0px 0px' },
+    )}
   `;
 }
