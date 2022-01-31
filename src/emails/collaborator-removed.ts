@@ -3,7 +3,6 @@ import { AppConfig } from '../config';
 import { Application, Collaborator, PersonalInfo } from '../domain/interface';
 import {
   appInfoBox,
-  approvalDetailsBox,
   approvalDetailsContent,
   compose,
   defaultTextStyle,
@@ -62,7 +61,7 @@ function messageBody(app: Application, recipient: PersonalInfo) {
         { padding: '0px 0px 20px 0px' },
       )}
       ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-      ${approvalDetailsContent(removalData, false)}
+      ${approvalDetailsContent(removalData)}
       <mj-section padding="0">
       <mj-column padding="0">
         ${text(
