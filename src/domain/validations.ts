@@ -158,7 +158,7 @@ export function validateProjectInfo(app: Application) {
     validateRequired(app.sections.projectInfo.aims, 'aims', errors),
     validateWordMax(app.sections.projectInfo.aims, 200, 'aims', errors),
     validateRequired(app.sections.projectInfo.summary, 'summary', errors),
-    validateWordMax(app.sections.projectInfo.summary, 200, 'summary', errors),
+    validateWordMax(app.sections.projectInfo.summary, 250, 'summary', errors),
     validateWordMin(app.sections.projectInfo.summary, 100, 'summary', errors),
     validateRequired(app.sections.projectInfo.methodology, 'methodology', errors),
     validateWordMax(app.sections.projectInfo.methodology, 200, 'methodology', errors),
