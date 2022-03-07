@@ -3,7 +3,6 @@ import { AppConfig } from '../config';
 import { Application, Collaborator, PersonalInfo } from '../domain/interface';
 import {
   appInfoBox,
-  approvalDetailsBox,
   approvalDetailsContent,
   compose,
   formatDate,
@@ -56,7 +55,7 @@ function messageBody(app: Application, recipient: PersonalInfo, surveyUrl: strin
       { padding: '0px 0px 20px 0px' },
     )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-    ${approvalDetailsContent(removalData, false)}
+    ${approvalDetailsContent(removalData)}
     ${textParagraphSection(
       `If you did not close this application and you have questions about the reason for this action, please <a href="${ICGC_ARGO_CONTACT_URL}">contact the ICGC DACO team</a>. `,
       { padding: '0px 0px 20px 0px' },

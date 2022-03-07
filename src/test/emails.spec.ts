@@ -6,6 +6,8 @@ import renderCollaboratorNotificationEmail from '../emails/collaborator-notifica
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
 import renderClosedEmail from '../emails/closed-approved';
 import rejected from '../emails/rejected';
+import renderAccessExpiringEmail from '../emails/access-expiring';
+import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 
 import {
   getAppInReview,
@@ -22,6 +24,17 @@ const stub = {
   revisionsRequestedGuide: '',
   approvalGuide: '',
   dacoSurvey: '',
+  accessRenewalGuide: '',
+};
+const expiryStub = {
+  daysToExpiry1: 90,
+  daysToExpiry2: 45,
+  daysPostExpiry: 90,
+};
+
+const uiLinksStub = {
+  baseUrl: 'http://daco.icgc-argo.org',
+  pathTemplate: '/applications/{id}?section={section}',
 };
 
 describe('emails', () => {
@@ -35,6 +48,7 @@ describe('emails', () => {
         reviewGuide: 'https://test.example.com',
         revisionsRequestedGuide: '',
         dacoSurvey: '',
+        accessRenewalGuide: '',
       });
       console.log(email.emailMjml);
     });
@@ -44,10 +58,7 @@ describe('emails', () => {
       const email = await renderNewReview(
         app,
         { lastName: 'Dough', firstName: 'Pizza' },
-        {
-          baseUrl: 'http://daco.icgc-argo.org',
-          pathTemplate: '/applications/{id}?section={section}',
-        },
+        uiLinksStub,
       );
       console.log(email.emailMjml);
     });
@@ -62,10 +73,7 @@ describe('emails', () => {
             revisionsRequestedGuide: 'https://www.google.ca',
           },
         },
-        ui: {
-          baseUrl: 'http://daco.icgc-argo.org',
-          sectionPath: '/applications/{id}?section={section}',
-        },
+        ui: uiLinksStub,
       } as any);
       console.log(email.emailMjml);
     });
@@ -145,6 +153,24 @@ describe('emails', () => {
     it('should render rejected email', async () => {
       const app = getRejectedApplication();
       const email = await rejected(app, stub);
+      console.log(email.emailMjml);
+    });
+
+    it('should render an access expiring in 45 days email', async () => {
+      const app = getApprovedApplication();
+      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, expiryStub, 45);
+      console.log(email.emailMjml);
+    });
+
+    it('should render an access expiring in 90 days email', async () => {
+      const app = getApprovedApplication();
+      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, expiryStub, 90);
+      console.log(email.emailMjml);
+    });
+
+    it('should render an access has expired email', async () => {
+      const app = getApprovedApplication();
+      const email = await renderAccessHasExpiredEmail(app, stub, uiLinksStub, expiryStub);
       console.log(email.emailMjml);
     });
   });

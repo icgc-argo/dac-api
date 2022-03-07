@@ -40,6 +40,8 @@ import renderCollaboratorNotificationEmail from '../emails/collaborator-notifica
 import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
 import renderApplicationClosedEmail from '../emails/closed-approved';
 import renderRejectedEmail from '../emails/rejected';
+import renderAccessExpiringEmail from '../emails/access-expiring';
+import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 
 import { Attachment } from 'nodemailer/lib/mailer';
 
@@ -943,6 +945,64 @@ async function sendReviewEmail(
     config.email.fromName,
     new Set([config.email.dacoAddress]),
     title,
+    emailContent,
+  );
+}
+
+async function sendAccessExpiringEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  daysToExpiry: number,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const title = `Your Access is Expiring in ${daysToExpiry} days`;
+  const notificationEmail = await renderAccessExpiringEmail(
+    updatedApp,
+    config.email.links,
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+    config.durations,
+    daysToExpiry,
+  );
+  const emailContent = notificationEmail.html;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    subject,
+    emailContent,
+  );
+}
+
+async function sendAccessHasExpiredEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const title = `Your Access to ICGC Controlled Data has Expired`;
+  const notificationEmail = await renderAccessHasExpiredEmail(
+    updatedApp,
+    config.email.links,
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+    config.durations,
+  );
+  const emailContent = notificationEmail.html;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    subject,
     emailContent,
   );
 }
