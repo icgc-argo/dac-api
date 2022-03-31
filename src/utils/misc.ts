@@ -12,7 +12,12 @@ import moment from 'moment';
 import { search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
-import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, IV_LENGTH } from './constants';
+import {
+  CHAR_ENCODING,
+  DACO_ENCRYPTION_ALGO,
+  EMAIL_CONTENT_ENCODING,
+  IV_LENGTH,
+} from './constants';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -133,12 +138,22 @@ export const encrypt: (
   encryptionKey: string,
 ) => Promise<{ iv: string; content: string } | undefined> = async (text, encryptionKey) => {
   try {
+    // create IV as a Buffer
     const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(DACO_ENCRYPTION_ALGO, encryptionKey, iv);
+    const cipher = createCipheriv(
+      DACO_ENCRYPTION_ALGO,
+      Buffer.from(encryptionKey, CHAR_ENCODING),
+      iv,
+    );
+    // default is no padding, set this so -nopad flag isn't needed in openssl command
+    cipher.setAutoPadding(true);
     const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+    // split into 64-character lines, so -A is not needed in openssl command, apparently can be buggy with longer files
+    // https://wiki.openssl.org/index.php/Command_Line_Utilities#Base64_Encoding_Strings
+    const encodedContent = encrypted.toString(EMAIL_CONTENT_ENCODING).replace(/(.{64})/g, '$1\n');
     return {
       iv: iv.toString(CHAR_ENCODING),
-      content: encrypted.toString(CHAR_ENCODING),
+      content: encodedContent,
     };
   } catch (err) {
     console.warn('Encryption failure: ', err);
