@@ -145,8 +145,6 @@ export const encrypt: (
       Buffer.from(encryptionKey, CHAR_ENCODING),
       iv,
     );
-    // default is no padding, set this so -nopad flag isn't needed in openssl command
-    cipher.setAutoPadding(true);
     const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
     // split into 64-character lines, so -A is not needed in openssl command, apparently can be buggy with longer files
     // https://wiki.openssl.org/index.php/Command_Line_Utilities#Base64_Encoding_Strings

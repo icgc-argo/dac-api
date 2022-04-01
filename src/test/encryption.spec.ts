@@ -34,7 +34,6 @@ describe('encryption', () => {
         Buffer.from(mockEncryptionKey, CHAR_ENCODING),
         Buffer.from(encrypted!.iv, CHAR_ENCODING),
       );
-      decipher.setAutoPadding(true);
       const decrypted = Buffer.concat([
         decipher.update(Buffer.from(encrypted!.content, EMAIL_CONTENT_ENCODING)),
         decipher.final(),
