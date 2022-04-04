@@ -13,7 +13,7 @@ import { search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
 import {
-  CHAR_ENCODING,
+  EMAIL_ENCRYPTION_CREDENTIALS_ENCODING,
   DACO_ENCRYPTION_ALGO,
   EMAIL_CONTENT_ENCODING,
   IV_LENGTH,
@@ -142,7 +142,7 @@ export const encrypt: (
     const iv = randomBytes(IV_LENGTH);
     const cipher = createCipheriv(
       DACO_ENCRYPTION_ALGO,
-      Buffer.from(encryptionKey, CHAR_ENCODING),
+      Buffer.from(encryptionKey, EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
       iv,
     );
     const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
@@ -150,11 +150,12 @@ export const encrypt: (
     // https://wiki.openssl.org/index.php/Command_Line_Utilities#Base64_Encoding_Strings
     const encodedContent = encrypted.toString(EMAIL_CONTENT_ENCODING).replace(/(.{64})/g, '$1\n');
     return {
-      iv: iv.toString(CHAR_ENCODING),
+      iv: iv.toString(EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
       content: encodedContent,
     };
   } catch (err) {
-    console.warn('Encryption failure: ', err);
+    console.error('Encryption failure: ', err);
+    throw new Error('Encryption failure');
   }
 };
 

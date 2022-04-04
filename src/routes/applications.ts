@@ -258,27 +258,29 @@ const createApplicationsRouter = (
       const csv = await createDacoCSVFile(req);
       // encrypt csv content, return {content, iv}
       const config = await getAppConfig();
-      const encrypted = await encrypt(csv, config.auth.DACO_ENCRYPTION_KEY);
-
-      if (encrypted?.content) {
+      try {
+        const encrypted = await encrypt(csv, config.auth.DACO_ENCRYPTION_KEY);
         sendEmail(
           emailClient,
           config.email.fromAddress,
           config.email.fromName,
           new Set([config.email.dccMailingList]),
           'Approved DACO Users', // TODO: verify expected subject line
-          `${encrypted.iv}`,
+          `${encrypted?.iv}`,
           undefined,
           [
             {
               filename: 'approved_users.csv',
-              content: encrypted.content,
+              content: encrypted?.content,
               contentType: 'text/plain',
             },
           ],
         );
-        res.status(200).send('OK');
-      } else {
+        return res.status(200).send('OK');
+      } catch (err) {
+        if (err instanceof Error) {
+          return res.status(500).send(err.message);
+        }
         res.status(400).send('An unknown error occurred.');
       }
     }),

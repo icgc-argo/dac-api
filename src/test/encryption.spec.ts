@@ -1,7 +1,11 @@
 import { expect } from 'chai';
 import { createDecipheriv } from 'crypto';
 import { encrypt } from '../utils/misc';
-import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, EMAIL_CONTENT_ENCODING } from '../utils/constants';
+import {
+  EMAIL_ENCRYPTION_CREDENTIALS_ENCODING,
+  DACO_ENCRYPTION_ALGO,
+  EMAIL_CONTENT_ENCODING,
+} from '../utils/constants';
 
 describe('encryption', () => {
   it('should encrypt and decrypt text', async () => {
@@ -31,8 +35,8 @@ describe('encryption', () => {
 
       const decipher = createDecipheriv(
         DACO_ENCRYPTION_ALGO,
-        Buffer.from(mockEncryptionKey, CHAR_ENCODING),
-        Buffer.from(encrypted!.iv, CHAR_ENCODING),
+        Buffer.from(mockEncryptionKey, EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
+        Buffer.from(encrypted!.iv, EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
       );
       const decrypted = Buffer.concat([
         decipher.update(Buffer.from(encrypted!.content, EMAIL_CONTENT_ENCODING)),

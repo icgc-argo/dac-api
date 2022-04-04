@@ -254,7 +254,7 @@ export const countriesList: string[] = countries
 
 // encryption
 export const DACO_ENCRYPTION_ALGO = 'aes-128-cbc';
-export const CHAR_ENCODING = 'hex';
+export const EMAIL_ENCRYPTION_CREDENTIALS_ENCODING = 'hex';
 export const EMAIL_CONTENT_ENCODING = 'base64';
 export const IV_LENGTH = 16;
 
