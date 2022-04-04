@@ -136,7 +136,7 @@ export const createDacoCSVFile = async (req: Request) => {
 export const encrypt: (
   text: string,
   encryptionKey: string,
-) => Promise<{ iv: string; content: string } | undefined> = async (text, encryptionKey) => {
+) => Promise<{ iv: string; content: string }> = async (text, encryptionKey) => {
   try {
     // create IV as a Buffer
     const iv = randomBytes(IV_LENGTH);

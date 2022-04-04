@@ -106,9 +106,9 @@ const createApplicationsRouter = (
         logger.error(`Error downloading zip file for ${appId}: ${error}`);
         // https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-0.html#unknown-on-catch-clause-bindings
         if (error instanceof Error) {
-          return res.status(400).send(error.message);
+          return res.status(500).send(error.message);
         }
-        return res.status(400).send('An unknown error occurred.');
+        return res.status(500).send('An unknown error occurred.');
       }
     }),
   );
@@ -266,12 +266,12 @@ const createApplicationsRouter = (
           config.email.fromName,
           new Set([config.email.dccMailingList]),
           'Approved DACO Users', // TODO: verify expected subject line
-          `${encrypted?.iv}`,
+          `${encrypted.iv}`,
           undefined,
           [
             {
               filename: 'approved_users.csv',
-              content: encrypted?.content,
+              content: encrypted.content,
               contentType: 'text/plain',
             },
           ],
@@ -281,7 +281,7 @@ const createApplicationsRouter = (
         if (err instanceof Error) {
           return res.status(500).send(err.message);
         }
-        res.status(400).send('An unknown error occurred.');
+        res.status(500).send('An unknown error occurred.');
       }
     }),
   );
