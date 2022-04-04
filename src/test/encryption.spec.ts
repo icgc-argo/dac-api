@@ -26,8 +26,8 @@ describe('encryption', () => {
       expect(encrypted).to.not.be.empty;
       expect(encrypted).to.haveOwnProperty('iv');
       expect(encrypted).to.haveOwnProperty('content');
-      expect(typeof encrypted?.iv).to.eq('string');
-      expect(typeof encrypted?.content).to.eq('string');
+      expect(typeof encrypted.iv).to.eq('string');
+      expect(typeof encrypted.content).to.eq('string');
 
       // command to decrypt encrypted.content with openssl in command line:
       // openssl enc -aes-128-cbc -d -a -K <key> -iv <iv> -in <input file> -out <output file>
@@ -36,10 +36,10 @@ describe('encryption', () => {
       const decipher = createDecipheriv(
         DACO_ENCRYPTION_ALGO,
         Buffer.from(mockEncryptionKey, EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
-        Buffer.from(encrypted!.iv, EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
+        Buffer.from(encrypted.iv, EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
       );
       const decrypted = Buffer.concat([
-        decipher.update(Buffer.from(encrypted!.content, EMAIL_CONTENT_ENCODING)),
+        decipher.update(Buffer.from(encrypted.content, EMAIL_CONTENT_ENCODING)),
         decipher.final(),
       ]);
       expect(decrypted.toString()).to.eq(text);
