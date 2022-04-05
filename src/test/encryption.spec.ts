@@ -1,7 +1,11 @@
 import { expect } from 'chai';
 import { createDecipheriv } from 'crypto';
 import { encrypt } from '../utils/misc';
-import { CHAR_ENCODING, DACO_ENCRYPTION_ALGO, IV_LENGTH } from '../utils/constants';
+import {
+  EMAIL_ENCRYPTION_CREDENTIALS_ENCODING,
+  DACO_ENCRYPTION_ALGO,
+  EMAIL_CONTENT_ENCODING,
+} from '../utils/constants';
 
 describe('encryption', () => {
   it('should encrypt and decrypt text', async () => {
@@ -14,7 +18,7 @@ describe('encryption', () => {
     Betty Boop,betty505@sample_email,betty_boop@example.com,2021-08-10T13:40,Some Institute
     Test2 Collab,collab_test2@sample_email,collab_test2@example.com,2021-08-11T13:00,Some Institute`;
 
-    const mockEncryptionKey = '0123456789123456';
+    const mockEncryptionKey = '4E645267556B586E3272357538782F41';
 
     try {
       const encrypted = await encrypt(text, mockEncryptionKey);
@@ -22,18 +26,20 @@ describe('encryption', () => {
       expect(encrypted).to.not.be.empty;
       expect(encrypted).to.haveOwnProperty('iv');
       expect(encrypted).to.haveOwnProperty('content');
-      expect(typeof encrypted?.iv).to.eq('string');
-      expect(typeof encrypted?.content).to.eq('string');
-      expect(Buffer.from(encrypted!.iv, CHAR_ENCODING).length).to.eq(IV_LENGTH);
+      expect(typeof encrypted.iv).to.eq('string');
+      expect(typeof encrypted.content).to.eq('string');
+
+      // command to decrypt encrypted.content with openssl in command line:
+      // openssl enc -aes-128-cbc -d -a -K <key> -iv <iv> -in <input file> -out <output file>
+      // can use either -base64 or -a flag for decoding input
 
       const decipher = createDecipheriv(
         DACO_ENCRYPTION_ALGO,
-        mockEncryptionKey,
-        Buffer.from(encrypted!.iv, CHAR_ENCODING),
+        Buffer.from(mockEncryptionKey, EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
+        Buffer.from(encrypted.iv, EMAIL_ENCRYPTION_CREDENTIALS_ENCODING),
       );
-
       const decrypted = Buffer.concat([
-        decipher.update(Buffer.from(encrypted!.content, CHAR_ENCODING)),
+        decipher.update(Buffer.from(encrypted.content, EMAIL_CONTENT_ENCODING)),
         decipher.final(),
       ]);
       expect(decrypted.toString()).to.eq(text);

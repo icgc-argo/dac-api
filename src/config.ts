@@ -161,7 +161,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       dacoAddress: process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org',
       fromName: process.env.EMAIL_FROM_NAME || 'ICGC DACO',
       fromAddress: process.env.EMAIL_FROM_ADDRESS || 'no-reply-daco@icgc-argo.org',
-      dccMailingList: secrets.DCC_MAILING_LIST || process.env.DCC_MAILING_LIST,
+      dccMailingList: process.env.DCC_MAILING_LIST || '',
       auth: {
         user: secrets.EMAIL_USER || process.env.EMAIL_USER,
         password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
