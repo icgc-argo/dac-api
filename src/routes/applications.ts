@@ -270,7 +270,7 @@ const createApplicationsRouter = (
           undefined,
           [
             {
-              filename: 'approved_users.csv',
+              filename: 'approved_users.csv.enc',
               content: encrypted.content,
               contentType: 'text/plain',
             },
