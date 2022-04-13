@@ -48,7 +48,6 @@ import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
   'dataAccessAgreement',
-  'terms',
   'applicant',
   'collaborators',
   'ethicsLetter',
@@ -75,7 +74,6 @@ const stateToLockedSectionsMap: Record<
     APPLICANT: [
       'appendices',
       'dataAccessAgreement',
-      'terms',
       'applicant',
       'representative',
       'projectInfo',
@@ -84,7 +82,6 @@ const stateToLockedSectionsMap: Record<
     REVIEWER: [
       'appendices',
       'dataAccessAgreement',
-      'terms',
       'applicant',
       'representative',
       'projectInfo',
@@ -92,7 +89,7 @@ const stateToLockedSectionsMap: Record<
     ],
   },
   'REVISIONS REQUESTED': {
-    APPLICANT: ['appendices', 'dataAccessAgreement', 'terms'],
+    APPLICANT: ['appendices', 'dataAccessAgreement'],
     REVIEWER: allSections,
   },
   'SIGN AND SUBMIT': {
@@ -559,13 +556,6 @@ export function newApplication(identity: Identity): Partial<Application> {
       dataAccessAgreement: {
         meta: pristineMeta,
         agreements: getDataAccessAgreement(),
-      },
-      terms: {
-        meta: pristineMeta,
-        agreement: {
-          accepted: false,
-          name: TERMS_AGREEMENT_NAME,
-        },
       },
       applicant: {
         meta: pristineMeta,
@@ -1044,7 +1034,6 @@ function updateAppStateForDraftApplication(
   if (updatePart.state === 'CLOSED') {
     return transitionToClosed(current, updatedBy);
   }
-  updateTerms(updatePart, current);
   updateApplicantSection(updatePart, current);
   updateRepresentative(updatePart, current);
   updateProjectInfo(updatePart, current);
@@ -1142,18 +1131,6 @@ function updateProjectInfo(updatePart: Partial<UpdateApplication>, current: Appl
     );
     updateSectionLastUpdatedAt(current, 'projectInfo');
     validateProjectInfo(current);
-  }
-}
-
-function updateTerms(updatePart: Partial<UpdateApplication>, current: Application) {
-  if (updatePart.sections?.terms?.agreement.accepted !== undefined) {
-    current.sections.terms.agreement.accepted = updatePart.sections?.terms.agreement.accepted;
-    if (current.sections.terms.agreement.accepted) {
-      current.sections.terms.meta.status = 'COMPLETE';
-    } else {
-      current.sections.terms.meta.status = 'INCOMPLETE';
-    }
-    updateSectionLastUpdatedAt(current, 'terms');
   }
 }
 
@@ -1290,7 +1267,6 @@ function mergeAgreementArray(current: AgreementItem[], update: AgreementItem[]) 
 function isReadyToSignAndSubmit(app: Application) {
   const sections = app.sections;
   const requiredSectionsComplete =
-    sections.terms.meta.status == 'COMPLETE' &&
     sections.applicant.meta.status == 'COMPLETE' &&
     sections.representative.meta.status == 'COMPLETE' &&
     sections.projectInfo.meta.status == 'COMPLETE' &&

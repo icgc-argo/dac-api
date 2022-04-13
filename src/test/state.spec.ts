@@ -25,33 +25,6 @@ const newApplication1: Partial<Application> = newApplication({
 } as Identity);
 
 describe('state manager', () => {
-  it('should update terms application', () => {
-    const emptyApp: Application = _.cloneDeep({
-      ...newApplication1,
-      appId: 'DACO-1',
-      appNumber: 1,
-    }) as Application;
-    const state = new ApplicationStateManager(emptyApp);
-    const terms = {
-      agreement: {
-        name: TERMS_AGREEMENT_NAME,
-        accepted: true,
-      },
-    } as any;
-
-    const result = state.updateApp(
-      {
-        sections: {
-          terms,
-        },
-      },
-      false,
-      { id: '1', role: DacoRole.SUBMITTER },
-    );
-
-    expect(result.sections.terms.agreement.accepted).to.eq(true);
-    expect(result.sections.terms.meta.status).to.eq('COMPLETE');
-  });
 
   it('should update applicant info', () => {
     const emptyApp: Application = _.cloneDeep({
@@ -387,7 +360,6 @@ export function getReadyToSignApp() {
     appNumber: 1,
   }) as Application;
   const updatePart: UpdateApplication['sections'] = _.pick(_.cloneDeep(app), 'sections').sections;
-  c(updatePart.terms).agreement.accepted = true;
   c(updatePart.applicant).info = getRandomInfo();
   c(updatePart.applicant).address = getAddress();
   c(updatePart.representative).address = getAddress();
