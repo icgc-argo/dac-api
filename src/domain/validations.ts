@@ -155,13 +155,16 @@ export function validateProjectInfo(app: Application) {
     validateUrl(app.sections.projectInfo.website, 'website', errors),
     validateRequired(app.sections.projectInfo.background, 'background', errors),
     validateWordMax(app.sections.projectInfo.background, 200, 'background', errors),
+    validateWordMin(app.sections.projectInfo.background, 100, 'background', errors),
     validateRequired(app.sections.projectInfo.aims, 'aims', errors),
     validateWordMax(app.sections.projectInfo.aims, 200, 'aims', errors),
+    validateWordMin(app.sections.projectInfo.aims, 100, 'aims', errors),
     validateRequired(app.sections.projectInfo.summary, 'summary', errors),
     validateWordMax(app.sections.projectInfo.summary, 250, 'summary', errors),
     validateWordMin(app.sections.projectInfo.summary, 100, 'summary', errors),
     validateRequired(app.sections.projectInfo.methodology, 'methodology', errors),
     validateWordMax(app.sections.projectInfo.methodology, 200, 'methodology', errors),
+    validateWordMin(app.sections.projectInfo.methodology, 100, 'methodology', errors),
     validatePublications(app.sections.projectInfo.publicationsURLs, errors),
   ];
   const valid = !validations.some((x) => x == false);

@@ -133,10 +133,6 @@ const ApplicationSchema = new mongoose.Schema(
       general: RevisionRequest,
     },
     sections: {
-      terms: {
-        meta: Meta,
-        agreement: AgreementItem,
-      },
       applicant: {
         meta: Meta,
         info: PersonalInfo,

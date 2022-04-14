@@ -181,10 +181,6 @@ type ApprovedAppDocument = {
 };
 
 export interface Sections {
-  terms: {
-    meta: Meta;
-    agreement: AgreementItem;
-  };
   applicant: {
     meta: Meta;
     info: PersonalInfo;
@@ -287,9 +283,6 @@ export interface UpdateApplication {
   denialReason?: string;
   revisionRequest?: RevisionRequestUpdate;
   sections: {
-    terms?: {
-      agreement: AgreementItem;
-    };
     applicant?: {
       info?: Partial<PersonalInfo>;
       address?: Partial<Address>;
