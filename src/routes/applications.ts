@@ -106,9 +106,9 @@ const createApplicationsRouter = (
         logger.error(`Error downloading zip file for ${appId}: ${error}`);
         // https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-0.html#unknown-on-catch-clause-bindings
         if (error instanceof Error) {
-          return res.status(400).send(error.message);
+          return res.status(500).send(error.message);
         }
-        return res.status(400).send('An unknown error occurred.');
+        return res.status(500).send('An unknown error occurred.');
       }
     }),
   );
@@ -258,9 +258,8 @@ const createApplicationsRouter = (
       const csv = await createDacoCSVFile(req);
       // encrypt csv content, return {content, iv}
       const config = await getAppConfig();
-      const encrypted = await encrypt(csv, config.auth.DACO_ENCRYPTION_KEY);
-
-      if (encrypted?.content) {
+      try {
+        const encrypted = await encrypt(csv, config.auth.DACO_ENCRYPTION_KEY);
         sendEmail(
           emailClient,
           config.email.fromAddress,
@@ -271,15 +270,18 @@ const createApplicationsRouter = (
           undefined,
           [
             {
-              filename: 'approved_users.csv',
+              filename: 'approved_users.csv.enc',
               content: encrypted.content,
               contentType: 'text/plain',
             },
           ],
         );
-        res.status(200).send('OK');
-      } else {
-        res.status(400).send('An unknown error occurred.');
+        return res.status(200).send('OK');
+      } catch (err) {
+        if (err instanceof Error) {
+          return res.status(500).send(err.message);
+        }
+        res.status(500).send('An unknown error occurred.');
       }
     }),
   );
