@@ -580,7 +580,7 @@ async function findApplication(appId: string, identity: Identity) {
 }
 
 async function hasReviewScope(identity: Identity) {
-  const REVIEW_SCOPE = (await getAppConfig()).auth.REVIEW_SCOPE;
+  const REVIEW_SCOPE = (await getAppConfig()).auth.reviewScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((v) => v == REVIEW_SCOPE);
 }
