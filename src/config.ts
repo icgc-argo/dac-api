@@ -61,8 +61,8 @@ export interface AppConfig {
     enabled: boolean;
     jwtKeyUrl: string;
     jwtKey: string;
-    REVIEW_SCOPE: string;
-    DACO_ENCRYPTION_KEY: string;
+    reviewScope: string;
+    dacoEncryptionKey: string;
   };
   storage: {
     endpoint: string;
@@ -139,8 +139,8 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       enabled: process.env.AUTH_ENABLED !== 'false',
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      REVIEW_SCOPE: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
-      DACO_ENCRYPTION_KEY: secrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY,
+      reviewScope: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
+      dacoEncryptionKey: secrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY,
     },
     ui: {
       baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org',

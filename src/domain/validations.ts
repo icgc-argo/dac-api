@@ -288,11 +288,21 @@ function validateWordMin(val: string, length: number, name: string, errors: Sect
   return true;
 }
 
-function countWords(str: string) {
-  str = str.replace(/(^\s*)|(\s*$)/gi, '');
-  str = str.replace(/[ ]{2,}/gi, ' ');
-  str = str.replace(/\n /, '\n');
-  return str.split(' ').length;
+// word count strategy from dac-ui
+const LINE_JUMP_PLACEHOLDER = ' øö ';
+
+function countWords(value: string) {
+  // // use a placeholder for line breaks, so we can respect white space on display
+  const wordArray = value.replace(/\r\n|\r|\n/g, LINE_JUMP_PLACEHOLDER).split(/\s/g);
+  // discount the following exceptions as non-words:
+  const empties = wordArray.filter(
+    (x: any) =>
+      !x || // empty spaces
+      x === LINE_JUMP_PLACEHOLDER.trim() || // line breaks (placeholder)
+      !x.match(/[a-zA-Z0-9]+/g), // chains of symbols without letters/numbers
+  ).length;
+
+  return wordArray.length - empties;
 }
 
 function validatePersonalInfo(
