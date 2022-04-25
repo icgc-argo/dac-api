@@ -29,6 +29,7 @@ import { FileFormat, UpdateApplication, UploadDocumentType } from '../domain/int
 import { AppConfig, getAppConfig } from '../config';
 import { Storage } from '../storage';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
+import { Readable } from 'stream';
 
 export interface IRequest extends Request {
   identity: Identity;
@@ -232,7 +233,7 @@ const createApplicationsRouter = (
 
   router.get(
     '/export/approved-users/',
-    authFilter([config.auth.REVIEW_SCOPE]),
+    authFilter([config.auth.reviewScope]),
     wrapAsync(async (req: Request, res: Response) => {
       logger.info(`exporting approved users for all applications`);
 
@@ -252,32 +253,60 @@ const createApplicationsRouter = (
 
   router.get(
     '/jobs/export-and-email/',
-    authFilter([config.auth.REVIEW_SCOPE]),
+    authFilter([config.auth.reviewScope]),
     wrapAsync(async (req: Request, res: Response) => {
       // generate CSV file from approved users
       const csv = await createDacoCSVFile(req);
       // encrypt csv content, return {content, iv}
       const config = await getAppConfig();
       try {
-        const encrypted = await encrypt(csv, config.auth.DACO_ENCRYPTION_KEY);
+        // encrypt the contents
+        const encrypted = await encrypt(csv, config.auth.dacoEncryptionKey);
+
+        // build streams to zip later
+        const ivStream = new Readable();
+        ivStream.push(encrypted.iv);
+        // tslint:disable-next-line:no-null-keyword
+        ivStream.push(null);
+        const contentStream = new Readable();
+        contentStream.push(encrypted.content);
+        // tslint:disable-next-line:no-null-keyword
+        contentStream.push(null);
+
+        // build the zip package
+        const zip = new JSZip();
+        [
+          {name: 'iv.txt', stream: ivStream},
+          {name: 'approved_users.csv.enc', stream: contentStream }
+        ].forEach((a) => {
+          zip.file(a.name, a.stream);
+        });
+        const zipFileOut = await zip.generateAsync({
+          type: 'nodebuffer'
+        });
+        const zipName = `icgc_daco_users.zip`;
+
+        // send the email
         sendEmail(
           emailClient,
           config.email.fromAddress,
           config.email.fromName,
           new Set([config.email.dccMailingList]),
-          'Approved DACO Users', // TODO: verify expected subject line
-          `${encrypted.iv}`,
+          'Approved DACO Users',
+          `find the attached zip package`,
           undefined,
           [
             {
-              filename: 'approved_users.csv.enc',
-              content: encrypted.content,
-              contentType: 'text/plain',
+              filename: zipName,
+              content: zipFileOut,
+              contentType: 'application/zip',
             },
           ],
         );
         return res.status(200).send('OK');
       } catch (err) {
+        logger.error('failed to export users and email them');
+        logger.error(err);
         if (err instanceof Error) {
           return res.status(500).send(err.message);
         }
@@ -288,7 +317,7 @@ const createApplicationsRouter = (
 
   router.get(
     '/export/application-history/',
-    authFilter([config.auth.REVIEW_SCOPE]),
+    authFilter([config.auth.reviewScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const tsv = await createAppHistoryTSV();
       const currentDate = moment().tz('America/Toronto').format(`YYYY-MM-DD`);
@@ -316,7 +345,7 @@ const createApplicationsRouter = (
 
   router.delete(
     '/applications/:id',
-    authFilter([config.auth.REVIEW_SCOPE]),
+    authFilter([config.auth.reviewScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const id = req.params.id;
       const validatedId = validateId(id);
