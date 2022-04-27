@@ -51,7 +51,7 @@ function messageBody(app: Application) {
       `The length of the access period is two years starting from the date of approval. At the end of the 2-year period, you can extend your access privilege for another 2 years by completing the renewal process.`,
       { padding: '0px 0px 20px 0px' },
     )}
-    ${textParagraphSection(`Next Steps:`, { padding: '0px 0px 15px 0px', 'font-weight': 'bold' })}
+    ${textParagraphSection(`Next Steps:`, { padding: '0px 0px 2px 0px', 'font-weight': 'bold' })}
     ${bulletPoints()}
   `;
 }
@@ -64,7 +64,7 @@ function bulletPoints() {
         <ol style="padding:0 0 0 19; font-family: 'Work Sans', Helvetica, Arial, sans-serif; font-size: 14px;font-weight:400;line-height:24px;color:#000">
           <li style="padding-left: 10px; margin-bottom: 20px">
             You can access ICGC Controlled Data in the following data portals:
-            <ol style="padding:0 0 0 15">
+            <ol style="padding:0px 0px 0px 15px">
               <li style="list-style-type:lower-alpha">
                 <a style="font-weight:600" href="${ICGC_ARGO_PLATFORM_URL}">ICGC ARGO Data Platform</a> - If you have never logged in to the ARGO Data Platform, <a style="font-weight:600" href="${ICGC_ARGO_PLATFORM_URL}">please log in now to initialize your account</a>. Access to ICGC ARGO Controlled Data will  be authorized within 24 hours after your account is initialized.
               </li>
