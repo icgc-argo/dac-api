@@ -262,6 +262,11 @@ export class ApplicationStateManager {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
       updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
+    } else if (current.state == 'DRAFT') {
+      // This is to handle the scenario where changing the primary affiliation in applicant section in an application that is in the state 'SIGN & SUBMIT'
+      // will invalidate the collaborators section
+      // after fixing the collaborator PA the application should go back to SIGN & SUBMIT and not remain stuck in DRAFT. see test case: 'collaborator - (4) in state.spec.ts'
+      transitionToSignAndSubmitOrRollBack(current, 'PRISTINE', 'DISABLED', 'DRAFT');
     }
     updateSectionLastUpdatedAt(current, 'collaborators');
     onAppUpdate(current);
@@ -328,6 +333,11 @@ export class ApplicationStateManager {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
       updateAppStateForReturnedApplication(current, {}, updatedBy);
+    } else if (current.state == 'DRAFT') {
+      // This is to handle the scenario where changing the primary affiliation in applicant section in an application that is in the state 'SIGN & SUBMIT'
+      // will invalidate the collaborators section
+      // after fixing the collaborator PA the application should go back to SIGN & SUBMIT and not remain stuck in DRAFT. see test case: 'collaborator - (4) in state.spec.ts'
+      transitionToSignAndSubmitOrRollBack(current, 'PRISTINE', 'DISABLED', 'DRAFT');
     }
 
     onAppUpdate(current);

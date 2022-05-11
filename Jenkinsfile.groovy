@@ -89,7 +89,10 @@ spec:
        // publish the edge tag
         stage('Publish Develop') {
             when {
-                branch "develop"
+              anyOf {
+                branch 'develop'
+                branch 'fix-collaborator-pa-signsubmit'
+              }
             }
             steps {
                 container('docker') {
@@ -108,7 +111,10 @@ spec:
 
         stage('deploy to argo-dev') {
             when {
-                branch "develop"
+              anyOf {
+                branch 'develop'
+                branch 'fix-collaborator-pa-signsubmit'
+              }
             }
             steps {
                 build(job: "/ARGO/provision/${serviceName}", parameters: [
