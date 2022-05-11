@@ -1009,7 +1009,9 @@ function updateAppStateForReturnedApplication(
   if (current.revisionRequest.applicant.requested) {
     updateApplicantSection(updatePart, current);
   }
-  if (current.revisionRequest.representative.requested) {
+  // if the representative section became incomplete when there is no rev requested (happens because of Primary affiliation)
+  if (current.revisionRequest.representative.requested
+    || current.sections.representative.meta.status == 'INCOMPLETE') {
     updateRepresentative(updatePart, current);
   }
   if (current.revisionRequest.projectInfo.requested) {
