@@ -91,7 +91,6 @@ spec:
             when {
               anyOf {
                 branch 'develop'
-                branch 'fix-collaborator-pa-signsubmit'
               }
             }
             steps {
@@ -113,7 +112,6 @@ spec:
             when {
               anyOf {
                 branch 'develop'
-                branch 'fix-collaborator-pa-signsubmit'
               }
             }
             steps {
