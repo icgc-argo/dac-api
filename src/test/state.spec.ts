@@ -86,7 +86,7 @@ describe('state manager', () => {
   });
 
   describe('collaborators', () => {
-    it('should add collaborator', () => {
+    it('1) should add collaborator', () => {
       const emptyApp: Application = _.cloneDeep({
         ...newApplication1,
         appId: 'DACO-1',
@@ -120,7 +120,7 @@ describe('state manager', () => {
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
     });
 
-    it('should not add duplicate collaborator', () => {
+    it('2) should not add duplicate collaborator', () => {
       const emptyApp: Application = _.cloneDeep({
         ...newApplication1,
         appId: 'DACO-1',
@@ -182,80 +182,140 @@ describe('state manager', () => {
       }
       throw new Error('test failed expected an error');
     });
-  });
 
-  it('should check collaborator primary affiliation', () => {
-    const app: Application = _.cloneDeep({
-      ...newApplication1,
-      appId: 'DACO-1',
-      appNumber: 1,
-    }) as Application;
-    app.sections.applicant.info.primaryAffiliation = 'ACME';
-    const state = new ApplicationStateManager(app);
-    const collab: Collaborator = {
-      meta: {
-        errorsList: [],
-        status: 'COMPLETE',
-      },
-      info: {
-        firstName: 'Bashar',
-        lastName: 'Allabadi',
-        googleEmail: 'bashar@example.com',
-        primaryAffiliation: 'OICR',
-        institutionEmail: 'adsa@example.com',
-        middleName: '',
-        positionTitle: 'Manager',
-        suffix: '',
-        title: '',
-        displayName: '',
-        website: '',
-      },
-      type: 'personnel',
-    };
+    it('3) should check collaborator primary affiliation', () => {
+      const app: Application = _.cloneDeep({
+        ...newApplication1,
+        appId: 'DACO-1',
+        appNumber: 1,
+      }) as Application;
+      app.sections.applicant.info.primaryAffiliation = 'ACME';
+      const state = new ApplicationStateManager(app);
+      const collab: Collaborator = {
+        meta: {
+          errorsList: [],
+          status: 'COMPLETE',
+        },
+        info: {
+          firstName: 'Bashar',
+          lastName: 'Allabadi',
+          googleEmail: 'bashar@example.com',
+          primaryAffiliation: 'OICR',
+          institutionEmail: 'adsa@example.com',
+          middleName: '',
+          positionTitle: 'Manager',
+          suffix: '',
+          title: '',
+          displayName: '',
+          website: '',
+        },
+        type: 'personnel',
+      };
 
-    try {
-      state.addCollaborator(collab, 'user123', false);
-    } catch (e) {
-      expect((e as BadRequest).info.errors[0]).to.include({
-        field: 'primaryAffiliation',
-        message: 'Primary Affiliation must be the same as the Applicant',
-      });
-    }
+      try {
+        state.addCollaborator(collab, 'user123', false);
+      } catch (e) {
+        expect((e as BadRequest).info.errors[0]).to.include({
+          field: 'primaryAffiliation',
+          message: 'Primary Affiliation must be the same as the Applicant',
+        });
+      }
 
-    // add with correct PA
-    collab.info.primaryAffiliation = 'ACME';
-    const app2 = state.addCollaborator(collab, 'user123', false);
-    app2.sections.collaborators.list[0].id = 'collab-1';
-    expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
+      // add with correct PA
+      collab.info.primaryAffiliation = 'ACME';
+      const app2 = state.addCollaborator(collab, 'user123', false);
+      app2.sections.collaborators.list[0].id = 'collab-1';
+      expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
 
-    // change applicant PA and observe collaborator goes to incomplete
-    const state2 = new ApplicationStateManager(app2);
-    const app3 = state2.updateApp(
-      {
-        sections: {
-          applicant: {
-            info: {
-              primaryAffiliation: 'OICR',
+      // change applicant PA and observe collaborator goes to incomplete
+      const state2 = new ApplicationStateManager(app2);
+      const app3 = state2.updateApp(
+        {
+          sections: {
+            applicant: {
+              info: {
+                primaryAffiliation: 'OICR',
+              },
             },
           },
         },
-      },
-      false,
-      { id: '1', role: DacoRole.SUBMITTER },
-    );
-    expect(app3.sections.collaborators.list[0].meta.status).to.eq('INCOMPLETE');
+        false,
+        { id: '1', role: DacoRole.SUBMITTER },
+      );
+      expect(app3.sections.collaborators.list[0].meta.status).to.eq('INCOMPLETE');
 
-    // fix the collaborator to match applicant PA again
-    collab.id = 'collab-1';
-    collab.info.primaryAffiliation = 'OICR';
-    const state3 = new ApplicationStateManager(app3);
-    const app4 = state3.updateCollaborator(collab, { id: 'user123', role: DacoRole.SUBMITTER });
-    expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
+      // fix the collaborator to match applicant PA again
+      collab.id = 'collab-1';
+      collab.info.primaryAffiliation = 'OICR';
+      const state3 = new ApplicationStateManager(app3);
+      const app4 = state3.updateCollaborator(collab, { id: 'user123', role: DacoRole.SUBMITTER });
+      expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
+    });
+
+    it('4) should change back to sign & submit when changing Primary affiliation in applicant in state SIGN & SUBMIT', () => {
+      const filledApp: Application = getReadyToSignApp();
+      const state = new ApplicationStateManager(filledApp);
+      const collab: Collaborator = {
+        meta: {
+          errorsList: [],
+          status: 'COMPLETE',
+        },
+        info: {
+          firstName: 'Bashar',
+          lastName: 'Allabadi',
+          googleEmail: 'bashar@example.com',
+          primaryAffiliation: 'OICR',
+          institutionEmail: 'adsa@example.com',
+          middleName: '',
+          positionTitle: 'Manager',
+          suffix: '',
+          title: '',
+          displayName: 'Bashar Allabadi',
+          website: '',
+        },
+        type: 'personnel',
+      };
+
+      const result = state.addCollaborator(collab, 'user123', false);
+      result.sections.collaborators.list[0].id = 'collab-1';
+      expect(result.state).to.eq('SIGN AND SUBMIT');
+
+      const result2 = new ApplicationStateManager(result).updateApp(
+        {
+          sections: {
+            applicant: {
+              info: {
+                primaryAffiliation: 'A'
+              }
+            },
+            representative: {
+              info: {
+                primaryAffiliation: 'A'
+              }
+            }
+          }
+        }
+        , false,
+        { id: '1', role: DacoRole.SUBMITTER }
+      );
+
+      expect(result2.state).to.eq('DRAFT');
+
+      // fix the collaborator to match applicant PA again
+      collab.id = 'collab-1';
+      collab.info.primaryAffiliation = 'A';
+      const stateMgr = new ApplicationStateManager(result2);
+      const app4 = stateMgr.updateCollaborator(collab, { id: 'user123', role: DacoRole.SUBMITTER });
+      expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
+      expect(app4.state).to.eq('SIGN AND SUBMIT');
+    });
   });
 
   it('should change to sign & submit', () => {
     const filledApp: Application = getReadyToSignApp();
   });
+
+
 
   it('should change to review', () => {
     const filledApp: Application = getAppInReview();
