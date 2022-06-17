@@ -162,7 +162,7 @@ export interface ApplicationSummary {
   revisionsRequested: boolean;
   currentApprovedAppDoc: boolean;
   isRenewal: boolean;
-  attestationDateUtc?: Date;
+  attestationByUtc?: Date;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -263,7 +263,7 @@ export interface Application {
   sections: Sections;
   updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
-  attestationDateUtc?: Date;
+  attestationByUtc?: Date; // calculated from approvedAtUtc
 }
 
 export type AppSections = keyof Application['sections'];

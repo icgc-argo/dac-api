@@ -170,3 +170,6 @@ export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor 
 export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();
 };
+
+export const getAttestationByDate: (approvalDate: Date) => Date = (approvalDate) =>
+  moment(approvalDate).add(1, 'year').toDate();
