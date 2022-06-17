@@ -860,6 +860,10 @@ function transitionToRejected(
 function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
+  // assume here this is a new approval because it's called from updateAppStateForReviewApplication, so new attestation date can be set
+  // there will need to be a new func like updateAppStateForPausedApplication to handled PAUSED -> APPROVED,
+  // and possibly reuse this transition with a check for current.state is PAUSED so we can avoid all the changes related to new attestation/expiry dates
+  current.attestationDateUtc = moment().add(1, 'year').toDate();
   current.updates.push(createUpdateEvent(current, approvedBy, UpdateEvent.APPROVED));
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
@@ -1010,8 +1014,10 @@ function updateAppStateForReturnedApplication(
     updateApplicantSection(updatePart, current);
   }
   // if the representative section became incomplete when there is no rev requested (happens because of Primary affiliation)
-  if (current.revisionRequest.representative.requested
-    || current.sections.representative.meta.status == 'INCOMPLETE') {
+  if (
+    current.revisionRequest.representative.requested ||
+    current.sections.representative.meta.status == 'INCOMPLETE'
+  ) {
     updateRepresentative(updatePart, current);
   }
   if (current.revisionRequest.projectInfo.requested) {

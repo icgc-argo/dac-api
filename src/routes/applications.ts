@@ -276,13 +276,13 @@ const createApplicationsRouter = (
         // build the zip package
         const zip = new JSZip();
         [
-          {name: 'iv.txt', stream: ivStream},
-          {name: 'approved_users.csv.enc', stream: contentStream }
+          { name: 'iv.txt', stream: ivStream },
+          { name: 'approved_users.csv.enc', stream: contentStream },
         ].forEach((a) => {
           zip.file(a.name, a.stream);
         });
         const zipFileOut = await zip.generateAsync({
-          type: 'nodebuffer'
+          type: 'nodebuffer',
         });
         const zipName = `icgc_daco_users.zip`;
 
