@@ -6,7 +6,8 @@ export type State =
   | 'APPROVED'
   | 'REJECTED'
   | 'CLOSED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'PAUSED';
 
 export type SectionStatus =
   | 'PRISTINE'
@@ -18,6 +19,10 @@ export type SectionStatus =
   | 'REVISIONS REQUESTED DISABLED'
   | 'REVISIONS MADE'
   | 'AMMENDABLE';
+
+export enum PauseReason {
+  PENDING_ATTESTATION = 'PENDING_ATTESTATION',
+}
 
 export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP' | 'APPROVED_PDF';
 
@@ -163,6 +168,7 @@ export interface ApplicationSummary {
   currentApprovedAppDoc: boolean;
   isRenewal: boolean;
   attestationByUtc?: Date;
+  attestedAtUtc?: Date;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -264,6 +270,7 @@ export interface Application {
   updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
   attestationByUtc?: Date; // calculated from approvedAtUtc
+  attestedAtUtc?: Date;
 }
 
 export type AppSections = keyof Application['sections'];

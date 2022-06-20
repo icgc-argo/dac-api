@@ -112,6 +112,10 @@ const stateToLockedSectionsMap: Record<
     APPLICANT: allSections,
     REVIEWER: allSections,
   },
+  PAUSED: {
+    APPLICANT: allSections,
+    REVIEWER: allSections,
+  },
 };
 
 export class ApplicationStateManager {
@@ -886,6 +890,15 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
   if (current.expiresAtUtc) {
     current.expiresAtUtc = closedDate;
   }
+  return current;
+};
+
+const transitionToPaused: (current: Application, pausedBy: UpdateAuthor) => Application = (
+  current,
+  pausedBy,
+) => {
+  current.state = 'PAUSED';
+  current.updates.push(createUpdateEvent(current, pausedBy, UpdateEvent.PAUSED));
   return current;
 };
 

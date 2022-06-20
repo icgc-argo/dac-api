@@ -663,6 +663,7 @@ components:
             - APPROVED
             - CLOSED
             - EXPIRED
+            - PAUSED
         applicant:
           type: object
           properties:
@@ -713,6 +714,12 @@ components:
         currentApprovedAppDoc:
           type: boolean
           readOnly: true
+        attestationByUtc:
+          type: string
+          format: data-time
+        attestedAtUtc:
+          type: string
+          format: data-time
 
     Application:
       type: object
@@ -731,6 +738,7 @@ components:
             - APPROVED
             - CLOSED
             - EXPIRED
+            - PAUSED
         submitterId:
           readOnly: true
           type: string
@@ -774,6 +782,12 @@ components:
         ableToRenew:
           type: boolean
           readOnly: true
+        attestationByUtc:
+          type: string
+          format: data-time
+        attestedAtUtc:
+          type: string
+          format: data-time
         revisionRequests:
           type: object
           properties:

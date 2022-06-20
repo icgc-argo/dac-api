@@ -422,6 +422,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
     REVIEW: 0,
     'REVISIONS REQUESTED': 0,
     'SIGN AND SUBMIT': 0,
+    PAUSED: 0,
   };
   if (count == 0) {
     return {
@@ -586,6 +587,12 @@ async function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = (await getAppConfig()).auth.reviewScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((v) => v == REVIEW_SCOPE);
+}
+
+async function hasDacoSystemScope(identity: Identity) {
+  const DACO_SYSTEM_SCOPE = await (await getAppConfig()).auth.dacoSystemScope;
+  const scopes = identity.tokenInfo.context.scope;
+  return scopes.some((scope) => scope === DACO_SYSTEM_SCOPE);
 }
 
 function checkDeletedDocuments(appDocObj: Application, result: Application) {
