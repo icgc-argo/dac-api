@@ -23,7 +23,7 @@ import {
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { c, getUpdateAuthor, sortByDate } from '../utils/misc';
+import { c, getAttestationByDate, getUpdateAuthor, sortByDate } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
@@ -489,6 +489,9 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         }),
         revisionsRequested: wasInRevisionRequestState(app),
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
+        ...(app.approvedAtUtc && {
+          attestationByUtc: getAttestationByDate(app.approvedAtUtc),
+        }),
       } as ApplicationSummary),
   );
 

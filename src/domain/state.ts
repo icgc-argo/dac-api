@@ -1,4 +1,4 @@
-import { getUpdateAuthor, mergeKnown } from '../utils/misc';
+import { getAttestationByDate, getUpdateAuthor, mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
 import { cloneDeep, last } from 'lodash';
@@ -149,6 +149,11 @@ export class ApplicationStateManager {
       this.currentApplication.state == 'REVISIONS REQUESTED' ||
       wasInRevisionRequestState(this.currentApplication);
 
+    if (this.currentApplication.approvedAtUtc) {
+      this.currentApplication.attestationByUtc = getAttestationByDate(
+        this.currentApplication.approvedAtUtc,
+      );
+    }
     return this.currentApplication;
   }
 
@@ -1010,8 +1015,10 @@ function updateAppStateForReturnedApplication(
     updateApplicantSection(updatePart, current);
   }
   // if the representative section became incomplete when there is no rev requested (happens because of Primary affiliation)
-  if (current.revisionRequest.representative.requested
-    || current.sections.representative.meta.status == 'INCOMPLETE') {
+  if (
+    current.revisionRequest.representative.requested ||
+    current.sections.representative.meta.status == 'INCOMPLETE'
+  ) {
     updateRepresentative(updatePart, current);
   }
   if (current.revisionRequest.projectInfo.requested) {
