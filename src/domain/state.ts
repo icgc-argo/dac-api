@@ -32,6 +32,7 @@ import {
   UserViewApplicationUpdate,
   Meta,
   Sections,
+  DacoRole,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -477,6 +478,10 @@ export class ApplicationStateManager {
         updateAppStateForDraftApplication(current, updatePart, updatedBy);
         break;
 
+      case 'PAUSED':
+        updateAppStateForPausedApplication(current, updatePart, updatedBy);
+        break;
+
       default:
         throw new Error(`Invalid app state: ${current.state}`);
     }
@@ -866,6 +871,11 @@ function transitionToRejected(
   return current;
 }
 
+function transitionFromPausedToApproved(current: Application, approvedBy: UpdateAuthor) {
+  current.state = 'APPROVED';
+  // TODO: changes for attestedAt date, ATTESTED update event
+}
+
 function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
@@ -893,11 +903,15 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
   return current;
 };
 
-const transitionToPaused: (current: Application, pausedBy: UpdateAuthor) => Application = (
-  current,
-  pausedBy,
-) => {
+const transitionToPaused: (
+  current: Application,
+  pausedBy: UpdateAuthor,
+  reason?: string,
+) => Application = (current, pausedBy, reason) => {
   current.state = 'PAUSED';
+  if (reason) {
+    current.pauseReason = reason;
+  }
   current.updates.push(createUpdateEvent(current, pausedBy, UpdateEvent.PAUSED));
   return current;
 };
@@ -1009,9 +1023,36 @@ function updateAppStateForApprovedApplication(
   if (updatePart.state === 'CLOSED') {
     return transitionToClosed(currentApplication, updatedBy);
   }
+  if (updatePart.state === 'PAUSED') {
+    if (currentApplication.state !== 'APPROVED') {
+      throw new Error('Cannot pause an application in this state');
+    }
+    // right now only SYSTEM role will be able to pause applications
+    if (updatedBy.role !== DacoRole.SYSTEM) {
+      throw new Error('Not allowed');
+    }
+    return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+  }
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
     updateEthics(updatePart, currentApplication, updateDocs);
+  }
+}
+
+function updateAppStateForPausedApplication(
+  currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  updatedBy: UpdateAuthor,
+  updateDocs?: boolean,
+) {
+  if (updatePart.state === 'APPROVED') {
+    // TODO: allow submitters to make this transition only if attestation is complete
+    // will add a check for attestedAtUtc in https://github.com/icgc-argo/dac-api/issues/240
+    // for now this operation will be blocked for submitters
+    if (updatedBy.role === DacoRole.SUBMITTER) {
+      throw new Error('Not allowed');
+    }
+    return transitionFromPausedToApproved(currentApplication, updatedBy);
   }
 }
 

@@ -9,7 +9,7 @@ import {
   UpdateAuthor,
 } from '../domain/interface';
 import moment from 'moment';
-import { search, SearchParams } from '../domain/service';
+import { hasDacoSystemScope, hasReviewScope, search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
 import {
@@ -18,6 +18,7 @@ import {
   EMAIL_CONTENT_ENCODING,
   IV_LENGTH,
 } from './constants';
+import { Identity } from '@overture-stack/ego-token-middleware';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -159,6 +160,7 @@ export const encrypt: (
   }
 };
 
+// TODO: update to handle SYSTEM role
 export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor = (
   id,
   isReviewer,
@@ -166,6 +168,12 @@ export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor 
   id,
   role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
 });
+
+export const getDacoRole: (identity: Identity) => Promise<DacoRole> = async (identity) => {
+  const isSystem = await hasDacoSystemScope(identity);
+  const isAdmin = await hasReviewScope(identity);
+  return isSystem ? DacoRole.SYSTEM : isAdmin ? DacoRole.ADMIN : DacoRole.SUBMITTER;
+};
 
 export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();

@@ -77,6 +77,8 @@ export interface AppConfig {
     daysToExpiry1: number;
     daysToExpiry2: number;
     daysPostExpiry: number;
+    // unitOfTime must be one of these keys https://momentjs.com/docs/#/manipulating/add/
+    attestation: { count: number; unitOfTime: string };
   };
 }
 
@@ -196,6 +198,10 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       daysToExpiry1: Number(process.env.DAYS_TO_EXPIRY_1) || 90,
       daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
       daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
+      attestation: {
+        count: Number(process.env.ATTESTATION_UNIT_COUNT) || 1,
+        unitOfTime: process.env.ATTESTATION_UNIT_OF_TIME || 'years',
+      },
     },
   };
   return config;

@@ -20,10 +20,6 @@ export type SectionStatus =
   | 'REVISIONS MADE'
   | 'AMMENDABLE';
 
-export enum PauseReason {
-  PENDING_ATTESTATION = 'PENDING_ATTESTATION',
-}
-
 export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP' | 'APPROVED_PDF';
 
 export interface Meta {
@@ -80,6 +76,7 @@ export type CollaboratorDto = {
 export enum DacoRole {
   SUBMITTER = 'SUBMITTER',
   ADMIN = 'ADMIN',
+  SYSTEM = 'SYSTEM',
 }
 
 export type UpdateAuthor = {
@@ -271,6 +268,7 @@ export interface Application {
   approvedAppDocs: ApprovedAppDocument[];
   attestationByUtc?: Date; // calculated from approvedAtUtc
   attestedAtUtc?: Date;
+  pauseReason?: string;
 }
 
 export type AppSections = keyof Application['sections'];
@@ -291,6 +289,7 @@ export interface UpdateApplication {
   expiresAtUtc?: Date;
   denialReason?: string;
   revisionRequest?: RevisionRequestUpdate;
+  pauseReason?: string;
   sections: {
     applicant?: {
       info?: Partial<PersonalInfo>;
