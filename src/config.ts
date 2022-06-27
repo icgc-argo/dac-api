@@ -80,6 +80,7 @@ export interface AppConfig {
     // unitOfTime must be one of these keys https://momentjs.com/docs/#/manipulating/add/
     attestation: { count: number; unitOfTime: string };
   };
+  adminPause: boolean;
 }
 
 export interface MongoProps {
@@ -203,6 +204,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
         unitOfTime: process.env.ATTESTATION_UNIT_OF_TIME || 'years',
       },
     },
+    adminPause: process.env.ADMIN_PAUSE === 'true' || false,
   };
   return config;
 };

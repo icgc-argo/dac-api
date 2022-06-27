@@ -1024,11 +1024,12 @@ function updateAppStateForApprovedApplication(
     return transitionToClosed(currentApplication, updatedBy);
   }
   if (updatePart.state === 'PAUSED') {
-    if (currentApplication.state !== 'APPROVED') {
-      throw new Error('Cannot pause an application in this state');
-    }
     // right now only SYSTEM role will be able to pause applications
-    if (updatedBy.role !== DacoRole.SYSTEM) {
+    // admin pause configurable for testing
+    if (
+      updatedBy.role !== DacoRole.SYSTEM &&
+      !(isReviewer && updatePart.pauseReason === 'ADMIN-PAUSE')
+    ) {
       throw new Error('Not allowed');
     }
     return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);

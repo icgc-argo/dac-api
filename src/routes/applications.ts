@@ -384,6 +384,33 @@ const createApplicationsRouter = (
     }),
   );
 
+  // for TESTING ONLY
+  config.adminPause &&
+    router.patch(
+      '/applications/:id/admin-pause',
+      authFilter([config.auth.reviewScope]),
+      wrapAsync(async (req: Request, res: Response) => {
+        const id = req.params.id;
+        const validatedId = validateId(id);
+        const pauseReq = {
+          state: 'PAUSED',
+          pauseReason: req.body.pauseReason || '',
+        } as Partial<UpdateApplication>;
+        logger.info(
+          `updating application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+        );
+
+        const updated = await updatePartial(
+          id,
+          pauseReq,
+          (req as IRequest).identity,
+          storageClient,
+          emailClient,
+        );
+        return res.status(200).send(updated);
+      }),
+    );
+
   router.get(
     '/collaborators/applications',
     authFilter([]),
