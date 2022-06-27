@@ -402,7 +402,7 @@ const createApplicationsRouter = (
       // define currentDate here so each job has the same reference date
       const currentDate = moment.utc().toDate();
       // define report to collect all modified appIds
-      // can be added in the response but should be sent somewhere with visibility
+      // TODO: can be added in the response but should be sent somewhere with visibility
       const report: Report = {
         pausedApps: { count: 0, ids: [], errors: [] },
         expiredApps: { count: 0, ids: [], errors: [] },
@@ -411,7 +411,7 @@ const createApplicationsRouter = (
       try {
         // attestation/pause flow
         logger.info('Initiating attestation check...');
-        report.pausedApps = await runPauseAppCheck(emailClient, report, user, currentDate);
+        await runPauseAppCheck(emailClient, report, user, currentDate);
         if (report.pausedApps.errors.length) {
           logger.warn('Batch jobs completed, with errors.');
         }

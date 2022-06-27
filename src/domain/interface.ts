@@ -165,7 +165,7 @@ export interface ApplicationSummary {
   currentApprovedAppDoc: boolean;
   isRenewal: boolean;
   attestationByUtc?: Date;
-  attestedAtUtc?: Date;
+  attestedAtUtc?: Date | null;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -267,7 +267,7 @@ export interface Application {
   updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
   attestationByUtc?: Date; // calculated from approvedAtUtc
-  attestedAtUtc?: Date;
+  attestedAtUtc?: Date | null;
   pauseReason?: string;
 }
 

@@ -420,6 +420,7 @@ describe('state manager', () => {
     expect(userApp.pauseReason).to.not.be.undefined;
     expect(userApp.pauseReason).to.eq('PENDING ATTESTATION');
     expect(userApp.approvedAtUtc.toDateString()).to.eq(app.approvedAtUtc.toDateString());
+    expect(userApp.searchValues).to.include('PAUSED');
   });
 
   it('should not pause a non-approved app', () => {
@@ -431,6 +432,7 @@ describe('state manager', () => {
 
     expect(userApp.state).to.eq('REVISIONS REQUESTED');
     expect(userApp.pauseReason).to.be.undefined;
+    expect(userApp.searchValues).to.not.include('PAUSED');
   });
 
   it('should not modify an app already in PAUSED state', () => {

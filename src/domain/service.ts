@@ -5,7 +5,7 @@ import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import moment, { unitOfTime } from 'moment';
-import _ from 'lodash';
+import _, { chunk } from 'lodash';
 import {
   ApplicationStateManager,
   getSearchFieldValues,
@@ -18,7 +18,6 @@ import {
   ApplicationUpdate,
   Collaborator,
   ColumnHeader,
-  DacoRole,
   SearchResult,
   State,
   UpdateApplication,
@@ -46,6 +45,9 @@ import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 
 import { Attachment } from 'nodemailer/lib/mailer';
 import { Report } from '../routes/applications';
+
+type RejectedUpdate = { status: 'rejected'; reason: string };
+type FulfilledUpdate = { status: 'fulfilled'; value: Application };
 
 export async function deleteDocument(
   appId: string,
@@ -534,33 +536,10 @@ export const searchCollaboratorApplications = async (identity: Identity) => {
   );
 };
 
-export const searchPauseableApplications = async (currentDate: Date) => {
-  const {
-    durations: {
-      attestation: { count, unitOfTime },
-    },
-  } = await getAppConfig();
-  // find all apps that are APPROVED with an approval date matching the configured time period
-  // default is 1 year to match DACO but we will need this for testing
-  const approvalDate = moment(currentDate).subtract(
-    count,
-    unitOfTime as unitOfTime.DurationConstructor,
-  );
-
-  const approvalDayStart = moment(approvalDate).startOf('day').toDate();
-  const approvalDayEnd = moment(approvalDate).endOf('day').toDate();
-
+const searchPauseableApplications = async (query: FilterQuery<ApplicationDocument>) => {
   // can still run this multiple times in the same 24hr period,
   // as any apps that were paused previously will be ignored because we're looking for APPROVED state
-  const apps = await ApplicationModel.find({
-    state: 'APPROVED',
-    approvedAtUtc: {
-      $gte: approvalDayStart, // check for an approvedAtUtc within a 24hr period
-      $lte: approvalDayEnd,
-    },
-    attestedAtUtc: { $exists: false }, // check the applicant has not already attested
-  }).exec();
-
+  const apps = await ApplicationModel.find(query).exec();
   return apps;
 };
 
@@ -589,43 +568,98 @@ const pauseApplication = async (currentApp: Application, identity: Identity, rea
   return updatedApp?.toObject() as Application;
 };
 
+const getPauseableQuery = (config: AppConfig, currentDate: Date) => {
+  const {
+    durations: {
+      attestation: { count, unitOfTime },
+    },
+  } = config;
+  // find all apps that are APPROVED with an approval date matching the configured time period
+  // default is 1 year to match DACO but we will need this for testing
+  const approvalDate = moment(currentDate).subtract(
+    count,
+    unitOfTime as unitOfTime.DurationConstructor,
+  );
+  const approvalDayStart = moment(approvalDate).startOf('day').toDate();
+  const approvalDayEnd = moment(approvalDate).endOf('day').toDate();
+  const query: FilterQuery<ApplicationDocument> = {
+    state: 'APPROVED',
+    approvedAtUtc: {
+      $gte: approvalDayStart, // check for an approvedAtUtc within a 24hr period
+      $lte: approvalDayEnd,
+    },
+    // tslint:disable-next-line:no-null-keyword
+    $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
+  };
+
+  return query;
+};
+
 export const runPauseAppCheck = async (
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   report: Report,
   user: Identity,
   currentDate: Date,
 ) => {
-  const pauseableApps = await searchPauseableApplications(currentDate);
   const config = await getAppConfig();
-  if (pauseableApps.length === 0) {
+  const query = getPauseableQuery(config, currentDate);
+  const pauseableAppCount = await ApplicationModel.find(query).countDocuments();
+  // if no applications fit the criteria, return initial report
+  if (pauseableAppCount === 0) {
     logger.info('No applications need to be paused at this time.');
     return report.pausedApps;
   }
+  logger.info(`There are ${pauseableAppCount} apps that should be PAUSED.`);
+  const pauseableApps = await searchPauseableApplications(query);
+  const requestChunkSize = 5;
 
-  await Promise.all(
-    pauseableApps.map(async (app) => {
-      try {
-        const updatedAppObj = (await pauseApplication(
-          app,
-          user,
-          'PENDING ATTESTATION',
-        )) as Application;
-        if (updatedAppObj.state == 'PAUSED') {
+  const results: (RejectedUpdate | FulfilledUpdate)[][] = [];
+
+  const requests = chunk(pauseableApps, requestChunkSize).map(
+    async (appChunk: ApplicationDocument[]) => {
+      return Promise.allSettled(
+        appChunk.map(async (app: ApplicationDocument) => {
+          const updatedAppObj = (await pauseApplication(
+            app,
+            user,
+            'PENDING ATTESTATION',
+          )) as Application;
+          if (updatedAppObj.state !== 'PAUSED') {
+            throw new Error(`PAUSED update failed on ${updatedAppObj.appId}`);
+          }
           onStateChange(updatedAppObj, app, emailClient, config);
-          addToReport('pausedApps', report, updatedAppObj.appId);
-        }
-      } catch (err) {
-        logger.warn(`Error pausing application [${app.appId}]: ${err}`);
-        if (err instanceof Error) {
-          report.pausedApps.errors.push(`Error pausing application [${app.appId}]: ${err.message}`);
-        } else {
-          report.pausedApps.errors.push(`Error pausing application [${app.appId}]: ${err}`);
-        }
-      }
-    }),
+          return updatedAppObj;
+        }),
+      );
+    },
   );
 
-  logger.info(`Paused ${report.pausedApps.count} applications`);
+  for (const chunk of requests) {
+    const result = (await chunk) as (FulfilledUpdate | RejectedUpdate)[];
+    results.push(result);
+  }
+
+  const allResults = results.flat();
+  // add successful pause requests to report, send emails for each
+  allResults
+    .filter((result) => result.status === 'fulfilled')
+    .map((fulfilled) => {
+      const { value } = fulfilled as FulfilledUpdate;
+      logger.info(`Successfully PAUSED ${value.appId}`);
+      // TODO: send email
+      addToReport('pausedApps', report, value.appId);
+    });
+
+  // add failed pause requests to report errors
+  allResults
+    .filter((result) => result.status === 'rejected')
+    .map((rejected) => {
+      const { reason } = rejected as RejectedUpdate;
+      logger.warn(`Error pausing application: ${reason}`);
+      report.pausedApps.errors.push(`Error pausing application: ${reason}`);
+    });
+
+  logger.info('returning PAUSED app report');
   return report.pausedApps;
 };
 
