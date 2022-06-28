@@ -4,8 +4,8 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
-import moment from 'moment';
-import _ from 'lodash';
+import moment, { unitOfTime } from 'moment';
+import _, { chunk } from 'lodash';
 import {
   ApplicationStateManager,
   getSearchFieldValues,
@@ -23,7 +23,7 @@ import {
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { c, getAttestationByDate, getUpdateAuthor, sortByDate } from '../utils/misc';
+import { c, getAttestationByDate, getDacoRole, getUpdateAuthor, sortByDate } from '../utils/misc';
 import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
@@ -44,6 +44,10 @@ import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 
 import { Attachment } from 'nodemailer/lib/mailer';
+import { Report } from '../routes/applications';
+
+type RejectedUpdate = { status: 'rejected'; reason: string };
+type FulfilledUpdate = { status: 'fulfilled'; value: Application };
 
 export async function deleteDocument(
   appId: string,
@@ -358,6 +362,9 @@ async function onStateChange(
       }),
     ).catch((err) => logger.error(err));
   }
+  if (updatedApp.state === 'PAUSED') {
+    // TODO: send PAUSED email
+  }
 }
 
 export type SearchParams = {
@@ -422,6 +429,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
     REVIEW: 0,
     'REVISIONS REQUESTED': 0,
     'SIGN AND SUBMIT': 0,
+    PAUSED: 0,
   };
   if (count == 0) {
     return {
@@ -528,6 +536,133 @@ export const searchCollaboratorApplications = async (identity: Identity) => {
   );
 };
 
+const searchPauseableApplications = async (query: FilterQuery<ApplicationDocument>) => {
+  // can still run this multiple times in the same 24hr period,
+  // as any apps that were paused previously will be ignored because we're looking for APPROVED state
+  const apps = await ApplicationModel.find(query).exec();
+  return apps;
+};
+
+const addToReport = (type: keyof Report, report: Report, appId: string) => {
+  report[type].count++;
+  report[type].ids.push(appId);
+  return report;
+};
+
+const pauseApplication = async (currentApp: Application, identity: Identity, reason?: string) => {
+  // set app in state
+  const appObj = new ApplicationStateManager(currentApp);
+  // update app state, including transition to paused + update event
+  const role = await getDacoRole(identity);
+  logger.info(`Role ${role} is trying to PAUSE appId ${currentApp.appId}`);
+  const result = appObj.updateApp({ state: 'PAUSED', pauseReason: reason }, false, {
+    id: identity.userId,
+    role,
+  });
+  // save new app state in db
+  await ApplicationModel.updateOne({ appId: result.appId }, result);
+  // retrieve updated app from db
+  const updatedApp = await ApplicationModel.findOne({
+    appId: result.appId,
+  }).exec();
+  return updatedApp?.toObject() as Application;
+};
+
+const getPauseableQuery = (config: AppConfig, currentDate: Date) => {
+  const {
+    durations: {
+      attestation: { count, unitOfTime },
+    },
+  } = config;
+  // find all apps that are APPROVED with an approval date matching the configured time period
+  // default is 1 year to match DACO but we will need this for testing
+  const approvalDate = moment(currentDate).subtract(
+    count,
+    unitOfTime as unitOfTime.DurationConstructor,
+  );
+  const approvalDayStart = moment(approvalDate).startOf('day').toDate();
+  const approvalDayEnd = moment(approvalDate).endOf('day').toDate();
+  const query: FilterQuery<ApplicationDocument> = {
+    state: 'APPROVED',
+    approvedAtUtc: {
+      $gte: approvalDayStart, // check for an approvedAtUtc within a 24hr period
+      $lte: approvalDayEnd,
+    },
+    // tslint:disable-next-line:no-null-keyword
+    $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
+  };
+
+  return query;
+};
+
+export const runPauseAppCheck = async (
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  report: Report,
+  user: Identity,
+  currentDate: Date,
+) => {
+  const config = await getAppConfig();
+  const query = getPauseableQuery(config, currentDate);
+  const pauseableAppCount = await ApplicationModel.find(query).countDocuments();
+  // if no applications fit the criteria, return initial report
+  if (pauseableAppCount === 0) {
+    logger.info('No applications need to be paused at this time.');
+    return report.pausedApps;
+  }
+  logger.info(`There are ${pauseableAppCount} apps that should be PAUSED.`);
+  const pauseableApps = await searchPauseableApplications(query);
+  const requestChunkSize = 5;
+
+  const results: (RejectedUpdate | FulfilledUpdate)[][] = [];
+
+  const requests = chunk(pauseableApps, requestChunkSize).map(
+    async (appChunk: ApplicationDocument[]) => {
+      return Promise.allSettled(
+        appChunk.map(async (app: ApplicationDocument) => {
+          const updatedAppObj = (await pauseApplication(
+            app,
+            user,
+            'PENDING ATTESTATION',
+          )) as Application;
+          if (updatedAppObj.state !== 'PAUSED') {
+            throw new Error(`PAUSED update failed on ${updatedAppObj.appId}`);
+          }
+          onStateChange(updatedAppObj, app, emailClient, config);
+          return updatedAppObj;
+        }),
+      );
+    },
+  );
+
+  for (const chunk of requests) {
+    const result = (await chunk) as (FulfilledUpdate | RejectedUpdate)[];
+    results.push(result);
+  }
+
+  const allResults = results.flat();
+  // add successful pause requests to report, send emails for each
+  allResults
+    .filter((result) => result.status === 'fulfilled')
+    .map((fulfilled) => {
+      const { value } = fulfilled as FulfilledUpdate;
+      logger.info(`Successfully PAUSED ${value.appId}`);
+      // TODO: send email
+      addToReport('pausedApps', report, value.appId);
+    });
+
+  // add failed pause requests to report errors
+  allResults
+    .filter((result) => result.status === 'rejected')
+    .map((rejected) => {
+      const { reason } = rejected as RejectedUpdate;
+      logger.warn(`Error pausing application: ${reason}`);
+      report.pausedApps.errors.push(`Error pausing application: ${reason}`);
+    });
+
+  logger.info('returning PAUSED app report');
+  return report.pausedApps;
+};
+
 export const getApplicationUpdates = async () => {
   // do not return empty arrays. this is for apps existing before reset_updates_list migration
   // this state should not be possible for applications created after this migration
@@ -582,10 +717,16 @@ async function findApplication(appId: string, identity: Identity) {
   return appDoc;
 }
 
-async function hasReviewScope(identity: Identity) {
+export async function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = (await getAppConfig()).auth.reviewScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((v) => v == REVIEW_SCOPE);
+}
+
+export async function hasDacoSystemScope(identity: Identity) {
+  const DACO_SYSTEM_SCOPE = await (await getAppConfig()).auth.dacoSystemScope;
+  const scopes = identity.tokenInfo.context.scope;
+  return scopes.some((scope) => scope === DACO_SYSTEM_SCOPE);
 }
 
 function checkDeletedDocuments(appDocObj: Application, result: Application) {

@@ -25,7 +25,6 @@ const newApplication1: Partial<Application> = newApplication({
 } as Identity);
 
 describe('state manager', () => {
-
   it('should update applicant info', () => {
     const emptyApp: Application = _.cloneDeep({
       ...newApplication1,
@@ -285,18 +284,18 @@ describe('state manager', () => {
           sections: {
             applicant: {
               info: {
-                primaryAffiliation: 'A'
-              }
+                primaryAffiliation: 'A',
+              },
             },
             representative: {
               info: {
-                primaryAffiliation: 'A'
-              }
-            }
-          }
-        }
-        , false,
-        { id: '1', role: DacoRole.SUBMITTER }
+                primaryAffiliation: 'A',
+              },
+            },
+          },
+        },
+        false,
+        { id: '1', role: DacoRole.SUBMITTER },
       );
 
       expect(result2.state).to.eq('DRAFT');
@@ -314,8 +313,6 @@ describe('state manager', () => {
   it('should change to sign & submit', () => {
     const filledApp: Application = getReadyToSignApp();
   });
-
-
 
   it('should change to review', () => {
     const filledApp: Application = getAppInReview();
@@ -411,6 +408,47 @@ describe('state manager', () => {
     expect(userApp.sections.signature.meta.status).to.eq('REVISIONS REQUESTED');
     expect(userApp.state).to.eq('SIGN AND SUBMIT');
   });
+
+  it('should transition an approved app to PAUSED state', () => {
+    const app: Application = getApprovedApplication();
+    const state = new ApplicationStateManager(app);
+    const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
+    state.updateApp({ state: 'PAUSED', pauseReason: 'PENDING ATTESTATION' }, false, systemUser);
+    const userApp = state.prepareApplicationForUser(true);
+
+    expect(userApp.state).to.eq('PAUSED');
+    expect(userApp.pauseReason).to.not.be.undefined;
+    expect(userApp.pauseReason).to.eq('PENDING ATTESTATION');
+    expect(userApp.approvedAtUtc.toDateString()).to.eq(app.approvedAtUtc.toDateString());
+    expect(userApp.searchValues).to.include('PAUSED');
+  });
+
+  it('should not pause a non-approved app', () => {
+    const app: Application = getAppInRevisionRequested();
+    const state = new ApplicationStateManager(app);
+    const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
+    state.updateApp({ state: 'PAUSED', pauseReason: 'PENDING ATTESTATION' }, false, systemUser);
+    const userApp = state.prepareApplicationForUser(true);
+
+    expect(userApp.state).to.eq('REVISIONS REQUESTED');
+    expect(userApp.pauseReason).to.be.undefined;
+    expect(userApp.searchValues).to.not.include('PAUSED');
+  });
+
+  it('should not modify an app already in PAUSED state', () => {
+    const app: Application = getPausedApplication();
+    const state = new ApplicationStateManager(app);
+    const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
+    state.updateApp(
+      { state: 'PAUSED', pauseReason: 'A different reason to pause' },
+      false,
+      systemUser,
+    );
+    const userApp = state.prepareApplicationForUser(true);
+
+    expect(userApp.state).to.eq('PAUSED');
+    expect(userApp.pauseReason).to.eq('PENDING ATTESTATION');
+  });
 });
 
 export function getReadyToSignApp() {
@@ -427,7 +465,8 @@ export function getReadyToSignApp() {
   c(updatePart.dataAccessAgreement).agreements.forEach((ag) => (ag.accepted = true));
   c(updatePart.appendices).agreements.forEach((ag) => (ag.accepted = true));
   c(updatePart.ethicsLetter).declaredAsRequired = false;
-  const exactly100words = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum in ex tellus. Vestibulum blandit egestas pharetra. Proin porttitor hendrerit ligula. Aliquam mattis in elit nec dictum. Nam ante neque, cursus ac tortor sit amet, faucibus lacinia metus. Integer vestibulum nulla mauris, a iaculis nisl auctor et. Suspendisse potenti. Nulla porttitor orci ac sapien feugiat, eu rhoncus ante iaculis. Vestibulum id neque sit amet mauris molestie dictum in sit amet odio. Integer mattis enim non ultrices aliquet. Aenean maximus leo lacus, in fringilla ex suscipit eget. Nam felis dolor, bibendum et lobortis sit amet, sodales eu orci. Nunc at elementum ex.';
+  const exactly100words =
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum in ex tellus. Vestibulum blandit egestas pharetra. Proin porttitor hendrerit ligula. Aliquam mattis in elit nec dictum. Nam ante neque, cursus ac tortor sit amet, faucibus lacinia metus. Integer vestibulum nulla mauris, a iaculis nisl auctor et. Suspendisse potenti. Nulla porttitor orci ac sapien feugiat, eu rhoncus ante iaculis. Vestibulum id neque sit amet mauris molestie dictum in sit amet odio. Integer mattis enim non ultrices aliquet. Aenean maximus leo lacus, in fringilla ex suscipit eget. Nam felis dolor, bibendum et lobortis sit amet, sodales eu orci. Nunc at elementum ex.';
   updatePart.projectInfo = {
     aims: exactly100words,
     background: exactly100words,
@@ -471,6 +510,20 @@ export function getApprovedApplication() {
   const result = state.updateApp(updatePart, true, { id: '1', role: DacoRole.ADMIN });
   expect(result.state).to.eq('APPROVED');
   expect(result.approvedAtUtc).to.not.eq(undefined);
+  return result;
+}
+
+export function getPausedApplication() {
+  const app = getApprovedApplication();
+  const state = new ApplicationStateManager(app);
+  const updatePart: Partial<UpdateApplication> = {
+    state: 'PAUSED',
+    pauseReason: 'PENDING ATTESTATION',
+  };
+  const result = state.updateApp(updatePart, true, { id: 'DACO-SYSTEM', role: DacoRole.SYSTEM });
+  expect(result.state).to.eq('PAUSED');
+  expect(result.approvedAtUtc).to.not.eq(undefined);
+  expect(result.pauseReason).to.exist;
   return result;
 }
 

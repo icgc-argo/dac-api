@@ -458,6 +458,25 @@ paths:
               example: |
                 "Application #  Date of Status Change  Application Status  Application Type  Action Performed By  Days Since Last Status Change  Institution Country Applicant Project Title Ethics Letter
                 DACO-1  2021-10-21  CREATED NEW SUBMITTER 0 OICR  Canada  Johnny Applicant  Research Title  Yes"
+
+  /jobs/batch-transitions/:
+    get:
+      tags:
+        - System
+      summary: Trigger batch jobs for PAUSING, EXPIRING applications
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pausedApps:
+                    $ref: '#/components/schemas/Report'
+                  expiredApps:
+                    $ref: '#/components/schemas/Report'
+
 tags:
   - name: Health
     description: Service status monitoring
@@ -663,6 +682,7 @@ components:
             - APPROVED
             - CLOSED
             - EXPIRED
+            - PAUSED
         applicant:
           type: object
           properties:
@@ -713,6 +733,12 @@ components:
         currentApprovedAppDoc:
           type: boolean
           readOnly: true
+        attestationByUtc:
+          type: string
+          format: data-time
+        attestedAtUtc:
+          type: string
+          format: data-time
 
     Application:
       type: object
@@ -731,6 +757,7 @@ components:
             - APPROVED
             - CLOSED
             - EXPIRED
+            - PAUSED
         submitterId:
           readOnly: true
           type: string
@@ -774,6 +801,12 @@ components:
         ableToRenew:
           type: boolean
           readOnly: true
+        attestationByUtc:
+          type: string
+          format: data-time
+        attestedAtUtc:
+          type: string
+          format: data-time
         revisionRequests:
           type: object
           properties:
@@ -939,3 +972,17 @@ components:
                     format: date
                   isCurrent:
                     type: boolean
+
+    Report:
+      type: object
+      properties:
+        count:
+          type: number
+        appIds:
+          type: array
+          items:
+            type: string
+        errors:
+          type: array
+          items:
+            type: string

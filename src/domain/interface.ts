@@ -6,7 +6,8 @@ export type State =
   | 'APPROVED'
   | 'REJECTED'
   | 'CLOSED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'PAUSED';
 
 export type SectionStatus =
   | 'PRISTINE'
@@ -75,6 +76,7 @@ export type CollaboratorDto = {
 export enum DacoRole {
   SUBMITTER = 'SUBMITTER',
   ADMIN = 'ADMIN',
+  SYSTEM = 'SYSTEM',
 }
 
 export type UpdateAuthor = {
@@ -163,6 +165,7 @@ export interface ApplicationSummary {
   currentApprovedAppDoc: boolean;
   isRenewal: boolean;
   attestationByUtc?: Date;
+  attestedAtUtc?: Date | null;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -264,6 +267,8 @@ export interface Application {
   updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
   attestationByUtc?: Date; // calculated from approvedAtUtc
+  attestedAtUtc?: Date | null;
+  pauseReason?: string;
 }
 
 export type AppSections = keyof Application['sections'];
@@ -284,6 +289,7 @@ export interface UpdateApplication {
   expiresAtUtc?: Date;
   denialReason?: string;
   revisionRequest?: RevisionRequestUpdate;
+  pauseReason?: string;
   sections: {
     applicant?: {
       info?: Partial<PersonalInfo>;

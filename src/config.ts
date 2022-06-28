@@ -63,6 +63,7 @@ export interface AppConfig {
     jwtKey: string;
     reviewScope: string;
     dacoEncryptionKey: string;
+    dacoSystemScope: string;
   };
   storage: {
     endpoint: string;
@@ -76,7 +77,10 @@ export interface AppConfig {
     daysToExpiry1: number;
     daysToExpiry2: number;
     daysPostExpiry: number;
+    // unitOfTime must be one of these keys https://momentjs.com/docs/#/manipulating/add/
+    attestation: { count: number; unitOfTime: string };
   };
+  adminPause: boolean;
 }
 
 export interface MongoProps {
@@ -141,6 +145,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       jwtKey: process.env.JWT_KEY || '',
       reviewScope: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
       dacoEncryptionKey: secrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY,
+      dacoSystemScope: process.env.DACO_SYSTEM_SCOPE || '',
     },
     ui: {
       baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org',
@@ -194,7 +199,12 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       daysToExpiry1: Number(process.env.DAYS_TO_EXPIRY_1) || 90,
       daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
       daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
+      attestation: {
+        count: Number(process.env.ATTESTATION_UNIT_COUNT) || 1,
+        unitOfTime: process.env.ATTESTATION_UNIT_OF_TIME || 'years',
+      },
     },
+    adminPause: process.env.ADMIN_PAUSE === 'true' || false,
   };
   return config;
 };

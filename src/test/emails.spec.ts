@@ -26,10 +26,14 @@ const stub = {
   dacoSurvey: '',
   accessRenewalGuide: '',
 };
-const expiryStub = {
+const durationsStub = {
   daysToExpiry1: 90,
   daysToExpiry2: 45,
   daysPostExpiry: 90,
+  attestation: {
+    count: 1,
+    unitOfTime: 'year',
+  },
 };
 
 const uiLinksStub = {
@@ -158,19 +162,19 @@ describe('emails', () => {
 
     it('should render an access expiring in 45 days email', async () => {
       const app = getApprovedApplication();
-      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, expiryStub, 45);
+      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, durationsStub, 45);
       console.log(email.emailMjml);
     });
 
     it('should render an access expiring in 90 days email', async () => {
       const app = getApprovedApplication();
-      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, expiryStub, 90);
+      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, durationsStub, 90);
       console.log(email.emailMjml);
     });
 
     it('should render an access has expired email', async () => {
       const app = getApprovedApplication();
-      const email = await renderAccessHasExpiredEmail(app, stub, uiLinksStub, expiryStub);
+      const email = await renderAccessHasExpiredEmail(app, stub, uiLinksStub, durationsStub);
       console.log(email.emailMjml);
     });
   });

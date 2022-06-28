@@ -22,6 +22,7 @@ import {
   sendEmail,
   searchCollaboratorApplications,
   createAppHistoryTSV,
+  runPauseAppCheck,
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
@@ -33,6 +34,11 @@ import { Readable } from 'stream';
 
 export interface IRequest extends Request {
   identity: Identity;
+}
+
+export interface Report {
+  pausedApps: { count: number; ids: string[]; errors: string[] };
+  expiredApps: { count: number; ids: string[]; errors: string[] };
 }
 
 const createApplicationsRouter = (
@@ -378,6 +384,33 @@ const createApplicationsRouter = (
     }),
   );
 
+  // for TESTING ONLY
+  config.adminPause &&
+    router.patch(
+      '/applications/:id/admin-pause',
+      authFilter([config.auth.reviewScope]),
+      wrapAsync(async (req: Request, res: Response) => {
+        const id = req.params.id;
+        const validatedId = validateId(id);
+        const pauseReq = {
+          state: 'PAUSED',
+          pauseReason: req.body.pauseReason || '',
+        } as Partial<UpdateApplication>;
+        logger.info(
+          `updating application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+        );
+
+        const updated = await updatePartial(
+          id,
+          pauseReq,
+          (req as IRequest).identity,
+          storageClient,
+          emailClient,
+        );
+        return res.status(200).send(updated);
+      }),
+    );
+
   router.get(
     '/collaborators/applications',
     authFilter([]),
@@ -385,6 +418,42 @@ const createApplicationsRouter = (
       const user = (req as IRequest).identity;
       const applications = await searchCollaboratorApplications(user);
       return res.status(200).send(applications);
+    }),
+  );
+
+  router.get(
+    '/jobs/batch-transitions/',
+    authFilter([config.auth.dacoSystemScope]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const user = (req as IRequest).identity;
+      // define currentDate here so each job has the same reference date
+      const currentDate = moment.utc().toDate();
+      // define report to collect all modified appIds
+      // TODO: can be added in the response but should be sent somewhere with visibility
+      const report: Report = {
+        pausedApps: { count: 0, ids: [], errors: [] },
+        expiredApps: { count: 0, ids: [], errors: [] },
+      };
+      logger.info('Initiating batch jobs...');
+      try {
+        // attestation/pause flow
+        logger.info('Initiating attestation check...');
+        await runPauseAppCheck(emailClient, report, user, currentDate);
+        if (report.pausedApps.errors.length) {
+          logger.warn('Batch jobs completed, with errors.');
+        }
+        return res.status(200).send(report);
+      } catch (err) {
+        if (err instanceof Error) {
+          logger.error(`Batch jobs failed to complete, with error: ${err.message}`);
+          return res.status(500).send(err.message);
+        }
+        logger.error(`Batch jobs failed to complete, with error: ${err}`);
+        res.status(500).send('An unknown error occurred.');
+      }
+
+      // TODO: implement expiry/renewal flow. Add to report
+      // TODO: add DACO report step to finish (existing cron job will reach out to this endpoint only)
     }),
   );
 
