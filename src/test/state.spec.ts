@@ -12,6 +12,9 @@ import { expect } from 'chai';
 import _ from 'lodash';
 import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
+import { AppConfig } from '../config';
+
+const mockConfig = {} as AppConfig;
 
 const newApplication1: Partial<Application> = newApplication({
   userId: 'abc123',
@@ -31,7 +34,7 @@ describe('state manager', () => {
       appId: 'DACO-1',
       appNumber: 1,
     }) as Application;
-    const state = new ApplicationStateManager(emptyApp);
+    const state = new ApplicationStateManager(emptyApp, mockConfig);
     const updatePart: Partial<UpdateApplication> = {
       sections: {
         applicant: {
@@ -52,7 +55,7 @@ describe('state manager', () => {
   it('should update representative info', () => {
     const app: Application = getReadyToSignApp();
     expect(app.sections.representative.address?.country).to.eq('Canada');
-    const state = new ApplicationStateManager(app);
+    const state = new ApplicationStateManager(app, mockConfig);
     const updatePart: Partial<UpdateApplication> = {
       sections: {
         representative: {
@@ -91,7 +94,7 @@ describe('state manager', () => {
         appId: 'DACO-1',
         appNumber: 1,
       }) as Application;
-      const state = new ApplicationStateManager(emptyApp);
+      const state = new ApplicationStateManager(emptyApp, mockConfig);
       const collab: Collaborator = {
         meta: {
           errorsList: [],
@@ -125,7 +128,7 @@ describe('state manager', () => {
         appId: 'DACO-1',
         appNumber: 1,
       }) as Application;
-      const state = new ApplicationStateManager(emptyApp);
+      const state = new ApplicationStateManager(emptyApp, mockConfig);
       const collab: Collaborator = {
         meta: {
           errorsList: [],
@@ -189,7 +192,7 @@ describe('state manager', () => {
         appNumber: 1,
       }) as Application;
       app.sections.applicant.info.primaryAffiliation = 'ACME';
-      const state = new ApplicationStateManager(app);
+      const state = new ApplicationStateManager(app, mockConfig);
       const collab: Collaborator = {
         meta: {
           errorsList: [],
@@ -227,7 +230,7 @@ describe('state manager', () => {
       expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
 
       // change applicant PA and observe collaborator goes to incomplete
-      const state2 = new ApplicationStateManager(app2);
+      const state2 = new ApplicationStateManager(app2, mockConfig);
       const app3 = state2.updateApp(
         {
           sections: {
@@ -246,14 +249,14 @@ describe('state manager', () => {
       // fix the collaborator to match applicant PA again
       collab.id = 'collab-1';
       collab.info.primaryAffiliation = 'OICR';
-      const state3 = new ApplicationStateManager(app3);
+      const state3 = new ApplicationStateManager(app3, mockConfig);
       const app4 = state3.updateCollaborator(collab, { id: 'user123', role: DacoRole.SUBMITTER });
       expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
     });
 
     it('4) should change back to sign & submit when changing Primary affiliation in applicant in state SIGN & SUBMIT', () => {
       const filledApp: Application = getReadyToSignApp();
-      const state = new ApplicationStateManager(filledApp);
+      const state = new ApplicationStateManager(filledApp, mockConfig);
       const collab: Collaborator = {
         meta: {
           errorsList: [],
@@ -279,7 +282,7 @@ describe('state manager', () => {
       result.sections.collaborators.list[0].id = 'collab-1';
       expect(result.state).to.eq('SIGN AND SUBMIT');
 
-      const result2 = new ApplicationStateManager(result).updateApp(
+      const result2 = new ApplicationStateManager(result, mockConfig).updateApp(
         {
           sections: {
             applicant: {
@@ -303,7 +306,7 @@ describe('state manager', () => {
       // fix the collaborator to match applicant PA again
       collab.id = 'collab-1';
       collab.info.primaryAffiliation = 'A';
-      const stateMgr = new ApplicationStateManager(result2);
+      const stateMgr = new ApplicationStateManager(result2, mockConfig);
       const app4 = stateMgr.updateCollaborator(collab, { id: 'user123', role: DacoRole.SUBMITTER });
       expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
       expect(app4.state).to.eq('SIGN AND SUBMIT');
@@ -320,7 +323,7 @@ describe('state manager', () => {
 
   it('should request revision for section', () => {
     const app: Application = getAppInReview();
-    const state = new ApplicationStateManager(app);
+    const state = new ApplicationStateManager(app, mockConfig);
     const updated = state.updateApp(
       {
         state: 'REVISIONS REQUESTED',
@@ -365,7 +368,7 @@ describe('state manager', () => {
 
   it('should change to sign and submit when revisions requested on signature section only', () => {
     const app: Application = getAppInReview();
-    const state = new ApplicationStateManager(app);
+    const state = new ApplicationStateManager(app, mockConfig);
     const updated = state.updateApp(
       {
         state: 'REVISIONS REQUESTED',
@@ -411,7 +414,7 @@ describe('state manager', () => {
 
   it('should transition an approved app to PAUSED state', () => {
     const app: Application = getApprovedApplication();
-    const state = new ApplicationStateManager(app);
+    const state = new ApplicationStateManager(app, mockConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp({ state: 'PAUSED', pauseReason: 'PENDING ATTESTATION' }, false, systemUser);
     const userApp = state.prepareApplicationForUser(true);
@@ -425,7 +428,7 @@ describe('state manager', () => {
 
   it('should not pause a non-approved app', () => {
     const app: Application = getAppInRevisionRequested();
-    const state = new ApplicationStateManager(app);
+    const state = new ApplicationStateManager(app, mockConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp({ state: 'PAUSED', pauseReason: 'PENDING ATTESTATION' }, false, systemUser);
     const userApp = state.prepareApplicationForUser(true);
@@ -437,7 +440,7 @@ describe('state manager', () => {
 
   it('should not modify an app already in PAUSED state', () => {
     const app: Application = getPausedApplication();
-    const state = new ApplicationStateManager(app);
+    const state = new ApplicationStateManager(app, mockConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp(
       { state: 'PAUSED', pauseReason: 'A different reason to pause' },
@@ -476,7 +479,7 @@ export function getReadyToSignApp() {
     website: 'http://www.institutionWebsite.web',
     publicationsURLs: ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs'],
   };
-  const state = new ApplicationStateManager(app);
+  const state = new ApplicationStateManager(app, mockConfig);
   const newState = state.updateApp(
     {
       sections: updatePart,
@@ -490,12 +493,12 @@ export function getReadyToSignApp() {
 
 export function getAppInReview() {
   const app = getReadyToSignApp();
-  const state = new ApplicationStateManager(app);
+  const state = new ApplicationStateManager(app, mockConfig);
   const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', 'user123', false);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REVIEW',
   };
-  const state2 = new ApplicationStateManager(appAfterSign);
+  const state2 = new ApplicationStateManager(appAfterSign, mockConfig);
   const result = state2.updateApp(updatePart, false, { id: '1', role: DacoRole.SUBMITTER });
   expect(result.state).to.eq('REVIEW');
   return result;
@@ -503,7 +506,7 @@ export function getAppInReview() {
 
 export function getApprovedApplication() {
   const app = getAppInReview();
-  const state = new ApplicationStateManager(app);
+  const state = new ApplicationStateManager(app, mockConfig);
   const updatePart: Partial<UpdateApplication> = {
     state: 'APPROVED',
   };
@@ -515,7 +518,7 @@ export function getApprovedApplication() {
 
 export function getPausedApplication() {
   const app = getApprovedApplication();
-  const state = new ApplicationStateManager(app);
+  const state = new ApplicationStateManager(app, mockConfig);
   const updatePart: Partial<UpdateApplication> = {
     state: 'PAUSED',
     pauseReason: 'PENDING ATTESTATION',
@@ -529,7 +532,7 @@ export function getPausedApplication() {
 
 export function getRejectedApplication() {
   const app = getAppInReview();
-  const state = new ApplicationStateManager(app);
+  const state = new ApplicationStateManager(app, mockConfig);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REJECTED',
     denialReason: 'Your plans to use the data is not accepted.',
@@ -542,7 +545,7 @@ export function getRejectedApplication() {
 
 export function getAppInRevisionRequested() {
   const app = getAppInReview();
-  const state = new ApplicationStateManager(app);
+  const state = new ApplicationStateManager(app, mockConfig);
   const update: Partial<UpdateApplication> = {
     revisionRequest: {
       applicant: {

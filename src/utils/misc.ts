@@ -8,7 +8,7 @@ import {
   DacoRole,
   UpdateAuthor,
 } from '../domain/interface';
-import moment from 'moment';
+import moment, { unitOfTime } from 'moment';
 import { hasDacoSystemScope, hasReviewScope, search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
@@ -19,6 +19,7 @@ import {
   IV_LENGTH,
 } from './constants';
 import { Identity } from '@overture-stack/ego-token-middleware';
+import { AppConfig } from '../config';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -179,5 +180,12 @@ export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();
 };
 
-export const getAttestationByDate: (approvalDate: Date) => Date = (approvalDate) =>
-  moment(approvalDate).add(1, 'year').toDate();
+export const getAttestationByDate: (approvalDate: Date, AppConfig: AppConfig) => Date = (
+  approvalDate,
+  config,
+) => {
+  const { unitOfTime, count } = config.durations?.attestation;
+  return moment(approvalDate)
+    .add(count as number, unitOfTime as unitOfTime.DurationConstructor)
+    .toDate();
+};
