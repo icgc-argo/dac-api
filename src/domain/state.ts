@@ -45,6 +45,7 @@ import {
   validateRepresentativeSection,
 } from './validations';
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
+import { AppConfig } from '../config';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -121,9 +122,11 @@ const stateToLockedSectionsMap: Record<
 
 export class ApplicationStateManager {
   public readonly currentApplication: Application;
+  public readonly currentAppConfig: AppConfig;
 
-  constructor(application: Application) {
+  constructor(application: Application, config: AppConfig) {
     this.currentApplication = cloneDeep(application);
+    this.currentAppConfig = cloneDeep(config);
   }
 
   prepareApplicationForUser(isReviewer: boolean) {
@@ -157,6 +160,7 @@ export class ApplicationStateManager {
     if (this.currentApplication.approvedAtUtc) {
       this.currentApplication.attestationByUtc = getAttestationByDate(
         this.currentApplication.approvedAtUtc,
+        this.currentAppConfig,
       );
     }
     return this.currentApplication;
