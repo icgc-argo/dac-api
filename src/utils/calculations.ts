@@ -34,5 +34,5 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   const attestationByDate = getAttestationByDate(currentApp.approvedAtUtc, config);
   const now = moment.utc().toDate();
   const elapsed = getDaysElapsed(now, attestationByDate);
-  return elapsed >= -45;
+  return elapsed >= -config.durations.attestation.daysToAttestation;
 };

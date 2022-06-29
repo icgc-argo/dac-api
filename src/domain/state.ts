@@ -1063,7 +1063,7 @@ function updateAppStateForPausedApplication(
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'APPROVED') {
-    // Submitters cannot APPROVE a PAUSED application without attesting
+    // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
     if (updatedBy.role === DacoRole.SUBMITTER) {
       throw new Error('Not allowed');
     }
