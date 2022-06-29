@@ -1,4 +1,3 @@
-import { getAttestationByDate, getUpdateAuthor, mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
 import { cloneDeep, last } from 'lodash';
@@ -46,6 +45,8 @@ import {
 } from './validations';
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 import { AppConfig } from '../config';
+import { getUpdateAuthor, mergeKnown } from '../utils/misc';
+import { getAttestationByDate, isAttestable } from '../utils/calculations';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -157,6 +158,7 @@ export class ApplicationStateManager {
       this.currentApplication.state == 'REVISIONS REQUESTED' ||
       wasInRevisionRequestState(this.currentApplication);
 
+    // TODO: add isAttestable so FE doesn't need to do the calculation
     if (this.currentApplication.approvedAtUtc) {
       this.currentApplication.attestationByUtc = getAttestationByDate(
         this.currentApplication.approvedAtUtc,
@@ -483,7 +485,7 @@ export class ApplicationStateManager {
         break;
 
       case 'PAUSED':
-        updateAppStateForPausedApplication(current, updatePart, updatedBy);
+        updateAppStateForPausedApplication(current, updatePart, updatedBy, this.currentAppConfig);
         break;
 
       default:
@@ -875,9 +877,18 @@ function transitionToRejected(
   return current;
 }
 
-function transitionFromPausedToApproved(current: Application, approvedBy: UpdateAuthor) {
+function transitionFromPausedToApproved(
+  current: Application,
+  updatedBy: UpdateAuthor,
+  attestedAtUtc?: Date,
+) {
+  // this transition does not equal an APPROVED update event
   current.state = 'APPROVED';
-  // TODO: changes for attestedAt date, ATTESTED update event
+  if (attestedAtUtc) {
+    current.attestedAtUtc = attestedAtUtc;
+    current.updates.push(createUpdateEvent(current, updatedBy, UpdateEvent.ATTESTED));
+  }
+  return current;
 }
 
 function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
@@ -1048,16 +1059,27 @@ function updateAppStateForPausedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'APPROVED') {
-    // TODO: allow submitters to make this transition only if attestation is complete
-    // will add a check for attestedAtUtc in https://github.com/icgc-argo/dac-api/issues/240
-    // for now this operation will be blocked for submitters
+    // Submitters cannot APPROVE a PAUSED application without attesting
     if (updatedBy.role === DacoRole.SUBMITTER) {
       throw new Error('Not allowed');
     }
     return transitionFromPausedToApproved(currentApplication, updatedBy);
+  }
+
+  // can only attest if it is 45 days to attestationByUtc date or later
+  if (updatePart.attestedAtUtc && isAttestable(currentApplication, config)) {
+    // only submitters can attest
+    if (updatedBy.role === DacoRole.SUBMITTER) {
+      return transitionFromPausedToApproved(
+        currentApplication,
+        updatedBy,
+        updatePart.attestedAtUtc,
+      );
+    }
   }
 }
 

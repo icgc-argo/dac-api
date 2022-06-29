@@ -14,7 +14,15 @@ import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 import { AppConfig } from '../config';
 
-const mockConfig = {} as AppConfig;
+const mockConfig = {
+  durations: {
+    attestation: {
+      count: 1,
+      unitOfTime: 'years',
+      daysToAttestation: 45,
+    },
+  },
+} as AppConfig;
 
 const newApplication1: Partial<Application> = newApplication({
   userId: 'abc123',

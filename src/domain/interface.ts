@@ -290,6 +290,7 @@ export interface UpdateApplication {
   denialReason?: string;
   revisionRequest?: RevisionRequestUpdate;
   pauseReason?: string;
+  attestedAtUtc?: Date;
   sections: {
     applicant?: {
       info?: Partial<PersonalInfo>;

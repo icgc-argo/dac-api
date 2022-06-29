@@ -33,6 +33,7 @@ const durationsStub = {
   attestation: {
     count: 1,
     unitOfTime: 'year',
+    daysToAttestation: 45,
   },
 };
 

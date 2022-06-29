@@ -123,6 +123,7 @@ const ApplicationSchema = new mongoose.Schema(
     searchValues: { type: [String], index: true, required: false },
     isRenewal: { type: Boolean, required: true },
     ableToRenew: { type: Boolean, required: true },
+    attestedAtUtc: { type: Date, required: false },
     revisionRequest: {
       applicant: RevisionRequest,
       representative: RevisionRequest,
