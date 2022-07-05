@@ -46,7 +46,7 @@ import {
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 import { AppConfig } from '../config';
 import { getUpdateAuthor, mergeKnown } from '../utils/misc';
-import { getAttestationByDate, isAttestable } from '../utils/calculations';
+import { getAttestationByDate, getDaysElapsed, isAttestable } from '../utils/calculations';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -158,10 +158,14 @@ export class ApplicationStateManager {
       this.currentApplication.state == 'REVISIONS REQUESTED' ||
       wasInRevisionRequestState(this.currentApplication);
 
-    // TODO: add isAttestable so FE doesn't need to do the calculation
     if (this.currentApplication.approvedAtUtc) {
       this.currentApplication.attestationByUtc = getAttestationByDate(
         this.currentApplication.approvedAtUtc,
+        this.currentAppConfig,
+      );
+      // add isAttestable so FE doesn't need to do the calculation
+      this.currentApplication.isAttestable = isAttestable(
+        this.currentApplication,
         this.currentAppConfig,
       );
     }
@@ -833,11 +837,7 @@ const createUpdateEvent: (
   // daysElapsed will be 0 if there is no previous update event
   let daysElapsed = 0;
   if (lastUpdateEvent) {
-    // create new moment values so currentDate is not mutated
-    // convert to start of day to ignore the time when calculating the diff: https://stackoverflow.com/a/9130040
-    const begin = moment.utc(currentDate).startOf('day');
-    const end = moment.utc(lastUpdateEvent.date).startOf('day');
-    daysElapsed = begin.diff(end, 'days');
+    daysElapsed = getDaysElapsed(currentDate, lastUpdateEvent.date);
   }
 
   // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot of these at the time the event occurred

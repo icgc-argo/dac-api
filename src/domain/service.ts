@@ -47,7 +47,7 @@ import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 
 import { Report } from '../routes/applications';
 import { c, getDacoRole, getUpdateAuthor } from '../utils/misc';
-import { getAttestationByDate, sortByDate } from '../utils/calculations';
+import { getAttestationByDate, isAttestable, sortByDate } from '../utils/calculations';
 
 type RejectedUpdate = { status: 'rejected'; reason: string };
 type FulfilledUpdate = { status: 'fulfilled'; value: Application };
@@ -509,6 +509,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
         ...(app.approvedAtUtc && {
           attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
+          isAttestable: isAttestable(app, config),
         }),
       } as ApplicationSummary),
   );

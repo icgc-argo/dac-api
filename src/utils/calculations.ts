@@ -20,6 +20,8 @@ export const getDaysElapsed: (baseDate: Date, dateToDiff: Date) => number = (
   baseDate,
   dateToDiff,
 ) => {
+  // create new moment values so currentDate is not mutated
+  // convert to start of day to ignore the time when calculating the diff: https://stackoverflow.com/a/9130040
   const begin = moment.utc(baseDate).startOf('day');
   const end = moment.utc(dateToDiff).startOf('day');
   const daysElapsed = begin.diff(end, 'days');
@@ -30,6 +32,10 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   currentApp,
   config,
 ) => {
+  // if app state is neither APPROVED nor PAUSED, attestation doesn't apply so isAttestable cannot be true
+  if (!(currentApp.state === 'APPROVED' || currentApp.state === 'PAUSED')) {
+    return false;
+  }
   const attestationByDate = getAttestationByDate(currentApp.approvedAtUtc, config);
   const now = moment.utc().toDate();
   const elapsed = getDaysElapsed(now, attestationByDate);
