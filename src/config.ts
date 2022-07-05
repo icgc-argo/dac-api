@@ -74,9 +74,13 @@ export interface AppConfig {
     timeout: number;
   };
   durations: {
-    daysToExpiry1: number;
-    daysToExpiry2: number;
-    daysPostExpiry: number;
+    expiry: {
+      daysToExpiry1: number;
+      daysToExpiry2: number;
+      daysPostExpiry: number;
+      count: number; // period length
+      unitOfTime: string; // period units
+    };
     // unitOfTime must be one of these keys https://momentjs.com/docs/#/manipulating/add/
     attestation: { count: number; unitOfTime: string; daysToAttestation: number };
   };
@@ -196,9 +200,13 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',
     },
     durations: {
-      daysToExpiry1: Number(process.env.DAYS_TO_EXPIRY_1) || 90,
-      daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
-      daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
+      expiry: {
+        daysToExpiry1: Number(process.env.DAYS_TO_EXPIRY_1) || 90,
+        daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
+        daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
+        count: Number(process.env.EXPIRY_UNIT_COUNT) || 2,
+        unitOfTime: process.env.EXPIRY_UNIT_OF_TIME || 'years',
+      },
       attestation: {
         count: Number(process.env.ATTESTATION_UNIT_COUNT) || 1,
         unitOfTime: process.env.ATTESTATION_UNIT_OF_TIME || 'years',

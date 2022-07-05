@@ -1108,7 +1108,7 @@ async function sendReviewEmail(
 async function sendAccessExpiringEmail(
   updatedApp: Application,
   config: AppConfig,
-  daysToExpiry: number,
+  daysToExpiry: number, // this will come from the cronjob that is executing, i.e. first (90 days) or second (45 days) warning
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const title = `Your Access is Expiring in ${daysToExpiry} days`;

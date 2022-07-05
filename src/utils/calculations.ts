@@ -1,7 +1,6 @@
 import moment, { unitOfTime } from 'moment';
 import { AppConfig } from '../config';
 import { Application } from '../domain/interface';
-// import { DAYS_TO_ATTESTATION } from './constants';
 
 export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();
