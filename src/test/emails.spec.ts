@@ -16,6 +16,7 @@ import {
   getRejectedApplication,
 } from './state.spec';
 import { Collaborator } from '../domain/interface';
+import { AppConfig } from '../config';
 
 const stub = {
   dataAccessGuide: '',
@@ -26,15 +27,21 @@ const stub = {
   dacoSurvey: '',
   accessRenewalGuide: '',
 };
+
 const durationsStub = {
-  daysToExpiry1: 90,
-  daysToExpiry2: 45,
-  daysPostExpiry: 90,
+  expiry: {
+    daysToExpiry1: 90,
+    daysToExpiry2: 45,
+    daysPostExpiry: 90,
+    count: 2,
+    unitOfTime: 'years',
+  },
   attestation: {
     count: 1,
     unitOfTime: 'year',
+    daysToAttestation: 45,
   },
-};
+} as AppConfig['durations'];
 
 const uiLinksStub = {
   baseUrl: 'http://daco.icgc-argo.org',

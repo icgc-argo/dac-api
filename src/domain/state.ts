@@ -1,4 +1,3 @@
-import { getAttestationByDate, getUpdateAuthor, mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
 import { cloneDeep, last } from 'lodash';
@@ -40,12 +39,15 @@ import {
   validateApplicantSection,
   validateCollaborator,
   validateDataAccessAgreement,
+  validateDate,
   validateEthicsLetterSection,
   validateProjectInfo,
   validateRepresentativeSection,
 } from './validations';
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 import { AppConfig } from '../config';
+import { getUpdateAuthor, mergeKnown } from '../utils/misc';
+import { getAttestationByDate, getDaysElapsed, isAttestable } from '../utils/calculations';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -163,6 +165,11 @@ export class ApplicationStateManager {
         this.currentAppConfig,
       );
     }
+    // add isAttestable so FE doesn't need to do the calculation
+    this.currentApplication.isAttestable = isAttestable(
+      this.currentApplication,
+      this.currentAppConfig,
+    );
     return this.currentApplication;
   }
 
@@ -206,7 +213,13 @@ export class ApplicationStateManager {
     }
 
     if (type == 'ETHICS') {
-      uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
+      uploadEthicsLetter(
+        current,
+        id,
+        name,
+        getUpdateAuthor(updatedBy, isReviewer),
+        this.currentAppConfig,
+      );
       return current;
     }
 
@@ -459,7 +472,14 @@ export class ApplicationStateManager {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
-        updateAppStateForApprovedApplication(current, updatePart, isReviewer, updatedBy);
+        updateAppStateForApprovedApplication(
+          current,
+          updatePart,
+          isReviewer,
+          updatedBy,
+          this.currentAppConfig,
+          false,
+        );
         break;
 
       case 'REVISIONS REQUESTED':
@@ -483,7 +503,7 @@ export class ApplicationStateManager {
         break;
 
       case 'PAUSED':
-        updateAppStateForPausedApplication(current, updatePart, updatedBy);
+        updateAppStateForPausedApplication(current, updatePart, updatedBy, this.currentAppConfig);
         break;
 
       default:
@@ -707,6 +727,7 @@ function uploadEthicsLetter(
   id: string,
   name: string,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
 ) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
@@ -735,7 +756,7 @@ function uploadEthicsLetter(
   } else if (current.state == 'REVISIONS REQUESTED') {
     updateAppStateForReturnedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'APPROVED') {
-    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, true);
+    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, config, true);
   } else if (current.state == 'SIGN AND SUBMIT') {
     updateAppStateForSignAndSubmit(current, updatePart, updatedBy, true);
   } else {
@@ -831,11 +852,7 @@ const createUpdateEvent: (
   // daysElapsed will be 0 if there is no previous update event
   let daysElapsed = 0;
   if (lastUpdateEvent) {
-    // create new moment values so currentDate is not mutated
-    // convert to start of day to ignore the time when calculating the diff: https://stackoverflow.com/a/9130040
-    const begin = moment.utc(currentDate).startOf('day');
-    const end = moment.utc(lastUpdateEvent.date).startOf('day');
-    daysElapsed = begin.diff(end, 'days');
+    daysElapsed = getDaysElapsed(currentDate, lastUpdateEvent.date);
   }
 
   // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot of these at the time the event occurred
@@ -875,9 +892,17 @@ function transitionToRejected(
   return current;
 }
 
-function transitionFromPausedToApproved(current: Application, approvedBy: UpdateAuthor) {
+function transitionFromPausedToApproved(
+  current: Application,
+  updatedBy: UpdateAuthor,
+  updatePart?: Partial<UpdateApplication>,
+) {
+  // this transition does not equal an APPROVED update event
   current.state = 'APPROVED';
-  // TODO: changes for attestedAt date, ATTESTED update event
+  if (updatePart?.attestedAtUtc) {
+    updateAttestedAtUtc(current, updatePart, updatedBy);
+  }
+  return current;
 }
 
 function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
@@ -1022,6 +1047,7 @@ function updateAppStateForApprovedApplication(
   updatePart: Partial<UpdateApplication>,
   isReviewer: boolean,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -1038,26 +1064,56 @@ function updateAppStateForApprovedApplication(
     }
     return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
   }
+
+  if (updatePart.attestedAtUtc) {
+    if (!isAttestable(currentApplication, config)) {
+      throw new Error('Application is not attestable');
+    }
+    if (updatedBy.role !== DacoRole.SUBMITTER) {
+      throw new Error('Not allowed');
+    }
+    updateAttestedAtUtc(currentApplication, updatePart, updatedBy);
+  }
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
     updateEthics(updatePart, currentApplication, updateDocs);
   }
 }
 
+function updateAttestedAtUtc(
+  currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  updatedBy: UpdateAuthor,
+) {
+  validateDate(updatePart.attestedAtUtc?.toString());
+  currentApplication.attestedAtUtc = updatePart.attestedAtUtc;
+  currentApplication.updates.push(
+    createUpdateEvent(currentApplication, updatedBy, UpdateEvent.ATTESTED),
+  );
+  return currentApplication;
+}
+
 function updateAppStateForPausedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'APPROVED') {
-    // TODO: allow submitters to make this transition only if attestation is complete
-    // will add a check for attestedAtUtc in https://github.com/icgc-argo/dac-api/issues/240
-    // for now this operation will be blocked for submitters
+    // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
     if (updatedBy.role === DacoRole.SUBMITTER) {
       throw new Error('Not allowed');
     }
     return transitionFromPausedToApproved(currentApplication, updatedBy);
+  }
+
+  // can only attest if it is the configured # of days to attestationByUtc date or later
+  if (updatePart.attestedAtUtc && isAttestable(currentApplication, config)) {
+    // only submitters can attest
+    if (updatedBy.role === DacoRole.SUBMITTER) {
+      return transitionFromPausedToApproved(currentApplication, updatedBy, updatePart);
+    }
   }
 }
 

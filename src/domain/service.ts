@@ -6,6 +6,11 @@ import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import moment, { unitOfTime } from 'moment';
 import _, { chunk } from 'lodash';
+import { Attachment } from 'nodemailer/lib/mailer';
+import { UploadedFile } from 'express-fileupload';
+import nodemail from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
+
 import {
   ApplicationStateManager,
   getSearchFieldValues,
@@ -23,16 +28,13 @@ import {
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { c, getAttestationByDate, getDacoRole, getUpdateAuthor, sortByDate } from '../utils/misc';
-import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
 import renderReviewEmail from '../emails/review-new';
 import renderReviewRevisedEmail from '../emails/review-revised';
 import renderEthicsLetterEmail from '../emails/ethics-letter';
 import renderCollaboratorAdded from '../emails/collaborator-added';
-import nodemail from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
+
 import renderSubmittedEmail from '../emails/submitted';
 import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
@@ -43,8 +45,9 @@ import renderRejectedEmail from '../emails/rejected';
 import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 
-import { Attachment } from 'nodemailer/lib/mailer';
 import { Report } from '../routes/applications';
+import { c, getDacoRole, getUpdateAuthor } from '../utils/misc';
+import { getAttestationByDate, isAttestable, sortByDate } from '../utils/calculations';
 
 type RejectedUpdate = { status: 'rejected'; reason: string };
 type FulfilledUpdate = { status: 'fulfilled'; value: Application };
@@ -506,6 +509,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
         ...(app.approvedAtUtc && {
           attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
+          isAttestable: isAttestable(app, config),
         }),
       } as ApplicationSummary),
   );
@@ -1105,7 +1109,7 @@ async function sendReviewEmail(
 async function sendAccessExpiringEmail(
   updatedApp: Application,
   config: AppConfig,
-  daysToExpiry: number,
+  daysToExpiry: number, // this will come from the cronjob that is executing, i.e. first (90 days) or second (45 days) warning
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const title = `Your Access is Expiring in ${daysToExpiry} days`;

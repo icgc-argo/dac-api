@@ -51,7 +51,7 @@ function messageBody(
 ) {
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
-  const daysLeftForRenewal = daysToExpiry + durationConfigs.daysPostExpiry;
+  const daysLeftForRenewal = daysToExpiry + durationConfigs.expiry.daysPostExpiry;
   return `
     ${textParagraphSection(
       `<strong>The following application is expiring in ${daysToExpiry} days.</strong> On the date of expiry, all project members will lose access to ICGC Controlled Data.`,

@@ -51,7 +51,7 @@ function messageBody(
 ) {
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
-  const daysLeftForRenewal = durationConfigs.daysPostExpiry;
+  const daysLeftForRenewal = durationConfigs.expiry.daysPostExpiry;
   const expiryData = [
     {
       label: 'Title of Project',
