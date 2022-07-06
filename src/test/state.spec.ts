@@ -14,11 +14,21 @@ import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 import { AppConfig } from '../config';
 
-const mockConfig = {
+const nonAttestableConfig = {
   durations: {
     attestation: {
       count: 1,
       unitOfTime: 'years',
+      daysToAttestation: 45,
+    },
+  },
+} as AppConfig;
+
+const attestableConfig = {
+  durations: {
+    attestation: {
+      count: 10,
+      unitOfTime: 'days',
       daysToAttestation: 45,
     },
   },
@@ -42,7 +52,7 @@ describe('state manager', () => {
       appId: 'DACO-1',
       appNumber: 1,
     }) as Application;
-    const state = new ApplicationStateManager(emptyApp, mockConfig);
+    const state = new ApplicationStateManager(emptyApp, nonAttestableConfig);
     const updatePart: Partial<UpdateApplication> = {
       sections: {
         applicant: {
@@ -63,7 +73,7 @@ describe('state manager', () => {
   it('should update representative info', () => {
     const app: Application = getReadyToSignApp();
     expect(app.sections.representative.address?.country).to.eq('Canada');
-    const state = new ApplicationStateManager(app, mockConfig);
+    const state = new ApplicationStateManager(app, nonAttestableConfig);
     const updatePart: Partial<UpdateApplication> = {
       sections: {
         representative: {
@@ -102,7 +112,7 @@ describe('state manager', () => {
         appId: 'DACO-1',
         appNumber: 1,
       }) as Application;
-      const state = new ApplicationStateManager(emptyApp, mockConfig);
+      const state = new ApplicationStateManager(emptyApp, nonAttestableConfig);
       const collab: Collaborator = {
         meta: {
           errorsList: [],
@@ -136,7 +146,7 @@ describe('state manager', () => {
         appId: 'DACO-1',
         appNumber: 1,
       }) as Application;
-      const state = new ApplicationStateManager(emptyApp, mockConfig);
+      const state = new ApplicationStateManager(emptyApp, nonAttestableConfig);
       const collab: Collaborator = {
         meta: {
           errorsList: [],
@@ -200,7 +210,7 @@ describe('state manager', () => {
         appNumber: 1,
       }) as Application;
       app.sections.applicant.info.primaryAffiliation = 'ACME';
-      const state = new ApplicationStateManager(app, mockConfig);
+      const state = new ApplicationStateManager(app, nonAttestableConfig);
       const collab: Collaborator = {
         meta: {
           errorsList: [],
@@ -238,7 +248,7 @@ describe('state manager', () => {
       expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
 
       // change applicant PA and observe collaborator goes to incomplete
-      const state2 = new ApplicationStateManager(app2, mockConfig);
+      const state2 = new ApplicationStateManager(app2, nonAttestableConfig);
       const app3 = state2.updateApp(
         {
           sections: {
@@ -257,14 +267,14 @@ describe('state manager', () => {
       // fix the collaborator to match applicant PA again
       collab.id = 'collab-1';
       collab.info.primaryAffiliation = 'OICR';
-      const state3 = new ApplicationStateManager(app3, mockConfig);
+      const state3 = new ApplicationStateManager(app3, nonAttestableConfig);
       const app4 = state3.updateCollaborator(collab, { id: 'user123', role: DacoRole.SUBMITTER });
       expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
     });
 
     it('4) should change back to sign & submit when changing Primary affiliation in applicant in state SIGN & SUBMIT', () => {
       const filledApp: Application = getReadyToSignApp();
-      const state = new ApplicationStateManager(filledApp, mockConfig);
+      const state = new ApplicationStateManager(filledApp, nonAttestableConfig);
       const collab: Collaborator = {
         meta: {
           errorsList: [],
@@ -290,7 +300,7 @@ describe('state manager', () => {
       result.sections.collaborators.list[0].id = 'collab-1';
       expect(result.state).to.eq('SIGN AND SUBMIT');
 
-      const result2 = new ApplicationStateManager(result, mockConfig).updateApp(
+      const result2 = new ApplicationStateManager(result, nonAttestableConfig).updateApp(
         {
           sections: {
             applicant: {
@@ -314,7 +324,7 @@ describe('state manager', () => {
       // fix the collaborator to match applicant PA again
       collab.id = 'collab-1';
       collab.info.primaryAffiliation = 'A';
-      const stateMgr = new ApplicationStateManager(result2, mockConfig);
+      const stateMgr = new ApplicationStateManager(result2, nonAttestableConfig);
       const app4 = stateMgr.updateCollaborator(collab, { id: 'user123', role: DacoRole.SUBMITTER });
       expect(app4.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
       expect(app4.state).to.eq('SIGN AND SUBMIT');
@@ -331,7 +341,7 @@ describe('state manager', () => {
 
   it('should request revision for section', () => {
     const app: Application = getAppInReview();
-    const state = new ApplicationStateManager(app, mockConfig);
+    const state = new ApplicationStateManager(app, nonAttestableConfig);
     const updated = state.updateApp(
       {
         state: 'REVISIONS REQUESTED',
@@ -376,7 +386,7 @@ describe('state manager', () => {
 
   it('should change to sign and submit when revisions requested on signature section only', () => {
     const app: Application = getAppInReview();
-    const state = new ApplicationStateManager(app, mockConfig);
+    const state = new ApplicationStateManager(app, nonAttestableConfig);
     const updated = state.updateApp(
       {
         state: 'REVISIONS REQUESTED',
@@ -422,7 +432,7 @@ describe('state manager', () => {
 
   it('should transition an approved app to PAUSED state', () => {
     const app: Application = getApprovedApplication();
-    const state = new ApplicationStateManager(app, mockConfig);
+    const state = new ApplicationStateManager(app, nonAttestableConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp({ state: 'PAUSED', pauseReason: 'PENDING ATTESTATION' }, false, systemUser);
     const userApp = state.prepareApplicationForUser(true);
@@ -436,7 +446,7 @@ describe('state manager', () => {
 
   it('should not pause a non-approved app', () => {
     const app: Application = getAppInRevisionRequested();
-    const state = new ApplicationStateManager(app, mockConfig);
+    const state = new ApplicationStateManager(app, nonAttestableConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp({ state: 'PAUSED', pauseReason: 'PENDING ATTESTATION' }, false, systemUser);
     const userApp = state.prepareApplicationForUser(true);
@@ -448,7 +458,7 @@ describe('state manager', () => {
 
   it('should not modify an app already in PAUSED state', () => {
     const app: Application = getPausedApplication();
-    const state = new ApplicationStateManager(app, mockConfig);
+    const state = new ApplicationStateManager(app, nonAttestableConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp(
       { state: 'PAUSED', pauseReason: 'A different reason to pause' },
@@ -459,6 +469,140 @@ describe('state manager', () => {
 
     expect(userApp.state).to.eq('PAUSED');
     expect(userApp.pauseReason).to.eq('PENDING ATTESTATION');
+  });
+
+  it('should be able to attest a PAUSED application', () => {
+    const app: Application = getPausedApplication();
+    const state = new ApplicationStateManager(app, attestableConfig);
+    const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
+    const currentDate = new Date();
+    const beforeApp = state.prepareApplicationForUser(false);
+    expect(beforeApp.isAttestable).to.be.true;
+    state.updateApp(
+      {
+        attestedAtUtc: currentDate,
+      },
+      false,
+      user,
+    );
+    const userApp = state.prepareApplicationForUser(false);
+
+    expect(userApp.state).to.eq('APPROVED');
+    expect(userApp.attestedAtUtc).to.not.eq(undefined);
+    expect(userApp.attestedAtUtc).to.eq(currentDate);
+    expect(userApp.isAttestable).to.be.false;
+  });
+
+  // this is not working yet because you're not handling updateAppState for approved apps
+  it('should be able to attest an APPROVED application in the attestation period', () => {
+    const app: Application = getApprovedApplication();
+    const state = new ApplicationStateManager(app, attestableConfig);
+    const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
+    const currentDate = new Date();
+    const beforeApp = state.prepareApplicationForUser(false);
+    expect(beforeApp.isAttestable).to.be.true;
+    state.updateApp(
+      {
+        attestedAtUtc: currentDate,
+      },
+      false,
+      user,
+    );
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.state).to.eq('APPROVED');
+    expect(userApp.attestedAtUtc).to.not.eq(undefined);
+    expect(userApp.attestedAtUtc).to.eq(currentDate);
+    expect(userApp.isAttestable).to.be.false;
+  });
+
+  it('a non-PAUSED or non-APPROVED application should not be attestable', () => {
+    const app: Application = getAppInRevisionRequested();
+    const state = new ApplicationStateManager(app, attestableConfig);
+    const beforeApp = state.prepareApplicationForUser(false);
+    expect(beforeApp.isAttestable).to.be.false;
+  });
+
+  it('should not be able to attest to an APPROVED application that is not in the attestation period', () => {
+    const app: Application = getApprovedApplication();
+    const state = new ApplicationStateManager(app, nonAttestableConfig);
+    const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
+    const currentDate = new Date();
+    const beforeApp = state.prepareApplicationForUser(false);
+    expect(beforeApp.isAttestable).to.be.false;
+    expect(() =>
+      state.updateApp(
+        {
+          attestedAtUtc: currentDate,
+        },
+        false,
+        user,
+      ),
+    ).to.throw(Error, 'Application is not attestable');
+
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.attestedAtUtc).to.eq(undefined);
+  });
+
+  it('should not be able to attest an application that has already been attested', () => {
+    const app: Application = getApprovedApplication();
+    app.attestedAtUtc = new Date();
+    const state = new ApplicationStateManager(app, attestableConfig);
+    const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
+    const currentDate = new Date();
+    const beforeApp = state.prepareApplicationForUser(false);
+    expect(beforeApp.isAttestable).to.be.false;
+    expect(() =>
+      state.updateApp(
+        {
+          attestedAtUtc: currentDate,
+        },
+        false,
+        user,
+      ),
+    ).to.throw(Error, 'Application is not attestable');
+  });
+
+  it('should not attest with an invalid date', () => {
+    const app: Application = getApprovedApplication();
+    const state = new ApplicationStateManager(app, attestableConfig);
+    const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
+    const currentDate = ('notADate' as unknown) as Date;
+    const beforeApp = state.prepareApplicationForUser(false);
+    expect(beforeApp.isAttestable).to.be.true;
+
+    expect(() =>
+      state.updateApp(
+        {
+          attestedAtUtc: currentDate,
+        },
+        false,
+        user,
+      ),
+    ).to.throw(Error, '"Invalid date"');
+
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.state).to.eq('APPROVED');
+    expect(userApp.attestedAtUtc).to.eq(undefined);
+  });
+
+  it('should not allow a non-submitter to attest', () => {
+    const app: Application = getApprovedApplication();
+    const state = new ApplicationStateManager(app, attestableConfig);
+    const user = { id: 'Mme Admin', role: DacoRole.ADMIN };
+    const currentDate = new Date();
+    const beforeApp = state.prepareApplicationForUser(false);
+    expect(beforeApp.isAttestable).to.be.true;
+    expect(() =>
+      state.updateApp(
+        {
+          attestedAtUtc: currentDate,
+        },
+        false,
+        user,
+      ),
+    ).to.throw(Error, 'Not allowed');
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.attestedAtUtc).to.eq(undefined);
   });
 });
 
@@ -487,7 +631,7 @@ export function getReadyToSignApp() {
     website: 'http://www.institutionWebsite.web',
     publicationsURLs: ['http://www.website.web', 'http://abcd.efg.ca', 'http://hijk.lmnop.qrs'],
   };
-  const state = new ApplicationStateManager(app, mockConfig);
+  const state = new ApplicationStateManager(app, nonAttestableConfig);
   const newState = state.updateApp(
     {
       sections: updatePart,
@@ -501,12 +645,12 @@ export function getReadyToSignApp() {
 
 export function getAppInReview() {
   const app = getReadyToSignApp();
-  const state = new ApplicationStateManager(app, mockConfig);
+  const state = new ApplicationStateManager(app, nonAttestableConfig);
   const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', 'user123', false);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REVIEW',
   };
-  const state2 = new ApplicationStateManager(appAfterSign, mockConfig);
+  const state2 = new ApplicationStateManager(appAfterSign, nonAttestableConfig);
   const result = state2.updateApp(updatePart, false, { id: '1', role: DacoRole.SUBMITTER });
   expect(result.state).to.eq('REVIEW');
   return result;
@@ -514,7 +658,7 @@ export function getAppInReview() {
 
 export function getApprovedApplication() {
   const app = getAppInReview();
-  const state = new ApplicationStateManager(app, mockConfig);
+  const state = new ApplicationStateManager(app, nonAttestableConfig);
   const updatePart: Partial<UpdateApplication> = {
     state: 'APPROVED',
   };
@@ -526,7 +670,7 @@ export function getApprovedApplication() {
 
 export function getPausedApplication() {
   const app = getApprovedApplication();
-  const state = new ApplicationStateManager(app, mockConfig);
+  const state = new ApplicationStateManager(app, nonAttestableConfig);
   const updatePart: Partial<UpdateApplication> = {
     state: 'PAUSED',
     pauseReason: 'PENDING ATTESTATION',
@@ -540,7 +684,7 @@ export function getPausedApplication() {
 
 export function getRejectedApplication() {
   const app = getAppInReview();
-  const state = new ApplicationStateManager(app, mockConfig);
+  const state = new ApplicationStateManager(app, nonAttestableConfig);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REJECTED',
     denialReason: 'Your plans to use the data is not accepted.',
@@ -553,7 +697,7 @@ export function getRejectedApplication() {
 
 export function getAppInRevisionRequested() {
   const app = getAppInReview();
-  const state = new ApplicationStateManager(app, mockConfig);
+  const state = new ApplicationStateManager(app, nonAttestableConfig);
   const update: Partial<UpdateApplication> = {
     revisionRequest: {
       applicant: {

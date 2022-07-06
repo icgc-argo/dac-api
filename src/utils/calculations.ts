@@ -32,6 +32,11 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   currentApp,
   config,
 ) => {
+  // isAttestable is false if attestation has already occurred
+  // **NOTE** attestation fields will be reset when an app goes through the renewal process
+  if (currentApp.attestedAtUtc) {
+    return false;
+  }
   // if app state is neither APPROVED nor PAUSED, attestation doesn't apply so isAttestable cannot be true
   if (!(currentApp.state === 'APPROVED' || currentApp.state === 'PAUSED')) {
     return false;

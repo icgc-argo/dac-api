@@ -8,7 +8,7 @@ import {
   SectionError,
 } from './interface';
 import validator from 'validate.js';
-import _ from 'lodash';
+import _, { isNaN } from 'lodash';
 import { countriesList } from '../utils/constants';
 import { c } from '../utils/misc';
 
@@ -367,6 +367,17 @@ function validateRequired(
       message: `field ${name} is required`,
     });
     return false;
+  }
+  return true;
+}
+
+export function validateDate(val?: string) {
+  if (!val) {
+    throw new BadRequest('Missing date value');
+  }
+  const test = Date.parse(val);
+  if (isNaN(test)) {
+    throw new BadRequest('Invalid date');
   }
   return true;
 }

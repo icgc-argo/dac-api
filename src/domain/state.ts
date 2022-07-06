@@ -39,6 +39,7 @@ import {
   validateApplicantSection,
   validateCollaborator,
   validateDataAccessAgreement,
+  validateDate,
   validateEthicsLetterSection,
   validateProjectInfo,
   validateRepresentativeSection,
@@ -163,12 +164,12 @@ export class ApplicationStateManager {
         this.currentApplication.approvedAtUtc,
         this.currentAppConfig,
       );
-      // add isAttestable so FE doesn't need to do the calculation
-      this.currentApplication.isAttestable = isAttestable(
-        this.currentApplication,
-        this.currentAppConfig,
-      );
     }
+    // add isAttestable so FE doesn't need to do the calculation
+    this.currentApplication.isAttestable = isAttestable(
+      this.currentApplication,
+      this.currentAppConfig,
+    );
     return this.currentApplication;
   }
 
@@ -212,7 +213,13 @@ export class ApplicationStateManager {
     }
 
     if (type == 'ETHICS') {
-      uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
+      uploadEthicsLetter(
+        current,
+        id,
+        name,
+        getUpdateAuthor(updatedBy, isReviewer),
+        this.currentAppConfig,
+      );
       return current;
     }
 
@@ -465,7 +472,14 @@ export class ApplicationStateManager {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
-        updateAppStateForApprovedApplication(current, updatePart, isReviewer, updatedBy);
+        updateAppStateForApprovedApplication(
+          current,
+          updatePart,
+          isReviewer,
+          updatedBy,
+          this.currentAppConfig,
+          false,
+        );
         break;
 
       case 'REVISIONS REQUESTED':
@@ -713,6 +727,7 @@ function uploadEthicsLetter(
   id: string,
   name: string,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
 ) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
@@ -741,7 +756,7 @@ function uploadEthicsLetter(
   } else if (current.state == 'REVISIONS REQUESTED') {
     updateAppStateForReturnedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'APPROVED') {
-    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, true);
+    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, config, true);
   } else if (current.state == 'SIGN AND SUBMIT') {
     updateAppStateForSignAndSubmit(current, updatePart, updatedBy, true);
   } else {
@@ -880,13 +895,12 @@ function transitionToRejected(
 function transitionFromPausedToApproved(
   current: Application,
   updatedBy: UpdateAuthor,
-  attestedAtUtc?: Date,
+  updatePart?: Partial<UpdateApplication>,
 ) {
   // this transition does not equal an APPROVED update event
   current.state = 'APPROVED';
-  if (attestedAtUtc) {
-    current.attestedAtUtc = attestedAtUtc;
-    current.updates.push(createUpdateEvent(current, updatedBy, UpdateEvent.ATTESTED));
+  if (updatePart?.attestedAtUtc) {
+    updateAttestedAtUtc(current, updatePart, updatedBy);
   }
   return current;
 }
@@ -1033,6 +1047,7 @@ function updateAppStateForApprovedApplication(
   updatePart: Partial<UpdateApplication>,
   isReviewer: boolean,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -1049,10 +1064,33 @@ function updateAppStateForApprovedApplication(
     }
     return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
   }
+
+  if (updatePart.attestedAtUtc) {
+    if (!isAttestable(currentApplication, config)) {
+      throw new Error('Application is not attestable');
+    }
+    if (updatedBy.role !== DacoRole.SUBMITTER) {
+      throw new Error('Not allowed');
+    }
+    updateAttestedAtUtc(currentApplication, updatePart, updatedBy);
+  }
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
     updateEthics(updatePart, currentApplication, updateDocs);
   }
+}
+
+function updateAttestedAtUtc(
+  currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  updatedBy: UpdateAuthor,
+) {
+  validateDate(updatePart.attestedAtUtc?.toString());
+  currentApplication.attestedAtUtc = updatePart.attestedAtUtc;
+  currentApplication.updates.push(
+    createUpdateEvent(currentApplication, updatedBy, UpdateEvent.ATTESTED),
+  );
+  return currentApplication;
 }
 
 function updateAppStateForPausedApplication(
@@ -1070,15 +1108,11 @@ function updateAppStateForPausedApplication(
     return transitionFromPausedToApproved(currentApplication, updatedBy);
   }
 
-  // can only attest if it is 45 days to attestationByUtc date or later
+  // can only attest if it is the configured # of days to attestationByUtc date or later
   if (updatePart.attestedAtUtc && isAttestable(currentApplication, config)) {
     // only submitters can attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
-      return transitionFromPausedToApproved(
-        currentApplication,
-        updatedBy,
-        updatePart.attestedAtUtc,
-      );
+      return transitionFromPausedToApproved(currentApplication, updatedBy, updatePart);
     }
   }
 }
