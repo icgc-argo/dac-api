@@ -502,6 +502,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         },
         submittedAtUtc: app.submittedAtUtc,
         lastUpdatedAtUtc: app.lastUpdatedAtUtc,
+        isAttestable: isAttestable(app, config),
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
@@ -509,7 +510,6 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
         ...(app.approvedAtUtc && {
           attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
-          isAttestable: isAttestable(app, config),
         }),
       } as ApplicationSummary),
   );
