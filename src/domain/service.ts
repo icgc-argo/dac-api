@@ -593,12 +593,12 @@ const getPauseableQuery = (config: AppConfig, currentDate: Date) => {
     unitOfTime as unitOfTime.DurationConstructor,
   );
   const approvalDayStart = moment(approvalDate).startOf('day').toDate();
-  const approvalDayEnd = moment(approvalDate).endOf('day').toDate();
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',
     approvedAtUtc: {
-      $gte: approvalDayStart, // check for an approvedAtUtc within a 24hr period
-      $lte: approvalDayEnd,
+      // filter for any time period equal to or past attestationByUtc in case an application that should have been paused previously
+      // is caught on a subsequent job run, as it will still be APPROVED and not have an attestedAtUtc value
+      $gte: approvalDayStart,
     },
     // tslint:disable-next-line:no-null-keyword
     $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
