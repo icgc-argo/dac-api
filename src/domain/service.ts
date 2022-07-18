@@ -502,6 +502,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         },
         submittedAtUtc: app.submittedAtUtc,
         lastUpdatedAtUtc: app.lastUpdatedAtUtc,
+        attestedAtUtc: app.attestedAtUtc,
         isAttestable: isAttestable(app, config),
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
