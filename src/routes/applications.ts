@@ -23,6 +23,8 @@ import {
   searchCollaboratorApplications,
   createAppHistoryTSV,
   runPauseAppCheck,
+  runAttestableNotificationCheck,
+  addErrorToReport,
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
@@ -36,9 +38,17 @@ export interface IRequest extends Request {
   identity: Identity;
 }
 
+interface ReportItem {
+  count: number;
+  ids: string[];
+  errors: string[];
+}
 export interface Report {
-  pausedApps: { count: number; ids: string[]; errors: string[] };
-  expiredApps: { count: number; ids: string[]; errors: string[] };
+  pausedApps: ReportItem;
+  expiredApps: ReportItem;
+  attestationNotifications: ReportItem;
+  expiryNotifications1: ReportItem;
+  expiryNotifications2: ReportItem;
 }
 
 const createApplicationsRouter = (
@@ -430,29 +440,78 @@ const createApplicationsRouter = (
       const currentDate = moment.utc().toDate();
       // define report to collect all modified appIds
       // TODO: can be added in the response but should be sent somewhere with visibility
+      // maybe not necessary to include apps that are being sent warning emails as they are not being updated?
+      const getInitialReportItem: () => ReportItem = () => ({ count: 0, ids: [], errors: [] });
       const report: Report = {
-        pausedApps: { count: 0, ids: [], errors: [] },
-        expiredApps: { count: 0, ids: [], errors: [] },
+        pausedApps: getInitialReportItem(),
+        expiredApps: getInitialReportItem(),
+        attestationNotifications: getInitialReportItem(),
+        expiryNotifications1: getInitialReportItem(),
+        expiryNotifications2: getInitialReportItem(),
       };
+      let responseStatus = null;
       logger.info('Initiating batch jobs...');
+
+      // Check + notification for applications entering attestation period
       try {
-        // attestation/pause flow
-        logger.info('Initiating attestation check...');
-        await runPauseAppCheck(emailClient, report, user, currentDate);
-        if (report.pausedApps.errors.length) {
-          logger.warn('Batch jobs completed, with errors.');
+        logger.info('Initiating attestation notification check...');
+        await runAttestableNotificationCheck(currentDate, report, emailClient, config);
+        if (report.attestationNotifications.errors.length) {
+          logger.warn('Attestation notification check completed, with errors.');
         }
-        return res.status(200).send(report);
+        responseStatus = 200;
       } catch (err) {
         if (err instanceof Error) {
-          logger.error(`Batch jobs failed to complete, with error: ${err.message}`);
-          return res.status(500).send(err.message);
+          responseStatus = 500;
+          addErrorToReport('attestationNotifications', report, err.message);
+          logger.error(
+            `Attestation notification check failed to complete, with error: ${err.message}`,
+          );
+        } else {
+          logger.error(`Attestation notification check failed to complete, with error: ${err}`);
+          responseStatus = 500;
+          addErrorToReport('attestationNotifications', report, `${err}`);
         }
-        logger.error(`Batch jobs failed to complete, with error: ${err}`);
-        res.status(500).send('An unknown error occurred.');
       }
 
+      // Check for applications that have reached attestationBy date and are not attested
+      // These will be PAUSED and notifications sent
+      try {
+        logger.info('Initiating pause app check...');
+        await runPauseAppCheck(emailClient, report, user, currentDate);
+        if (report.pausedApps.errors.length) {
+          logger.warn('Pause app check completed, with errors.');
+        }
+      } catch (err) {
+        if (err instanceof Error) {
+          logger.error(`Pause app check failed to complete, with error: ${err.message}`);
+          responseStatus = 500;
+          addErrorToReport('pausedApps', report, err.message);
+        }
+        logger.error(`Pause app check failed to complete, with error: ${err}`);
+        responseStatus = 500;
+        addErrorToReport('pausedApps', report, `${err}`);
+      }
+
+      logger.info('All batch jobs completed, returning report.');
+
+      // how to handle the response status? 200 if you return the report at all?
+      if (responseStatus) {
+        return res.status(responseStatus).send(report);
+      }
+      return res.status(500).send('An unknown error occurred.');
+
       // TODO: implement expiry/renewal flow. Add to report
+
+      // 1st notification for applications entering renewal period (DAYS_TO_EXPIRY_1)
+
+      // 2nd notification for applications that have not begun renewal process (DAYS_TO_EXPIRY_2)
+
+      // Check for applications that have reached expiry date and have not begun renewal process
+      // this will transition applications to EXPIRED and expiry notifications sent
+
+      // Check for applications that have reached expiry date + DAYS_POST_EXPIRY
+      // if they are not already in REVIEW state, they will transition to CLOSED
       // TODO: add DACO report step to finish (existing cron job will reach out to this endpoint only)
     }),
   );

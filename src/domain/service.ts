@@ -48,6 +48,7 @@ import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 import { Report } from '../routes/applications';
 import { c, getDacoRole, getUpdateAuthor } from '../utils/misc';
 import { getAttestationByDate, isAttestable, sortByDate } from '../utils/calculations';
+import { NOTIFICATION_UNIT_OF_TIME, REQUEST_CHUNK_SIZE } from '../utils/constants';
 
 type RejectedUpdate = { status: 'rejected'; reason: string };
 type FulfilledUpdate = { status: 'fulfilled'; value: Application };
@@ -547,17 +548,12 @@ export const searchCollaboratorApplications = async (identity: Identity) => {
   );
 };
 
+// ***BATCH SERVICE CALLS***
 const searchPauseableApplications = async (query: FilterQuery<ApplicationDocument>) => {
   // can still run this multiple times in the same 24hr period,
   // as any apps that were paused previously will be ignored because we're looking for APPROVED state
   const apps = await ApplicationModel.find(query).exec();
   return apps;
-};
-
-const addToReport = (type: keyof Report, report: Report, appId: string) => {
-  report[type].count++;
-  report[type].ids.push(appId);
-  return report;
 };
 
 const pauseApplication = async (currentApp: Application, identity: Identity, reason?: string) => {
@@ -594,6 +590,8 @@ const getPauseableQuery = (config: AppConfig, currentDate: Date) => {
   );
   const approvalDayStart = moment(approvalDate).startOf('day').toDate();
   const approvalDayEnd = moment(approvalDate).endOf('day').toDate();
+  // TODO: depending on how expiry/renewal is handled for applications that are never attested, will need to modify this query
+  // to check for PAUSED state and date range of attestationByUtc to expiresAtUtc
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',
     approvedAtUtc: {
@@ -623,11 +621,10 @@ export const runPauseAppCheck = async (
   }
   logger.info(`There are ${pauseableAppCount} apps that should be PAUSED.`);
   const pauseableApps = await searchPauseableApplications(query);
-  const requestChunkSize = 5;
 
   const results: (RejectedUpdate | FulfilledUpdate)[][] = [];
 
-  const requests = chunk(pauseableApps, requestChunkSize).map(
+  const requests = chunk(pauseableApps, REQUEST_CHUNK_SIZE).map(
     async (appChunk: ApplicationDocument[]) => {
       return Promise.allSettled(
         appChunk.map(async (app: ApplicationDocument) => {
@@ -658,8 +655,7 @@ export const runPauseAppCheck = async (
     .map((fulfilled) => {
       const { value } = fulfilled as FulfilledUpdate;
       logger.info(`Successfully PAUSED ${value.appId}`);
-      // TODO: send email
-      addToReport('pausedApps', report, value.appId);
+      addAppIdToReport('pausedApps', report, value.appId);
     });
 
   // add failed pause requests to report errors
@@ -673,6 +669,62 @@ export const runPauseAppCheck = async (
 
   logger.info('returning PAUSED app report');
   return report.pausedApps;
+};
+
+const getAttestableQuery = (config: AppConfig, currentDate: Date) => {
+  const {
+    durations: {
+      attestation: { count, unitOfTime, daysToAttestation },
+    },
+  } = config;
+  // find all apps that are APPROVED with an approval date matching the configured time period + configured daysToAttestation
+  // default is 1 year less 45 days to match DACO
+  const attestationStartDate = moment(currentDate)
+    .subtract(count, unitOfTime as unitOfTime.DurationConstructor)
+    .add(daysToAttestation, NOTIFICATION_UNIT_OF_TIME);
+  const query: FilterQuery<ApplicationDocument> = {
+    state: 'APPROVED',
+    approvedAtUtc: getDayRange(attestationStartDate),
+    // tslint:disable-next-line:no-null-keyword
+    $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
+  };
+
+  return query;
+};
+
+export const runAttestableNotificationCheck = async (
+  currentDate: Date,
+  report: Report,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+) => {
+  const query = getAttestableQuery(config, currentDate);
+  const attestableAppCount = await ApplicationModel.find(query).countDocuments();
+  if (attestableAppCount === 0) {
+    logger.info('No applications are entering the attestation period.');
+    return report;
+  }
+
+  const attestableApps = await ApplicationModel.find(query).exec();
+  const apps: Application[] = attestableApps.map(
+    (app: ApplicationDocument) => app.toObject() as Application,
+  );
+
+  const emails = chunk(apps, REQUEST_CHUNK_SIZE).map(async (appChunk: Application[]) => {
+    return Promise.allSettled(
+      appChunk.map(async (app) => sendAttestationOpenNotificationEmail(app, emailClient, config)),
+    );
+  });
+
+  const results: PromiseSettledResult<any>[][] = [];
+  for (const email of emails) {
+    const result = (await email) as PromiseSettledResult<any>[];
+    results.push(result);
+  }
+  const allResults = results.flat();
+
+  reportResults(allResults, 'attestationNotifications', report);
+  return report.attestationNotifications;
 };
 
 export const getApplicationUpdates = async () => {
@@ -729,6 +781,15 @@ async function findApplication(appId: string, identity: Identity) {
   }
   return appDoc;
 }
+
+const getDayRange: (targetDate: moment.Moment) => { $gte: Date; $lte: Date } = (targetDate) => {
+  const start = moment(targetDate).startOf('day').toDate();
+  const end = moment(targetDate).endOf('day').toDate();
+  return {
+    $gte: start,
+    $lte: end,
+  };
+};
 
 export async function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = (await getAppConfig()).auth.reviewScope;
@@ -869,6 +930,48 @@ function mapField(field: string) {
     default:
       return field;
   }
+}
+
+const addAppIdToReport = (type: keyof Report, report: Report, appId: string) => {
+  report[type].count++;
+  report[type].ids.push(appId);
+  return report;
+};
+
+export const addErrorToReport = (type: keyof Report, report: Report, err: string) => {
+  report[type].errors.push(err);
+  return report;
+};
+
+function reportResults(
+  results: PromiseSettledResult<any>[],
+  reportType: keyof Report,
+  report: Report,
+) {
+  logger.info('Adding successful requests to report.');
+  results
+    .filter((res) => res.status === 'fulfilled')
+    .map((success) => {
+      const { value } = success as FulfilledUpdate;
+      addAppIdToReport(reportType, report, value.appId);
+    });
+  logger.info('Adding failed requests to report.');
+  results
+    .filter((res) => res.status === 'rejected')
+    .map((rej) => {
+      const { reason } = rej as RejectedUpdate;
+      addAppIdToReport(reportType, report, reason);
+    });
+}
+
+async function sendAttestationOpenNotificationEmail(
+  currentApp: Application,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+) {
+  // TODO: implement attestation notification email
+  // const attestationNotificationEmail = await renderAttestationOpenEmail()
+  return currentApp;
 }
 
 async function sendSubmissionConfirmation(
