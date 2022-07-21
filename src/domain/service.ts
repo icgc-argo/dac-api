@@ -503,6 +503,8 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         },
         submittedAtUtc: app.submittedAtUtc,
         lastUpdatedAtUtc: app.lastUpdatedAtUtc,
+        attestedAtUtc: app.attestedAtUtc,
+        isAttestable: isAttestable(app, config),
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
@@ -510,7 +512,6 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
         ...(app.approvedAtUtc && {
           attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
-          isAttestable: isAttestable(app, config),
         }),
       } as ApplicationSummary),
   );
@@ -589,14 +590,14 @@ const getPauseableQuery = (config: AppConfig, currentDate: Date) => {
     unitOfTime as unitOfTime.DurationConstructor,
   );
   const approvalDayStart = moment(approvalDate).startOf('day').toDate();
-  const approvalDayEnd = moment(approvalDate).endOf('day').toDate();
   // TODO: depending on how expiry/renewal is handled for applications that are never attested, will need to modify this query
   // to check for PAUSED state and date range of attestationByUtc to expiresAtUtc
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',
     approvedAtUtc: {
-      $gte: approvalDayStart, // check for an approvedAtUtc within a 24hr period
-      $lte: approvalDayEnd,
+      // filter for any time period equal to or past attestationByUtc in case an application that should have been paused previously
+      // is caught on a subsequent job run, as it will still be APPROVED and not have an attestedAtUtc value
+      $gte: approvalDayStart,
     },
     // tslint:disable-next-line:no-null-keyword
     $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
