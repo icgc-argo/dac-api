@@ -493,12 +493,12 @@ const createApplicationsRouter = (
         addErrorToReport('pausedApps', report, `${err}`);
       }
 
-      logger.info('All batch jobs completed, returning report.');
-
       // how to handle the response status? 200 if you return the report at all?
       if (responseStatus) {
+        logger.info('All batch jobs completed, returning report.');
         return res.status(responseStatus).send(report);
       }
+      logger.error(`Batch jobs failed with unknown error`);
       return res.status(500).send('An unknown error occurred.');
 
       // TODO: implement expiry/renewal flow. Add to report
