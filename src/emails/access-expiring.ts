@@ -3,7 +3,7 @@ import { Application } from '../domain/interface';
 import {
   actionGetStarted,
   appInfoBox,
-  approvalDetailsBox,
+  accessDetailsBox,
   compose,
   textParagraphSection,
   UILinksInfo,
@@ -58,7 +58,7 @@ function messageBody(
       { padding: '0px 0px 20px 0px' },
     )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-    ${approvalDetailsBox(
+    ${accessDetailsBox(
       app,
       app.sections.applicant.info.googleEmail,
       'The following are your access details:',
