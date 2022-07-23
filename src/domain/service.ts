@@ -45,6 +45,7 @@ import renderRejectedEmail from '../emails/rejected';
 import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 import renderAttestationRequiredEmail from '../emails/attestation-required';
+import renderApplicationPausedEmail from '../emails/application-paused';
 
 import { Report } from '../routes/applications';
 import { c, getDacoRole, getUpdateAuthor } from '../utils/misc';
@@ -1130,6 +1131,33 @@ async function sendAttestationRequiredEmail(
     config.email.fromAddress,
     config.email.fromName,
     getApplicantEmails(currentApp),
+    subject,
+    emailContent,
+  );
+}
+
+async function sendApplicationPausedEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const title = 'Your Access to ICGC Controlled Data has been Paused';
+  const email = await renderApplicationPausedEmail(
+    updatedApp,
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+    config,
+  );
+  const emailContent = email.html;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
     subject,
     emailContent,
   );
