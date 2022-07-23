@@ -6,7 +6,7 @@ import {
 } from '../utils/constants';
 import { AppConfig } from '../config';
 import { Application, Collaborator, PersonalInfo } from '../domain/interface';
-import { appInfoBox, approvalDetailsBox, compose, textParagraphSection } from './common';
+import { appInfoBox, accessDetailsBox, compose, textParagraphSection } from './common';
 import { compileMjmlInPromise } from './mjml';
 
 export default async function (
@@ -47,7 +47,7 @@ function messageBody(app: Application, recipient: PersonalInfo) {
       { padding: '0px 0px 20px 0px' },
     )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-    ${approvalDetailsBox(app, recipient.googleEmail, 'The following are your access details:')}
+    ${accessDetailsBox(app, recipient.googleEmail, 'The following are your access details:')}
     ${textParagraphSection(
       `Please note that access to ICGC Controlled Data remains conditional upon respecting the terms and conditions of the Data Access Agreement, particularly regarding (but not limited to) the publication moratorium and re-identification of research participants.`,
       { padding: '0px 0px 20px 0px' },

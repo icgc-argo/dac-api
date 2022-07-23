@@ -57,7 +57,7 @@ function header(title: string) {
         .card-title-container{
         	border: 1px solid #0774D3;
         }
-        .app-tbl-lable {
+        .app-tbl-label {
           font-weight: 600;
           width: 145px;
           padding: 2px 4px 2px 10px;
@@ -256,7 +256,7 @@ export function infoBox(
                           .map((d) => {
                             return `
                             <tr>
-                              <td class="app-tbl-lable">
+                              <td class="app-tbl-label">
                                 ${d.label}:
                               </td>
                               <td class="app-tbl-val">
@@ -275,7 +275,7 @@ export function infoBox(
   `;
 }
 
-export function approvalDetailsBox(
+export function accessDetailsBox(
   app: Application,
   accessEmail: string,
   accessDetailsSubtitle?: string,
@@ -301,6 +301,7 @@ export function approvalDetailsBox(
 export const approvalDetailsContent = (
   data: { label: string; value: string }[],
   accessDetailsSubtitle?: string,
+  customLabelWidth?: number,
 ) => {
   return `
   <mj-section padding="0px 0px 20px 0px">
@@ -324,7 +325,9 @@ export const approvalDetailsContent = (
                           .map((d) => {
                             return `
                             <tr>
-                              <td class="app-tbl-lable">
+                              <td class="app-tbl-label"${
+                                customLabelWidth ? ` style="width: ${customLabelWidth}px"` : ''
+                              }>
                                 ${d.label}:
                               </td>
                               <td class="app-tbl-val">
