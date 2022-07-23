@@ -44,6 +44,7 @@ import renderApplicationClosedEmail from '../emails/closed-approved';
 import renderRejectedEmail from '../emails/rejected';
 import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
+import renderAttestationRequiredEmail from '../emails/attestation-required';
 
 import { Report } from '../routes/applications';
 import { c, getDacoRole, getUpdateAuthor } from '../utils/misc';
@@ -1103,6 +1104,33 @@ async function sendReviewEmail(
     config.email.fromName,
     new Set([config.email.dacoAddress]),
     title,
+    emailContent,
+  );
+}
+
+async function sendAttestationRequiredEmail(
+  currentApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const title = 'An Annual Attestation is Required';
+  const email = await renderAttestationRequiredEmail(
+    currentApp,
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+    config,
+  );
+  const emailContent = email.html;
+  const subject = `[${currentApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(currentApp),
+    subject,
     emailContent,
   );
 }

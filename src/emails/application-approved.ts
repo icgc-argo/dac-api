@@ -1,7 +1,7 @@
 import { ICGC_25K_URL, ICGC_ARGO_PLATFORM_URL, ICGC_ARGO_URL } from '../utils/constants';
 import { AppConfig } from '../config';
 import { Application } from '../domain/interface';
-import { appInfoBox, approvalDetailsBox, compose, textParagraphSection } from './common';
+import { appInfoBox, accessDetailsBox, compose, textParagraphSection } from './common';
 import { compileMjmlInPromise } from './mjml';
 
 export default async function (app: Application, linksConfigs: AppConfig['email']['links']) {
@@ -38,7 +38,7 @@ function messageBody(app: Application) {
       { padding: '0px 0px 20px 0px' },
     )}
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-    ${approvalDetailsBox(
+    ${accessDetailsBox(
       app,
       app.sections.applicant.info.googleEmail,
       'The following are your access details:',
