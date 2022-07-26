@@ -9,55 +9,60 @@ import { AppConfig, getAppConfig } from '../config';
 import { NOTIFICATION_UNIT_OF_TIME, REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { ApplicationDocument, ApplicationModel } from '../domain/model';
 import { Application } from '../domain/interface';
-import { buildReportItem, getDayRange, getEmptyReport } from './utils';
-import { sendAttestationOpenNotificationEmail } from '../domain/service';
+import { buildReportItem, getEmptyReport } from './utils';
+import { sendAttestationRequiredEmail } from '../domain/service';
+import { getDayRange } from '../utils/calculations';
+
+export const JOB_NAME = 'ATTESTATION REQUIRED NOTIFICATIONS';
 
 // Check + notification for applications entering attestation period
-export default async function (
+async function attestationRequiredNotificationCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const config = await getAppConfig();
   try {
-    logger.info('Initiating attestation notification check...');
-    // check func needs to return report
-    const report = await runAttestableNotificationCheck(currentDate, emailClient, config);
+    logger.info(`${JOB_NAME} - Initiating...`);
+    const report = await getAttestableNotificationReport(currentDate, emailClient, config);
+    logger.info(`${JOB_NAME} - Completed.`);
     if (report?.errors.length) {
-      logger.warn('Attestation notification check completed, with errors.');
+      logger.warn(`${JOB_NAME} - Completed, with errors.`);
     }
+    logger.info(`${JOB_NAME} - Returning report.`);
     return report;
   } catch (err) {
-    logger.error(
-      `Attestation notification check failed to complete, with error: ${(err as Error).message}`,
-    );
-    return `Attestation notification check failed to complete, with error: ${
-      (err as Error).message
-    }`;
+    logger.error(`${JOB_NAME} - Failed to complete, with error: ${(err as Error).message}`);
+    return `${JOB_NAME} - Failed to complete, with error: ${(err as Error).message}`;
   }
 }
 
-const runAttestableNotificationCheck = async (
+const getAttestableNotificationReport = async (
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
   config: AppConfig,
 ) => {
-  // const query = getAttestableQuery(config, currentDate);
-  const query: FilterQuery<ApplicationDocument> = { state: 'APPROVED' };
+  const query = getAttestableQuery(config, currentDate);
   const attestableAppCount = await ApplicationModel.find(query).countDocuments();
   if (attestableAppCount === 0) {
-    logger.info('No applications are entering the attestation period.');
-    logger.info('ATTESTATION NOTIFICATIONS - Complete');
+    logger.info(`${JOB_NAME} - No applications are entering the attestation period.`);
+    logger.info(`${JOB_NAME} - Generating report.`);
     return getEmptyReport();
   }
 
-  const attestableApps = await ApplicationModel.find(query).exec();
-  const apps: Application[] = attestableApps.map(
-    (app: ApplicationDocument) => app.toObject() as Application,
+  logger.info(
+    `${JOB_NAME} - ${attestableAppCount} applications are entering the attestation period.`,
   );
+  const attestableApps = await ApplicationModel.find(query).exec();
+  const apps: Application[] = attestableApps.map((app: ApplicationDocument) => {
+    logger.info(`${JOB_NAME} - Should notify ${app.appId} regarding attestation.`);
+    return app.toObject() as Application;
+  });
 
+  // is this waiting for each email chunk like i'm expecting?
   const emails = chunk(apps, REQUEST_CHUNK_SIZE).map(async (appChunk: Application[]) => {
+    logger.info(`${JOB_NAME} - Initiating email requests.`);
     return Promise.allSettled(
-      appChunk.map(async (app) => sendAttestationOpenNotificationEmail(app, emailClient, config)),
+      appChunk.map(async (app) => sendAttestationRequiredEmail(app, config, emailClient)),
     );
   });
 
@@ -67,8 +72,12 @@ const runAttestableNotificationCheck = async (
     results.push(result);
   }
   const allResults = results.flat();
-  const attestationNotificationReport = buildReportItem(allResults, 'attestationNotifications');
-  logger.info('ATTESTATION NOTIFICATIONS - Complete');
+  logger.info(`${JOB_NAME} - Generating report.`);
+  const attestationNotificationReport = buildReportItem(
+    allResults,
+    'attestationNotifications',
+    JOB_NAME,
+  );
   return attestationNotificationReport;
 };
 
@@ -92,3 +101,5 @@ const getAttestableQuery = (config: AppConfig, currentDate: Date) => {
 
   return query;
 };
+
+export default attestationRequiredNotificationCheck;

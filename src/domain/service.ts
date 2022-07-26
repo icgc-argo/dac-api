@@ -10,6 +10,8 @@ import { Attachment } from 'nodemailer/lib/mailer';
 import { UploadedFile } from 'express-fileupload';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { JOB_NAME as attestationNotificationJobName } from '../jobs/attestationRequiredNotification';
+import { JOB_NAME as pauseAppJobName } from '../jobs/pauseAppCheck';
 
 import {
   ApplicationStateManager,
@@ -47,9 +49,8 @@ import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 import renderAttestationRequiredEmail from '../emails/attestation-required';
 import renderApplicationPausedEmail from '../emails/application-paused';
 
-import { c, getDacoRole, getUpdateAuthor } from '../utils/misc';
+import { c, getUpdateAuthor } from '../utils/misc';
 import { getAttestationByDate, isAttestable, sortByDate } from '../utils/calculations';
-import { NOTIFICATION_UNIT_OF_TIME, REQUEST_CHUNK_SIZE } from '../utils/constants';
 
 export async function deleteDocument(
   appId: string,
@@ -371,7 +372,7 @@ export async function onStateChange(
     ).catch((err) => logger.error(err));
   }
   if (updatedApp.state === 'PAUSED') {
-    // TODO: send PAUSED email
+    await sendApplicationPausedEmail(updatedApp, config, emailClient);
   }
 }
 
@@ -743,16 +744,6 @@ function mapField(field: string) {
   }
 }
 
-export async function sendAttestationOpenNotificationEmail(
-  currentApp: Application,
-  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
-  config: AppConfig,
-) {
-  // TODO: implement attestation notification email
-  // await renderAttestationOpenEmail(currentApp);
-  return currentApp;
-}
-
 async function sendSubmissionConfirmation(
   updatedApp: Application,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
@@ -988,7 +979,7 @@ async function sendReviewEmail(
   );
 }
 
-async function sendAttestationRequiredEmail(
+export async function sendAttestationRequiredEmail(
   currentApp: Application,
   config: AppConfig,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
@@ -1005,6 +996,9 @@ async function sendAttestationRequiredEmail(
   const emailContent = email.html;
   const subject = `[${currentApp.appId}] ${title}`;
 
+  logger.info(
+    `${attestationNotificationJobName} - Sending notification email for ${currentApp.appId}.`,
+  );
   await sendEmail(
     emailClient,
     config.email.fromAddress,
@@ -1013,9 +1007,12 @@ async function sendAttestationRequiredEmail(
     subject,
     emailContent,
   );
+
+  logger.info(`${attestationNotificationJobName} - Email sent for ${currentApp.appId}.`);
+  return currentApp;
 }
 
-async function sendApplicationPausedEmail(
+export async function sendApplicationPausedEmail(
   updatedApp: Application,
   config: AppConfig,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
@@ -1031,7 +1028,9 @@ async function sendApplicationPausedEmail(
   );
   const emailContent = email.html;
   const subject = `[${updatedApp.appId}] ${title}`;
-
+  logger.info(
+    `${pauseAppJobName} - Sending application PAUSED notification for ${updatedApp.appId}.`,
+  );
   await sendEmail(
     emailClient,
     config.email.fromAddress,
@@ -1040,6 +1039,8 @@ async function sendApplicationPausedEmail(
     subject,
     emailContent,
   );
+  logger.info(`${pauseAppJobName} - Email sent for ${updatedApp.appId}.`);
+  return updatedApp;
 }
 
 async function sendAccessExpiringEmail(

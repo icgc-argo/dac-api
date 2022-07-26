@@ -899,6 +899,9 @@ function transitionFromPausedToApproved(
 ) {
   // this transition does not equal an APPROVED update event
   current.state = 'APPROVED';
+  // reset pauseReason if no longer in PAUSED state
+  // TODO: right now there is no other transition for a PAUSED app, but may need to revisit this for a possible PAUSED -> EXPIRED transition
+  current.pauseReason = undefined;
   if (updatePart?.attestedAtUtc) {
     updateAttestedAtUtc(current, updatePart, updatedBy);
   }
