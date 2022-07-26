@@ -2,6 +2,7 @@ export interface ReportItem {
   count: number;
   ids: string[];
   errors: string[];
+  errorCount: number;
 }
 
 export interface Report {

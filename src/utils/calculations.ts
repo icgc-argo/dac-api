@@ -46,3 +46,14 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   const elapsed = getDaysElapsed(now, attestationByDate);
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
+
+export const getDayRange: (targetDate: moment.Moment) => { $gte: Date; $lte: Date } = (
+  targetDate,
+) => {
+  const start = moment(targetDate).startOf('day').toDate();
+  const end = moment(targetDate).endOf('day').toDate();
+  return {
+    $gte: start,
+    $lte: end,
+  };
+};
