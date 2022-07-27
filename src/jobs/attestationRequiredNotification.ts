@@ -87,7 +87,7 @@ const getAttestableQuery = (config: AppConfig, currentDate: Date) => {
       attestation: { count, unitOfTime, daysToAttestation },
     },
   } = config;
-  // find all apps that are APPROVED with an approval date matching the configured time period + configured daysToAttestation
+  // find all apps that are APPROVED with an approval date matching the configured time period minus configured daysToAttestation
   // default is 1 year less 45 days to match DACO
   const attestationStartDate = moment(currentDate)
     .subtract(count, unitOfTime as unitOfTime.DurationConstructor)
