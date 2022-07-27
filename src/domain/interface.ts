@@ -275,7 +275,7 @@ export interface Application {
   attestationByUtc?: Date; // calculated from approvedAtUtc
   attestedAtUtc?: Date | null;
   isAttestable?: boolean;
-  pauseReason?: PauseReason;
+  pauseReason?: PauseReason | null;
 }
 
 export type AppSections = keyof Application['sections'];

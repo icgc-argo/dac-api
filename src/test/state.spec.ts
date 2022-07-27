@@ -512,11 +512,13 @@ describe('state manager', () => {
       user,
     );
     const userApp = state.prepareApplicationForUser(false);
-
     expect(userApp.state).to.eq('APPROVED');
     expect(userApp.attestedAtUtc).to.not.eq(undefined);
     expect(userApp.attestedAtUtc).to.eq(currentDate);
     expect(userApp.isAttestable).to.be.false;
+    // NOTE: when an app is transitioned from PAUSED to APPROVED, the pauseReason is deleted
+    // in practice the app is refetched from the db after an update and would return null for this field
+    expect(userApp.pauseReason).to.be.undefined;
   });
 
   // this is not working yet because you're not handling updateAppState for approved apps
@@ -704,7 +706,8 @@ export function getPausedApplication() {
   const result = state.updateApp(updatePart, true, { id: 'DACO-SYSTEM', role: DacoRole.SYSTEM });
   expect(result.state).to.eq('PAUSED');
   expect(result.approvedAtUtc).to.not.eq(undefined);
-  expect(result.pauseReason).to.exist;
+  expect(result.pauseReason).to.not.be.undefined;
+  expect(result.pauseReason).to.eq(PauseReason.PENDING_ATTESTATION);
   return result;
 }
 
