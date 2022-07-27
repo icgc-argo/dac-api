@@ -32,6 +32,7 @@ import {
   Meta,
   Sections,
   DacoRole,
+  PauseReason,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -938,7 +939,7 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
 const transitionToPaused: (
   current: Application,
   pausedBy: UpdateAuthor,
-  reason?: string,
+  reason?: PauseReason,
 ) => Application = (current, pausedBy, reason) => {
   current.state = 'PAUSED';
   if (reason) {
@@ -1057,11 +1058,15 @@ function updateAppStateForApprovedApplication(
     return transitionToClosed(currentApplication, updatedBy);
   }
   if (updatePart.state === 'PAUSED') {
+    // disallow invalid pause reasons
+    if (updatePart.pauseReason && !Object.values(PauseReason).includes(updatePart.pauseReason)) {
+      throw new BadRequest('Invalid pause reason');
+    }
     // right now only SYSTEM role will be able to pause applications
     // admin pause configurable for testing
     if (
       updatedBy.role !== DacoRole.SYSTEM &&
-      !(isReviewer && updatePart.pauseReason === 'ADMIN-PAUSE')
+      !(isReviewer && updatePart.pauseReason === PauseReason.ADMIN_PAUSE)
     ) {
       throw new Error('Not allowed');
     }

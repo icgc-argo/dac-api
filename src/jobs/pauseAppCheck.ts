@@ -8,7 +8,7 @@ import { chunk } from 'lodash';
 import logger from '../logger';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationModel, ApplicationDocument } from '../domain/model';
-import { Application } from '../domain/interface';
+import { Application, PauseReason } from '../domain/interface';
 import { ApplicationStateManager } from '../domain/state';
 import { getDacoRole } from '../utils/misc';
 import { REQUEST_CHUNK_SIZE } from '../utils/constants';
@@ -46,11 +46,15 @@ const searchPauseableApplications = async (query: FilterQuery<ApplicationDocumen
   return apps;
 };
 
-const pauseApplication = async (currentApp: Application, identity: Identity, reason?: string) => {
+// update app state, including transition to paused + update event
+const pauseApplication = async (
+  currentApp: Application,
+  identity: Identity,
+  reason?: PauseReason,
+) => {
   const config = await getAppConfig();
   // set app in state
   const appObj = new ApplicationStateManager(currentApp, config);
-  // update app state, including transition to paused + update event
   const role = await getDacoRole(identity);
   logger.info(
     `${JOB_NAME} - Role ${role} is trying to PAUSE appId ${currentApp.appId} with pause reason ${reason}`,
@@ -124,7 +128,7 @@ const getPausedAppsReport = async (
           const updatedAppObj = (await pauseApplication(
             app,
             user,
-            'PENDING ATTESTATION',
+            PauseReason.PENDING_ATTESTATION,
           )) as Application;
           if (updatedAppObj.state !== 'PAUSED') {
             logger.error(

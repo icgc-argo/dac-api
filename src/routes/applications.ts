@@ -25,7 +25,12 @@ import {
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
-import { FileFormat, UpdateApplication, UploadDocumentType } from '../domain/interface';
+import {
+  FileFormat,
+  PauseReason,
+  UpdateApplication,
+  UploadDocumentType,
+} from '../domain/interface';
 import { AppConfig, getAppConfig } from '../config';
 import { Storage } from '../storage';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
@@ -389,7 +394,7 @@ const createApplicationsRouter = (
         const validatedId = validateId(id);
         const pauseReq = {
           state: 'PAUSED',
-          pauseReason: req.body.pauseReason || '',
+          pauseReason: (req.body.pauseReason || '') as PauseReason,
         } as Partial<UpdateApplication>;
         logger.info(
           `updating application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
