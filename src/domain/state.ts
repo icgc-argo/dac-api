@@ -899,6 +899,9 @@ function transitionFromPausedToApproved(
 ) {
   // this transition does not equal an APPROVED update event
   current.state = 'APPROVED';
+  // reset pauseReason if no longer in PAUSED state
+  // TODO: right now there is no other transition for a PAUSED app, but may need to revisit this for a possible PAUSED -> EXPIRED transition
+  current.pauseReason = undefined;
   if (updatePart?.attestedAtUtc) {
     updateAttestedAtUtc(current, updatePart, updatedBy);
   }
@@ -1072,7 +1075,7 @@ function updateAppStateForApprovedApplication(
     if (updatedBy.role !== DacoRole.SUBMITTER) {
       throw new Error('Not allowed');
     }
-    updateAttestedAtUtc(currentApplication, updatePart, updatedBy);
+    return updateAttestedAtUtc(currentApplication, updatePart, updatedBy);
   }
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
@@ -1085,8 +1088,9 @@ function updateAttestedAtUtc(
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
 ) {
+  // TODO: change request body from ui so date validation is not needed, i.e. {attesting: true} or similar
   validateDate(updatePart.attestedAtUtc?.toString());
-  currentApplication.attestedAtUtc = updatePart.attestedAtUtc;
+  currentApplication.attestedAtUtc = new Date();
   currentApplication.updates.push(
     createUpdateEvent(currentApplication, updatedBy, UpdateEvent.ATTESTED),
   );
