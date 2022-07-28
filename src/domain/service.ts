@@ -5,7 +5,7 @@ import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import moment, { unitOfTime } from 'moment';
-import _, { chunk, isEmpty } from 'lodash';
+import { chunk, difference, isEmpty } from 'lodash';
 import { Attachment } from 'nodemailer/lib/mailer';
 import { UploadedFile } from 'express-fileupload';
 import nodemail from 'nodemailer';
@@ -763,7 +763,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const ethicsArrayAfter = result.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
-  const ethicsDiff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
+  const ethicsDiff = difference(ethicsArrayBefore, ethicsArrayAfter);
   ethicsDiff.forEach((o) => removedIds.push(o));
 
   if (
@@ -779,7 +779,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const approvedArrayAfter = result.approvedAppDocs
     .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
     .map((e) => e.approvedAppDocObjId);
-  const approvedDiff = _.difference(approvedArrayBefore, approvedArrayAfter);
+  const approvedDiff = difference(approvedArrayBefore, approvedArrayAfter);
   approvedDiff.forEach((o) => removedIds.push(o));
 
   console.log('removing docs: ', removedIds);
