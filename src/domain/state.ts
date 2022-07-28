@@ -1088,9 +1088,9 @@ function updateAttestedAtUtc(
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
 ) {
-  // TODO: change this to have the api set the date here, so the ui doesn't need to send a date
+  // TODO: change request body from ui so date validation is not needed, i.e. {attesting: true} or similar
   validateDate(updatePart.attestedAtUtc?.toString());
-  currentApplication.attestedAtUtc = updatePart.attestedAtUtc;
+  currentApplication.attestedAtUtc = new Date();
   currentApplication.updates.push(
     createUpdateEvent(currentApplication, updatedBy, UpdateEvent.ATTESTED),
   );
