@@ -52,6 +52,7 @@ export interface AppConfig {
       dacoSurvey: string;
       accessRenewalGuide: string;
       attestationGuide: string;
+      generalApplicationGuide: string;
     };
   };
   ui: {
@@ -199,6 +200,9 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
         attestationGuide:
           process.env.ATTESTATION_GUIDE ||
           'https://docs.icgc-argo.org/docs/data-access/daco/renew-close#annual-attestation',
+        generalApplicationGuide:
+          process.env.GENERAL_APPLICATION_GUIDE ||
+          'https://docs.icgc-argo.org/docs/data-access/daco/applying',
       },
       reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',
