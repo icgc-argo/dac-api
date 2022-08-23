@@ -46,6 +46,7 @@ import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 import renderAttestationRequiredEmail from '../emails/attestation-required';
 import renderApplicationPausedEmail from '../emails/application-paused';
+import renderAttestationReceivedEmail from '../emails/attestation-received';
 
 import { Report } from '../routes/applications';
 import { c, getDacoRole, getUpdateAuthor } from '../utils/misc';
@@ -316,9 +317,9 @@ export async function updatePartial(
   // triggering this here to ensure attestedAtUtc value has been properly updated in the db before sending email
   // cannot rely on stateChanged result because attestation does not imply a state change has occurred
   // i.e. an approved app can be attested and stay in approved state
-  const wasAttested = isEmpty(appDocObj.attestedAtUtc) && !isEmpty(updatedApp.attestedAtUtc);
+  const wasAttested = isEmpty(appDocObj.attestedAtUtc) && !!updatedApp.attestedAtUtc;
   if (wasAttested) {
-    // TODO: await send attestation received email
+    await sendAttestationReceivedEmail(updatedApp, config, emailClient);
   }
 
   const deleted = checkDeletedDocuments(appDocObj, updatedApp);
@@ -1170,6 +1171,27 @@ async function sendApplicationPausedEmail(
     getApplicantEmails(updatedApp),
     subject,
     emailContent,
+  );
+}
+
+async function sendAttestationReceivedEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const title = `We have Received your Annual Attestation`;
+  const attestationEmail = await renderAttestationReceivedEmail(updatedApp, config.email.links);
+  const emailContent = attestationEmail.html;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    subject,
+    emailContent,
+    new Set([config.email.dacoAddress]),
   );
 }
 
