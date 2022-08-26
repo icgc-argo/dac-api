@@ -46,3 +46,28 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   const elapsed = getDaysElapsed(now, attestationByDate);
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
+('');
+export const isRenewable: (currentApp: Application, config: AppConfig) => boolean = (
+  currentApp,
+  config,
+) => {
+  // TODO: verify whether PAUSED apps can be renewed
+  if (!currentApp.expiresAtUtc || ['CLOSED', 'REJECTED'].includes(currentApp.state)) {
+    return false;
+  }
+  const now = moment.utc();
+  // expiry - DAYS_TO_EXPIRY_1
+  const expiryPeriodStart = moment
+    .utc(currentApp.expiresAtUtc)
+    .startOf('day')
+    .subtract(config.durations.expiry.daysToExpiry1, 'days');
+
+  // expiry + DAYS_POST_EXPIRY
+  const expiryPeriodEnd = moment
+    .utc(currentApp.expiresAtUtc)
+    .endOf('day')
+    .add(config.durations.expiry.daysPostExpiry, 'days');
+
+  // between 90 days prior to today and 90 days after
+  return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
+};
