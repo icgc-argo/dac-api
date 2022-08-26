@@ -5,6 +5,7 @@ import { getDaysElapsed, isAttestable, isRenewable } from '../utils/calculations
 import {
   getApprovedApplication,
   getClosedAfterApprovalApplication,
+  getClosedBeforeApprovalApplication,
   getPausedApplication,
   getReadyToSignApp,
   getRejectedApplication,
@@ -106,8 +107,14 @@ describe('utils', () => {
       },
     } as AppConfig;
 
-    it('should not be renewable in CLOSED state', () => {
+    it('should not be renewable in CLOSED after approval state', () => {
       const closedApp = getClosedAfterApprovalApplication();
+      const canRenew = isRenewable(closedApp, mockRenewalConfig);
+      expect(canRenew).to.be.false;
+    });
+
+    it('should not be renewable in CLOSED before approval state', () => {
+      const closedApp = getClosedBeforeApprovalApplication();
       const canRenew = isRenewable(closedApp, mockRenewalConfig);
       expect(canRenew).to.be.false;
     });

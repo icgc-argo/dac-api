@@ -21,6 +21,11 @@ const nonAttestableConfig = {
       unitOfTime: 'years',
       daysToAttestation: 45,
     },
+    expiry: {
+      daysToExpiry1: 90,
+      daysToExpiry2: 45,
+      daysPostExpiry: 90,
+    },
   },
 } as AppConfig;
 
@@ -30,6 +35,11 @@ const attestableConfig = {
       count: 10,
       unitOfTime: 'days',
       daysToAttestation: 45,
+    },
+    expiry: {
+      daysToExpiry1: 90,
+      daysToExpiry2: 45,
+      daysPostExpiry: 90,
     },
   },
 } as AppConfig;
