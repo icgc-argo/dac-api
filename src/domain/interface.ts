@@ -166,7 +166,8 @@ export interface ApplicationSummary {
   isRenewal: boolean;
   attestationByUtc?: Date;
   attestedAtUtc?: Date | null;
-  isAttestable?: boolean;
+  isAttestable: boolean;
+  ableToRenew: boolean;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -235,6 +236,7 @@ export interface Sections {
     signedDocName: string;
   };
 }
+
 export interface Application {
   appId: string;
   appNumber: number;
@@ -269,7 +271,7 @@ export interface Application {
   approvedAppDocs: ApprovedAppDocument[];
   attestationByUtc?: Date; // calculated from approvedAtUtc
   attestedAtUtc?: Date | null;
-  isAttestable?: boolean;
+  isAttestable: boolean;
   pauseReason?: string;
 }
 

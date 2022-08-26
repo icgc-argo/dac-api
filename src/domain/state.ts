@@ -47,7 +47,12 @@ import {
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 import { AppConfig } from '../config';
 import { getUpdateAuthor, mergeKnown } from '../utils/misc';
-import { getAttestationByDate, getDaysElapsed, isAttestable } from '../utils/calculations';
+import {
+  getAttestationByDate,
+  getDaysElapsed,
+  isAttestable,
+  isRenewable,
+} from '../utils/calculations';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -167,6 +172,11 @@ export class ApplicationStateManager {
     }
     // add isAttestable so FE doesn't need to do the calculation
     this.currentApplication.isAttestable = isAttestable(
+      this.currentApplication,
+      this.currentAppConfig,
+    );
+    // calculate renewable status
+    this.currentApplication.ableToRenew = isRenewable(
       this.currentApplication,
       this.currentAppConfig,
     );

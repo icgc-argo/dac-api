@@ -50,7 +50,7 @@ import renderAttestationReceivedEmail from '../emails/attestation-received';
 
 import { Report } from '../routes/applications';
 import { c, getDacoRole, getUpdateAuthor } from '../utils/misc';
-import { getAttestationByDate, isAttestable, sortByDate } from '../utils/calculations';
+import { getAttestationByDate, isAttestable, isRenewable, sortByDate } from '../utils/calculations';
 
 type RejectedUpdate = { status: 'rejected'; reason: string };
 type FulfilledUpdate = { status: 'fulfilled'; value: Application };
@@ -520,6 +520,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
+        ableToRenew: isRenewable(app, config),
         revisionsRequested: wasInRevisionRequestState(app),
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
         ...(app.approvedAtUtc && {
