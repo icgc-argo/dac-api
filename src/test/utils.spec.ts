@@ -1,8 +1,14 @@
+import { Identity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
-import moment, { unitOfTime } from 'moment';
+import moment from 'moment';
+import { cloneDeep } from 'lodash';
+
+import { newApplication } from '../domain/state';
 import { AppConfig } from '../config';
 import { getDaysElapsed, isAttestable, isRenewable } from '../utils/calculations';
 import {
+  getAppInReview,
+  getAppInRevisionRequested,
   getApprovedApplication,
   getClosedAfterApprovalApplication,
   getClosedBeforeApprovalApplication,
@@ -10,6 +16,7 @@ import {
   getReadyToSignApp,
   getRejectedApplication,
 } from './state.spec';
+import { Application } from '../domain/interface';
 
 const mockConfig = {
   durations: {
@@ -20,6 +27,17 @@ const mockConfig = {
     },
   },
 } as AppConfig;
+
+const newApplication1: Partial<Application> = newApplication({
+  userId: 'abc123',
+  tokenInfo: {
+    context: {
+      user: {
+        email: 'test@example.com',
+      },
+    },
+  },
+} as Identity);
 
 describe('utils', () => {
   describe('daysElapsed', () => {
@@ -125,7 +143,35 @@ describe('utils', () => {
       expect(canRenew).to.be.false;
     });
 
-    it('should be renewable if app has never been APPROVED', () => {
+    it('should not be renewable in REVIEW state', () => {
+      const reviewApp = getAppInReview();
+      const canRenew = isRenewable(reviewApp, mockRenewalConfig);
+      expect(canRenew).to.be.false;
+    });
+
+    it('should not be renewable in DRAFT state', () => {
+      const draftApp = cloneDeep({
+        ...newApplication1,
+        appId: 'DACO-1',
+        appNumber: 1,
+      }) as Application;
+      const canRenew = isRenewable(draftApp, mockRenewalConfig);
+      expect(canRenew).to.be.false;
+    });
+
+    it('should not be renewable in SIGN AND SUBMIT state', () => {
+      const signSubmitApp = getReadyToSignApp();
+      const canRenew = isRenewable(signSubmitApp, mockRenewalConfig);
+      expect(canRenew).to.be.false;
+    });
+
+    it('should not be renewable in REVISIONS REQUESTED state', () => {
+      const revisionsApp = getAppInRevisionRequested();
+      const canRenew = isRenewable(revisionsApp, mockRenewalConfig);
+      expect(canRenew).to.be.false;
+    });
+
+    it('should not be renewable if app has never been APPROVED', () => {
       const readyToSignApp = getReadyToSignApp();
       const canRenew = isRenewable(readyToSignApp, mockRenewalConfig);
       expect(canRenew).to.be.false;
@@ -190,6 +236,16 @@ describe('utils', () => {
       expect(app.expiresAtUtc).to.not.eq(undefined);
       const mockExpiresAtUtc = moment.utc();
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
+      const canRenew = isRenewable(app, mockRenewalConfig);
+      expect(canRenew).to.be.true;
+    });
+
+    it('should be renewable if app has been renewed before', () => {
+      const app = getApprovedApplication();
+      expect(app.expiresAtUtc).to.not.eq(undefined);
+      const mockExpiresAtUtc = moment.utc().add(75, 'days');
+      app.expiresAtUtc = mockExpiresAtUtc.toDate();
+      app.isRenewal = true;
       const canRenew = isRenewable(app, mockRenewalConfig);
       expect(canRenew).to.be.true;
     });

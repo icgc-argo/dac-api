@@ -51,8 +51,10 @@ export const isRenewable: (currentApp: Application, config: AppConfig) => boolea
   currentApp,
   config,
 ) => {
+  // if the user has already started the renewal process, app state will be in DRAFT, SIGN AND SUBMIT, REVIEW or REVISIONS REQUESTED,
+  // so need to look for apps still in APPROVED or EXPIRED state, which means no action has been taken yet
   // TODO: verify whether PAUSED apps can be renewed
-  if (!currentApp.expiresAtUtc || ['CLOSED', 'REJECTED'].includes(currentApp.state)) {
+  if (!(currentApp.expiresAtUtc && ['APPROVED', 'EXPIRED'].includes(currentApp.state))) {
     return false;
   }
   const now = moment.utc();
