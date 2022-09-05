@@ -18,7 +18,6 @@ import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 
 export const JOB_NAME = 'PAUSING APPLICATIONS';
 
-// default doCheck, searchWithQuery, pauseAction, getQuery, getReport
 // Job to check for applications that have reached attestationBy date and are not attested
 // These will be PAUSED and notifications sent
 async function runPauseAppsCheck(

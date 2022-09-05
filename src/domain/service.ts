@@ -996,9 +996,6 @@ export async function sendAttestationRequiredEmail(
   const emailContent = email.html;
   const subject = `[${currentApp.appId}] ${title}`;
 
-  logger.info(
-    `${attestationNotificationJobName} - Sending notification email for ${currentApp.appId}.`,
-  );
   await sendEmail(
     emailClient,
     config.email.fromAddress,
@@ -1007,8 +1004,6 @@ export async function sendAttestationRequiredEmail(
     subject,
     emailContent,
   );
-
-  logger.info(`${attestationNotificationJobName} - Email sent for ${currentApp.appId}.`);
   return currentApp;
 }
 
