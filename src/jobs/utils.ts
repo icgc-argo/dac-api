@@ -1,43 +1,47 @@
-import { Application } from '../domain/interface';
 import logger from '../logger';
-import { Report, ReportItem } from './types';
+import {
+  Report,
+  BatchJobDetails,
+  JobResultForApplication,
+  JobErrorResultForApplication,
+} from './types';
 
-export const getEmptyReport: () => ReportItem = () => ({
+export const getEmptyReportDetails: () => BatchJobDetails = () => ({
   count: 0,
   ids: [],
   errors: [],
   errorCount: 0,
 });
 
-export const buildReportItem = (
-  results: PromiseSettledResult<any>[],
+// filter func to ensure errors list is of type JobErrorResultForApplication
+const jobErrorFilter = (inputs: JobResultForApplication[]): JobErrorResultForApplication[] => {
+  const outputs: JobErrorResultForApplication[] = [];
+  inputs.forEach((input) => {
+    if (!input.success) {
+      outputs.push(input);
+    }
+  });
+  return outputs;
+};
+
+export const buildReportDetails = (
+  results: JobResultForApplication[],
   reportType: keyof Report,
   jobName: string,
-) => {
+): BatchJobDetails => {
   logger.info(`${jobName} - Building report item for [${reportType}].`);
-  logger.info(`${jobName} - Adding successful requests to [${reportType}] report.`);
-  const resolved = results
-    .filter((res) => res.status === 'fulfilled')
-    .map((success) => {
-      const { value } = success as PromiseFulfilledResult<Application>;
-      logger.info(`${jobName} - Notification succeeded for ${value.appId}`);
-      return value.appId;
-    });
-  logger.info(`${jobName} - Adding failed requests to [${reportType}] report.`);
-  const rejected = results
-    .filter((res) => res.status === 'rejected')
-    .map((rej) => {
-      const { reason } = rej as PromiseRejectedResult;
-      // TODO: is there a way to guarantee appObj/appId can be returned in the error?
-      logger.warn(`${jobName} - Notification failed: ${reason}`);
-      return reason.toString();
-    });
-
+  const ids = results.map((result) => result.app.appId);
+  const count = ids.length;
+  const failedResults = jobErrorFilter(results).map((error) => ({
+    id: error.app.appId,
+    message: error.message,
+  }));
   logger.info(`${jobName} - Processed request results, returning [${reportType}] report.`);
-  return {
-    ids: resolved,
-    count: resolved.length,
-    errors: rejected,
-    errorCount: rejected.length,
-  } as ReportItem;
+  const details: BatchJobDetails = {
+    ids,
+    count,
+    errors: failedResults,
+    errorCount: failedResults.length,
+  };
+  return details;
 };

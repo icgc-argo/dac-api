@@ -983,7 +983,7 @@ export async function sendAttestationRequiredEmail(
   currentApp: Application,
   config: AppConfig,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
-) {
+): Promise<Application> {
   const title = 'An Annual Attestation is Required';
   const email = await renderAttestationRequiredEmail(
     currentApp,

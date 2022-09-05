@@ -6,8 +6,8 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import logger from '../logger';
 import attestationRequiredNotification from './attestationRequiredNotification';
 import runPauseAppsCheck from './pauseAppCheck';
-import { Report } from './types';
-import { getEmptyReport } from './utils';
+import { Report, JobReport } from './types';
+import { getEmptyReportDetails } from './utils';
 
 const JOB_NAME = 'ALL BATCH JOBS';
 
@@ -31,12 +31,20 @@ export default async function (
     // this function will build a complete summary
     // will simply log the summary for now until we decide what to do with it
     logger.info(`${JOB_NAME} - Completed, generating report.`);
+    // TODO: remove once expiry reports are implemented, just making ts happy
+    const getReportToBeImplemented: (jobName: string) => JobReport<any> = (jobName) => ({
+      jobName,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      success: false,
+    });
     const completeReport: Report = {
       attestationNotifications: attestationNotificationReport,
       pausedApps: pausedAppReport,
-      expiryNotifications1: getEmptyReport(),
-      expiryNotifications2: getEmptyReport(),
-      expiredApps: getEmptyReport(),
+      // TODO: implement expiry/renewal jobs. Add to report
+      expiryNotifications1: getReportToBeImplemented('FIRST EXPIRY NOTIFICATIONS'),
+      expiryNotifications2: getReportToBeImplemented('SECOND EXPIRY NOTIFICATIONS'),
+      expiredApps: getReportToBeImplemented('EXPIRING APPLICATIONS'),
     };
     logger.info(`${JOB_NAME} - Logging report`);
     logger.info(`${JOB_NAME} - ${JSON.stringify(completeReport)}`);
@@ -46,6 +54,5 @@ export default async function (
     logger.error(`${JOB_NAME} - ${err as Error}`);
   }
 
-  // TODO: implement expiry/renewal jobs. Add to report
   // TODO: add DACO report step to finish (existing cron job will reach out to this endpoint only)
 }

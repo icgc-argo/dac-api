@@ -13,33 +13,54 @@ import { ApplicationStateManager } from '../domain/state';
 import { getDacoRole } from '../utils/misc';
 import { REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { onStateChange } from '../domain/service';
-import { buildReportItem, getEmptyReport } from './utils';
+import { buildReportDetails, getEmptyReportDetails } from './utils';
+import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 
 export const JOB_NAME = 'PAUSING APPLICATIONS';
 
+// default doCheck, searchWithQuery, pauseAction, getQuery, getReport
 // Job to check for applications that have reached attestationBy date and are not attested
 // These will be PAUSED and notifications sent
 async function runPauseAppsCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
   user: Identity,
-) {
+): Promise<JobReport<BatchJobDetails>> {
+  const jobStartTime = new Date();
   try {
     logger.info(`${JOB_NAME} - Initiating...`);
-    const report = await getPausedAppsReport(emailClient, user, currentDate);
-    logger.info(`${JOB_NAME} - Completed.`);
-    if (report.errors.length) {
-      logger.warn(`${JOB_NAME} - Completed, with errors.`);
-    }
-    logger.info(`${JOB_NAME} - Returning report.`);
-    return report;
+    const details = await getPausedAppsReportDetails(emailClient, user, currentDate);
+    details.errors.length
+      ? logger.info(`${JOB_NAME} - Completed.`)
+      : logger.warn(`${JOB_NAME} - Completed with errors.`);
+    const endTime = new Date();
+    const jobSuccessReport: JobReport<BatchJobDetails> = {
+      jobName: JOB_NAME,
+      startedAt: jobStartTime,
+      finishedAt: endTime,
+      success: true,
+      details,
+    };
+    logger.info(`${JOB_NAME} - Report: ${JSON.stringify(jobSuccessReport)}`);
+    return jobSuccessReport;
   } catch (err) {
     logger.error(`${JOB_NAME} - Failed to complete, with error: ${(err as Error).message}`);
-    return `${JOB_NAME} - Failed to complete, with error: ${(err as Error).message}`;
+    const jobEndTime = new Date();
+    const jobFailedReport: JobReport<BatchJobDetails> = {
+      jobName: JOB_NAME,
+      startedAt: jobStartTime,
+      finishedAt: jobEndTime,
+      success: false,
+      error: `${JOB_NAME} - Failed to complete, with error: ${(err as Error).message}`,
+    };
+    logger.error(`${JOB_NAME} - Report: ${JSON.stringify(jobFailedReport)}`);
+    return jobFailedReport;
   }
 }
 
-const searchPauseableApplications = async (query: FilterQuery<ApplicationDocument>) => {
+const searchPauseableApplications = async (
+  query: FilterQuery<ApplicationDocument>,
+): Promise<ApplicationDocument[]> => {
   // can still run this multiple times in the same 24hr period,
   // as any apps that were paused previously will be ignored because we're looking for APPROVED state
   const apps = await ApplicationModel.find(query).exec();
@@ -51,7 +72,7 @@ const pauseApplication = async (
   currentApp: Application,
   identity: Identity,
   reason?: PauseReason,
-) => {
+): Promise<Application> => {
   const config = await getAppConfig();
   // set app in state
   const appObj = new ApplicationStateManager(currentApp, config);
@@ -70,11 +91,20 @@ const pauseApplication = async (
   const updatedApp = await ApplicationModel.findOne({
     appId: result.appId,
   }).exec();
-  logger.info(`${JOB_NAME} - Returning updated app ${updatedApp?.appId}.`);
-  return updatedApp?.toObject() as Application;
+  if (updatedApp) {
+    logger.info(`${JOB_NAME} - Returning updated app ${updatedApp?.appId}.`);
+    return updatedApp?.toObject();
+  }
+  logger.error(
+    `${JOB_NAME} - Unable to retrieve updated application document for ${currentApp.appId}, returning input application.`,
+  );
+  return currentApp;
 };
 
-const getPauseableQuery = (config: AppConfig, currentDate: Date) => {
+const getPauseableQuery = (
+  config: AppConfig,
+  currentDate: Date,
+): FilterQuery<ApplicationDocument> => {
   const {
     durations: {
       attestation: { count, unitOfTime },
@@ -103,11 +133,11 @@ const getPauseableQuery = (config: AppConfig, currentDate: Date) => {
   return query;
 };
 
-const getPausedAppsReport = async (
+const getPausedAppsReportDetails = async (
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
   user: Identity,
   currentDate: Date,
-) => {
+): Promise<BatchJobDetails> => {
   const config = await getAppConfig();
   const query = getPauseableQuery(config, currentDate);
   const pauseableAppCount = await ApplicationModel.find(query).countDocuments();
@@ -115,51 +145,47 @@ const getPausedAppsReport = async (
   if (pauseableAppCount === 0) {
     logger.info(`${JOB_NAME} - No applications need to be paused at this time.`);
     logger.info(`${JOB_NAME} - Generating report.`);
-    return getEmptyReport();
+    return getEmptyReportDetails();
   }
   logger.info(`${JOB_NAME} - There are ${pauseableAppCount} apps that should be PAUSED.`);
   const pauseableApps = await searchPauseableApplications(query);
 
-  const results: PromiseSettledResult<any>[][] = [];
-  const requests = chunk(pauseableApps, REQUEST_CHUNK_SIZE).map(
-    async (appChunk: ApplicationDocument[]) => {
-      return Promise.allSettled(
-        appChunk.map(async (app: ApplicationDocument) => {
-          const updatedAppObj = (await pauseApplication(
-            app,
-            user,
-            PauseReason.PENDING_ATTESTATION,
-          )) as Application;
-          if (updatedAppObj.state !== 'PAUSED') {
-            logger.error(
-              `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to PAUSED state.`,
-            );
-            logger.error(
-              `${JOB_NAME} - ${updatedAppObj.appId} is in ${updatedAppObj.state} state.`,
-            );
-            throw new Error(
-              `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to PAUSED state.`,
-            );
-          }
-          logger.info(
-            `${JOB_NAME} - Successfully transitioned app ${updatedAppObj.appId} to PAUSED state.`,
-          );
-          await onStateChange(updatedAppObj, app, emailClient, config);
-          return updatedAppObj;
-        }),
-      );
-    },
-  );
+  const doPauseApplication = async (app: ApplicationDocument): Promise<JobResultForApplication> => {
+    try {
+      const updatedAppObj = await pauseApplication(app, user, PauseReason.PENDING_ATTESTATION);
+      if (updatedAppObj.state === 'PAUSED') {
+        // send required emails
+        await onStateChange(updatedAppObj, app, emailClient, config);
+        return { success: true, app: updatedAppObj };
+      } else {
+        // State change failed
+        logger.error(
+          `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to PAUSED state.`,
+        );
+        return {
+          success: false,
+          app: updatedAppObj,
+          message: `Failed to transition ${updatedAppObj.appId} from ${app.state} to PAUSED state.`,
+        };
+      }
+    } catch (err: unknown) {
+      // Error thrown in one of our async operations
+      logger.error(`${JOB_NAME} - Error caught while pausing application ${app.appId} - ${err}`);
+      return { success: false, app, message: `${err}` };
+    }
+  };
 
-  for (const chunk of requests) {
-    const result = (await chunk) as PromiseSettledResult<any>[];
+  const results: JobResultForApplication[][] = [];
+  const chunks = chunk(pauseableApps, REQUEST_CHUNK_SIZE);
+  for (const chunk of chunks) {
+    const result = await Promise.all(chunk.map(doPauseApplication));
     results.push(result);
   }
 
   const allResults = results.flat();
-  logger.info(`${JOB_NAME} - Generating report.`);
-  const report = buildReportItem(allResults, 'pausedApps', JOB_NAME);
-  return report;
+  logger.info(`${JOB_NAME} - Generating report details.`);
+  const details: BatchJobDetails = buildReportDetails(allResults, 'pausedApps', JOB_NAME);
+  return details;
 };
 
 export default runPauseAppsCheck;

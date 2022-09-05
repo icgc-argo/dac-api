@@ -9,9 +9,10 @@ import { AppConfig, getAppConfig } from '../config';
 import { NOTIFICATION_UNIT_OF_TIME, REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { ApplicationDocument, ApplicationModel } from '../domain/model';
 import { Application } from '../domain/interface';
-import { buildReportItem, getEmptyReport } from './utils';
+import { buildReportDetails, getEmptyReportDetails } from './utils';
 import { sendAttestationRequiredEmail } from '../domain/service';
 import { getDayRange } from '../utils/calculations';
+import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 
 export const JOB_NAME = 'ATTESTATION REQUIRED NOTIFICATIONS';
 
@@ -19,61 +20,82 @@ export const JOB_NAME = 'ATTESTATION REQUIRED NOTIFICATIONS';
 async function attestationRequiredNotificationCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
-) {
+): Promise<JobReport<BatchJobDetails>> {
   const config = await getAppConfig();
+  const startedAt = new Date();
   try {
     logger.info(`${JOB_NAME} - Initiating...`);
-    const report = await getAttestableNotificationReport(currentDate, emailClient, config);
-    logger.info(`${JOB_NAME} - Completed.`);
-    if (report?.errors.length) {
-      logger.warn(`${JOB_NAME} - Completed, with errors.`);
-    }
-    logger.info(`${JOB_NAME} - Returning report.`);
-    return report;
+    const details = await getAttestableNotificationReportDetails(currentDate, emailClient, config);
+    details.errors.length
+      ? logger.info(`${JOB_NAME} - Completed.`)
+      : logger.warn(`${JOB_NAME} - Completed with errors.`);
+    const finishedAt = new Date();
+    const jobSuccessReport: JobReport<BatchJobDetails> = {
+      jobName: JOB_NAME,
+      startedAt,
+      finishedAt,
+      success: true,
+      details,
+    };
+    logger.info(`${JOB_NAME} - Report: ${JSON.stringify(jobSuccessReport)}`);
+    return jobSuccessReport;
   } catch (err) {
     logger.error(`${JOB_NAME} - Failed to complete, with error: ${(err as Error).message}`);
-    return `${JOB_NAME} - Failed to complete, with error: ${(err as Error).message}`;
+    const finishedAt = new Date();
+    const jobFailedReport: JobReport<BatchJobDetails> = {
+      jobName: JOB_NAME,
+      startedAt,
+      finishedAt,
+      success: false,
+      error: `${JOB_NAME} - Failed to complete, with error: ${(err as Error).message}`,
+    };
+    logger.error(`${JOB_NAME} - Report: ${JSON.stringify(jobFailedReport)}`);
+    return jobFailedReport;
   }
 }
 
-const getAttestableNotificationReport = async (
+const getAttestableNotificationReportDetails = async (
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
   config: AppConfig,
-) => {
+): Promise<BatchJobDetails> => {
   const query = getAttestableQuery(config, currentDate);
   const attestableAppCount = await ApplicationModel.find(query).countDocuments();
   if (attestableAppCount === 0) {
     logger.info(`${JOB_NAME} - No applications are entering the attestation period.`);
     logger.info(`${JOB_NAME} - Generating report.`);
-    return getEmptyReport();
+    return getEmptyReportDetails();
   }
-
   logger.info(
     `${JOB_NAME} - ${attestableAppCount} applications are entering the attestation period.`,
   );
   const attestableApps = await ApplicationModel.find(query).exec();
   const apps: Application[] = attestableApps.map((app: ApplicationDocument) => {
-    logger.info(`${JOB_NAME} - Should notify ${app.appId} regarding attestation.`);
-    return app.toObject() as Application;
+    return app.toObject();
   });
 
-  // is this waiting for each email chunk like i'm expecting?
-  const emails = chunk(apps, REQUEST_CHUNK_SIZE).map(async (appChunk: Application[]) => {
-    logger.info(`${JOB_NAME} - Initiating email requests.`);
-    return Promise.allSettled(
-      appChunk.map(async (app) => sendAttestationRequiredEmail(app, config, emailClient)),
-    );
-  });
-
-  const results: PromiseSettledResult<any>[][] = [];
-  for (const email of emails) {
-    const result = (await email) as PromiseSettledResult<any>[];
+  logger.info(`${JOB_NAME} - Initiating email requests.`);
+  const sendNotification = async (app: Application): Promise<JobResultForApplication> => {
+    try {
+      await sendAttestationRequiredEmail(app, config, emailClient);
+      return { success: true, app };
+    } catch (err: unknown) {
+      // Error thrown in one of our async operations
+      logger.error(
+        `${JOB_NAME} - Error caught while sending attestation required email for ${app.appId} - ${err}`,
+      );
+      return { success: false, app, message: `${err}` };
+    }
+  };
+  const chunkedEmails = chunk(apps, REQUEST_CHUNK_SIZE);
+  const results: JobResultForApplication[][] = [];
+  for (const email of chunkedEmails) {
+    const result = await Promise.all(email.map(sendNotification));
     results.push(result);
   }
   const allResults = results.flat();
   logger.info(`${JOB_NAME} - Generating report.`);
-  const attestationNotificationReport = buildReportItem(
+  const attestationNotificationReport = buildReportDetails(
     allResults,
     'attestationNotifications',
     JOB_NAME,
@@ -81,7 +103,10 @@ const getAttestableNotificationReport = async (
   return attestationNotificationReport;
 };
 
-const getAttestableQuery = (config: AppConfig, currentDate: Date) => {
+const getAttestableQuery = (
+  config: AppConfig,
+  currentDate: Date,
+): FilterQuery<ApplicationDocument> => {
   const {
     durations: {
       attestation: { count, unitOfTime, daysToAttestation },
