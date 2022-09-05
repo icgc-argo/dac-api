@@ -4,14 +4,12 @@ import { NotFound } from '../utils/errors';
 import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
-import moment, { unitOfTime } from 'moment';
-import _, { chunk } from 'lodash';
+import moment from 'moment';
+import _ from 'lodash';
 import { Attachment } from 'nodemailer/lib/mailer';
 import { UploadedFile } from 'express-fileupload';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
-import { JOB_NAME as attestationNotificationJobName } from '../jobs/attestationRequiredNotification';
-import { JOB_NAME as pauseAppJobName } from '../jobs/pauseAppCheck';
 
 import {
   ApplicationStateManager,
@@ -1023,9 +1021,6 @@ export async function sendApplicationPausedEmail(
   );
   const emailContent = email.html;
   const subject = `[${updatedApp.appId}] ${title}`;
-  logger.info(
-    `${pauseAppJobName} - Sending application PAUSED notification for ${updatedApp.appId}.`,
-  );
   await sendEmail(
     emailClient,
     config.email.fromAddress,
@@ -1034,7 +1029,6 @@ export async function sendApplicationPausedEmail(
     subject,
     emailContent,
   );
-  logger.info(`${pauseAppJobName} - Email sent for ${updatedApp.appId}.`);
   return updatedApp;
 }
 
