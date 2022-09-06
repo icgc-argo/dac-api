@@ -27,8 +27,8 @@ async function attestationRequiredNotificationCheck(
     logger.info(`${JOB_NAME} - Initiating...`);
     const details = await getAttestableNotificationReportDetails(currentDate, emailClient, config);
     details.errors.length
-      ? logger.info(`${JOB_NAME} - Completed.`)
-      : logger.warn(`${JOB_NAME} - Completed with errors.`);
+      ? logger.warn(`${JOB_NAME} - Completed with errors.`)
+      : logger.info(`${JOB_NAME} - Completed.`);
     const finishedAt = new Date();
     const jobSuccessReport: JobReport<BatchJobDetails> = {
       jobName: JOB_NAME,

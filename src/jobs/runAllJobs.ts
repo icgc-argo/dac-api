@@ -7,7 +7,6 @@ import logger from '../logger';
 import attestationRequiredNotification from './attestationRequiredNotification';
 import runPauseAppsCheck from './pauseAppCheck';
 import { Report, JobReport } from './types';
-import { getEmptyReportDetails } from './utils';
 
 const JOB_NAME = 'ALL BATCH JOBS';
 
