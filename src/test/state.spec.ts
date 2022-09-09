@@ -14,6 +14,7 @@ import _ from 'lodash';
 import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 import { AppConfig } from '../config';
+import moment, { unitOfTime } from 'moment';
 
 const nonAttestableConfig = {
   durations: {
@@ -433,6 +434,7 @@ describe('state manager', () => {
 
   it('should transition an approved app to PAUSED state', () => {
     const app: Application = getApprovedApplication();
+    app.approvedAtUtc = moment.utc(new Date()).subtract(380, 'days').toDate();
     const state = new ApplicationStateManager(app, nonAttestableConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp(
@@ -466,11 +468,12 @@ describe('state manager', () => {
   });
 
   it('should not modify an app already in PAUSED state', () => {
-    const app: Application = getPausedApplication();
+    const app: Application = getPausedApplication(nonAttestableConfig);
     const state = new ApplicationStateManager(app, nonAttestableConfig);
+    expect(app.state).to.eq('PAUSED');
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp(
-      { state: 'PAUSED', pauseReason: 'A different reason to pause' as PauseReason },
+      { state: 'PAUSED', pauseReason: PauseReason.PENDING_ATTESTATION },
       false,
       systemUser,
     );
@@ -498,7 +501,7 @@ describe('state manager', () => {
   });
 
   it('should be able to attest a PAUSED application', () => {
-    const app: Application = getPausedApplication();
+    const app: Application = getPausedApplication(attestableConfig);
     const state = new ApplicationStateManager(app, attestableConfig);
     const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
     const currentDate = new Date();
@@ -696,14 +699,21 @@ export function getApprovedApplication() {
   return result;
 }
 
-export function getPausedApplication() {
+export function getPausedApplication(config: AppConfig) {
   const app = getApprovedApplication();
-  const state = new ApplicationStateManager(app, nonAttestableConfig);
+  app.approvedAtUtc = moment
+    .utc(new Date())
+    .subtract(
+      config.durations.attestation.count,
+      config.durations.attestation.unitOfTime as unitOfTime.DurationConstructor,
+    )
+    .toDate();
+  const state = new ApplicationStateManager(app, attestableConfig);
   const updatePart: Partial<UpdateApplication> = {
     state: 'PAUSED',
     pauseReason: PauseReason.PENDING_ATTESTATION,
   };
-  const result = state.updateApp(updatePart, true, { id: 'DACO-SYSTEM', role: DacoRole.SYSTEM });
+  const result = state.updateApp(updatePart, false, { id: 'DACO-SYSTEM', role: DacoRole.SYSTEM });
   expect(result.state).to.eq('PAUSED');
   expect(result.approvedAtUtc).to.not.eq(undefined);
   expect(result.pauseReason).to.not.be.undefined;

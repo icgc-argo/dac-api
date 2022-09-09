@@ -1,8 +1,8 @@
 import { expect } from 'chai';
-import moment, { unitOfTime } from 'moment';
+import moment from 'moment';
 import { AppConfig } from '../config';
-import { getDaysElapsed, isAttestable } from '../utils/calculations';
-import { getApprovedApplication, getPausedApplication } from './state.spec';
+import { getDaysElapsed, isAttestable, isPauseableDueToAttestation } from '../utils/calculations';
+import { getAppInReview, getApprovedApplication, getPausedApplication } from './state.spec';
 
 const mockConfig = {
   durations: {
@@ -69,7 +69,7 @@ describe('utils', () => {
     });
 
     it('should be attestable after attestationByUtc date', () => {
-      const pausedApp = getPausedApplication();
+      const pausedApp = getPausedApplication(mockConfig);
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(13, 'months').toDate();
       pausedApp.approvedAtUtc = mockApprovalDate;
@@ -78,12 +78,50 @@ describe('utils', () => {
     });
 
     it('should be attestable on the attestationByUtc date', () => {
-      const pausedApp = getPausedApplication();
+      const pausedApp = getPausedApplication(mockConfig);
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(1, 'year').toDate();
       pausedApp.approvedAtUtc = mockApprovalDate;
       const canAttest = isAttestable(pausedApp, mockConfig);
       expect(canAttest).to.be.true;
+    });
+  });
+
+  // these apply only to pausing applications due to incomplete attestation
+  describe('isPauseableDueToAttestation', () => {
+    it('should be pauseable on attestation by date if in APPROVED state', () => {
+      const approvedApp = getApprovedApplication();
+      approvedApp.approvedAtUtc = moment.utc().subtract(1, 'year').toDate();
+      expect(approvedApp.state).to.eq('APPROVED');
+      const pauseable = isPauseableDueToAttestation(approvedApp, mockConfig);
+      expect(pauseable).to.be.true;
+    });
+
+    it('should be pauseable after the attestation by date if still in APPROVED state', () => {
+      const approvedApp = getApprovedApplication();
+      approvedApp.approvedAtUtc = moment.utc().subtract(400, 'days').toDate();
+      expect(approvedApp.state).to.eq('APPROVED');
+      const pauseable = isPauseableDueToAttestation(approvedApp, mockConfig);
+      expect(pauseable).to.be.true;
+    });
+
+    it('should not be pauseable before the attestation by date', () => {
+      const approvedApp = getApprovedApplication();
+      const pauseable = isPauseableDueToAttestation(approvedApp, mockConfig);
+      expect(pauseable).to.be.false;
+    });
+
+    it('should not be pauseable if not in APPROVED state', () => {
+      const reviewApp = getAppInReview();
+      const pauseable = isPauseableDueToAttestation(reviewApp, mockConfig);
+      expect(pauseable).to.be.false;
+    });
+
+    it('should not be pauseable if already attested', () => {
+      const approvedApp = getApprovedApplication();
+      approvedApp.attestedAtUtc = new Date();
+      const pauseable = isPauseableDueToAttestation(approvedApp, mockConfig);
+      expect(pauseable).to.be.false;
     });
   });
 });

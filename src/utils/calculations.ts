@@ -28,6 +28,17 @@ export const getDaysElapsed: (baseDate: Date, dateToDiff: Date) => number = (
   return daysElapsed;
 };
 
+export const getDayRange: (targetDate: moment.Moment) => { $gte: Date; $lte: Date } = (
+  targetDate,
+) => {
+  const start = moment(targetDate).startOf('day').toDate();
+  const end = moment(targetDate).endOf('day').toDate();
+  return {
+    $gte: start,
+    $lte: end,
+  };
+};
+
 export const isAttestable: (currentApp: Application, config: AppConfig) => boolean = (
   currentApp,
   config,
@@ -47,13 +58,16 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
 
-export const getDayRange: (targetDate: moment.Moment) => { $gte: Date; $lte: Date } = (
-  targetDate,
-) => {
-  const start = moment(targetDate).startOf('day').toDate();
-  const end = moment(targetDate).endOf('day').toDate();
-  return {
-    $gte: start,
-    $lte: end,
-  };
+export const isPauseableDueToAttestation: (
+  currentApp: Application,
+  config: AppConfig,
+) => boolean = (currentApp, config) => {
+  if (currentApp.state === 'APPROVED' && !currentApp.attestedAtUtc) {
+    const now = moment.utc();
+    const attestationByDate = getAttestationByDate(currentApp.approvedAtUtc, config);
+    const startOfAttestationByDay = moment(attestationByDate).startOf('day');
+    return now.isSameOrAfter(startOfAttestationByDay);
+  } else {
+    return false;
+  }
 };

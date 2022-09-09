@@ -198,8 +198,8 @@ describe('emails', () => {
     });
 
     it('should render an application paused email', async () => {
-      const app = getPausedApplication();
       const configStub = { durations: durationsStub, email: { links: stub } } as AppConfig;
+      const app = getPausedApplication(configStub);
       const email = await renderApplicationPausedEmail(app, uiLinksStub, configStub);
       console.log(email.emailMjml);
     });

@@ -48,7 +48,12 @@ import {
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 import { AppConfig } from '../config';
 import { getUpdateAuthor, mergeKnown } from '../utils/misc';
-import { getAttestationByDate, getDaysElapsed, isAttestable } from '../utils/calculations';
+import {
+  getAttestationByDate,
+  getDaysElapsed,
+  isAttestable,
+  isPauseableDueToAttestation,
+} from '../utils/calculations';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -1058,19 +1063,31 @@ function updateAppStateForApprovedApplication(
     return transitionToClosed(currentApplication, updatedBy);
   }
   if (updatePart.state === 'PAUSED') {
-    // disallow invalid pause reasons
-    if (updatePart.pauseReason && !Object.values(PauseReason).includes(updatePart.pauseReason)) {
-      throw new BadRequest('Invalid pause reason');
-    }
-    // right now only SYSTEM role will be able to pause applications
-    // admin pause configurable for testing
-    if (
-      updatedBy.role !== DacoRole.SYSTEM &&
-      !(isReviewer && updatePart.pauseReason === PauseReason.ADMIN_PAUSE)
-    ) {
+    if (updatedBy.role === DacoRole.SUBMITTER) {
       throw new Error('Not allowed');
     }
-    return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+    // admin pause configurable for testing. In general only SYSTEM role will be pausing applications
+    // reason must be ADMIN_PAUSE
+    if (isReviewer) {
+      if (updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
+        return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+      } else {
+        throw new BadRequest('Invalid pause reason.');
+      }
+    }
+    // right now SYSTEM can only pause because of PENDING_ATTESTATION
+    // system doesn't necessarily need a reason but good to have very specific controls here
+    if (updatedBy.role === DacoRole.SYSTEM) {
+      if (updatePart.pauseReason === PauseReason.PENDING_ATTESTATION) {
+        if (isPauseableDueToAttestation(currentApplication, config)) {
+          return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+        } else {
+          throw new Error('Not allowed: Application is not pauseable at this time.');
+        }
+      } else {
+        throw new BadRequest('Invalid pause reason.');
+      }
+    }
   }
 
   if (updatePart.attestedAtUtc) {
