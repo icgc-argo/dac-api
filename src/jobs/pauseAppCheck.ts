@@ -85,19 +85,14 @@ const pauseApplication = async (
   });
   logger.info(`${JOB_NAME} - Updating ${result.appId} in db to ${result.state}.`);
   // save new app state in db
-  await ApplicationModel.updateOne({ appId: result.appId }, result);
-  // retrieve updated app from db
-  const updatedApp = await ApplicationModel.findOne({
-    appId: result.appId,
+  const updatedApp = await ApplicationModel.findOneAndUpdate({ appId: result.appId }, result, {
+    new: true,
   }).exec();
   if (updatedApp) {
-    logger.info(`${JOB_NAME} - Returning updated app ${updatedApp?.appId}.`);
-    return updatedApp?.toObject();
+    return updatedApp;
+  } else {
+    throw new Error(`${JOB_NAME} - Find and update operation failed for ${currentApp.appId}.`);
   }
-  logger.error(
-    `${JOB_NAME} - Unable to retrieve updated application document for ${currentApp.appId}, returning input application.`,
-  );
-  return currentApp;
 };
 
 const getPauseableQuery = (
@@ -115,7 +110,7 @@ const getPauseableQuery = (
     count,
     unitOfTime as unitOfTime.DurationConstructor,
   );
-  const approvalDayStart = moment(approvalDate).startOf('day').toDate();
+  const approvalDayEnd = moment(approvalDate).endOf('day').toDate();
   // TODO: depending on how expiry/renewal is handled for applications that are never attested, will need to modify this query
   // to check for PAUSED state and date range of attestationByUtc to expiresAtUtc
   const query: FilterQuery<ApplicationDocument> = {
@@ -123,7 +118,7 @@ const getPauseableQuery = (
     approvedAtUtc: {
       // filter for any time period equal to or past attestationByUtc in case an application that should have been paused previously
       // is caught on a subsequent job run, as it will still be APPROVED and not have an attestedAtUtc value
-      $gte: approvalDayStart,
+      $lte: approvalDayEnd,
     },
     // tslint:disable-next-line:no-null-keyword
     $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
@@ -140,7 +135,7 @@ const getPausedAppsReportDetails = async (
   const config = await getAppConfig();
   const query = getPauseableQuery(config, currentDate);
   const pauseableAppCount = await ApplicationModel.find(query).countDocuments();
-  // if no applications fit the criteria, return initial report
+  // if no applications fit the criteria, return empty report details
   if (pauseableAppCount === 0) {
     logger.info(`${JOB_NAME} - No applications need to be paused at this time.`);
     logger.info(`${JOB_NAME} - Generating report.`);
