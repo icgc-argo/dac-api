@@ -3,6 +3,9 @@ const AutoIncrement = require('mongoose-sequence')(mongoose);
 import { Application } from './interface';
 
 mongoose.set('debug', true);
+// To fix deprecation warning on findOneAndUpdate() https://mongoosejs.com/docs/5.x/docs/deprecations.html#findandmodify
+mongoose.set('useFindAndModify', false);
+
 const Meta = new mongoose.Schema(
   {
     status: { type: String, required: false },
