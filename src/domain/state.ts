@@ -1056,7 +1056,8 @@ function updateAppStateForApprovedApplication(
 ) {
   if (updatePart.state === 'CLOSED') {
     return transitionToClosed(currentApplication, updatedBy);
-  } else if (updatePart.state === 'PAUSED') {
+  }
+  if (updatePart.state === 'PAUSED') {
     switch (updatedBy.role) {
       case DacoRole.ADMIN:
         // admin pause configurable for testing. In general only SYSTEM role will be pausing applications

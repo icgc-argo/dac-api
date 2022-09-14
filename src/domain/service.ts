@@ -1020,7 +1020,7 @@ export async function sendApplicationPausedEmail(
   updatedApp: Application,
   config: AppConfig,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
-) {
+): Promise<Application> {
   const title = 'Your Access to ICGC Controlled Data has been Paused';
   const email = await renderApplicationPausedEmail(
     updatedApp,

@@ -11,9 +11,7 @@ export const getAttestationByDate: (approvalDate: Date, config: AppConfig) => Da
   config,
 ) => {
   const { unitOfTime, count } = config.durations?.attestation;
-  return moment(approvalDate)
-    .add(count as number, unitOfTime)
-    .toDate();
+  return moment(approvalDate).add(count, unitOfTime).toDate();
 };
 
 export const getDaysElapsed: (baseDate: Date, dateToDiff: Date) => number = (
