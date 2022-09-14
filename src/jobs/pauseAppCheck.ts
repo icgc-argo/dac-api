@@ -1,6 +1,6 @@
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
-import moment, { unitOfTime } from 'moment';
+import moment from 'moment';
 import { FilterQuery } from 'mongoose';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { chunk } from 'lodash';
@@ -104,13 +104,11 @@ const getPauseableQuery = (
       attestation: { count, unitOfTime },
     },
   } = config;
-  // find all apps that are APPROVED with an approval date matching the configured time period
+  // find all apps that are APPROVED with an approval date matching the configured time period, check vs the start of the day this check is run
+  const approvalReferenceDate = moment(currentDate).startOf('day');
+
   // default is 1 year to match DACO but we will need this for testing
-  const approvalDate = moment(currentDate).subtract(
-    count,
-    unitOfTime as unitOfTime.DurationConstructor,
-  );
-  const approvalDayEnd = moment(approvalDate).endOf('day').toDate();
+  const approvalThreshold = approvalReferenceDate.subtract(count, unitOfTime).toDate();
   // TODO: depending on how expiry/renewal is handled for applications that are never attested, will need to modify this query
   // to check for PAUSED state and date range of attestationByUtc to expiresAtUtc
   const query: FilterQuery<ApplicationDocument> = {
@@ -118,7 +116,7 @@ const getPauseableQuery = (
     approvedAtUtc: {
       // filter for any time period equal to or past attestationByUtc in case an application that should have been paused previously
       // is caught on a subsequent job run, as it will still be APPROVED and not have an attestedAtUtc value
-      $lte: approvalDayEnd,
+      $lte: approvalThreshold,
     },
     // tslint:disable-next-line:no-null-keyword
     $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal

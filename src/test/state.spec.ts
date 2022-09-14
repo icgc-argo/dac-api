@@ -14,7 +14,7 @@ import _ from 'lodash';
 import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 import { AppConfig } from '../config';
-import moment, { unitOfTime } from 'moment';
+import moment from 'moment';
 
 const nonAttestableConfig = {
   durations: {
@@ -483,10 +483,10 @@ describe('state manager', () => {
     expect(userApp.pauseReason).to.eq('PENDING ATTESTATION');
   });
 
-  it('should not PAUSE an app with an invalid pauseReason', () => {
+  it('should not PAUSE an app with an invalid ADMIN pauseReason', () => {
     const app: Application = getApprovedApplication();
     const state = new ApplicationStateManager(app, nonAttestableConfig);
-    const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
+    const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.ADMIN };
 
     expect(() =>
       state.updateApp(
@@ -703,10 +703,7 @@ export function getPausedApplication(config: AppConfig) {
   const app = getApprovedApplication();
   app.approvedAtUtc = moment
     .utc(new Date())
-    .subtract(
-      config.durations.attestation.count,
-      config.durations.attestation.unitOfTime as unitOfTime.DurationConstructor,
-    )
+    .subtract(config.durations.attestation.count, config.durations.attestation.unitOfTime)
     .toDate();
   const state = new ApplicationStateManager(app, attestableConfig);
   const updatePart: Partial<UpdateApplication> = {

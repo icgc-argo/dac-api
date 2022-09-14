@@ -1,4 +1,4 @@
-import moment, { unitOfTime } from 'moment';
+import moment from 'moment';
 import { AppConfig } from '../config';
 import { Application } from '../domain/interface';
 
@@ -12,7 +12,7 @@ export const getAttestationByDate: (approvalDate: Date, config: AppConfig) => Da
 ) => {
   const { unitOfTime, count } = config.durations?.attestation;
   return moment(approvalDate)
-    .add(count as number, unitOfTime as unitOfTime.DurationConstructor)
+    .add(count as number, unitOfTime)
     .toDate();
 };
 
@@ -56,18 +56,4 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   const now = moment.utc().toDate();
   const elapsed = getDaysElapsed(now, attestationByDate);
   return elapsed >= -config.durations.attestation.daysToAttestation;
-};
-
-export const isPauseableDueToAttestation: (
-  currentApp: Application,
-  config: AppConfig,
-) => boolean = (currentApp, config) => {
-  if (currentApp.state === 'APPROVED' && !currentApp.attestedAtUtc) {
-    const now = moment.utc();
-    const attestationByDate = getAttestationByDate(currentApp.approvedAtUtc, config);
-    const startOfAttestationByDay = moment(attestationByDate).startOf('day');
-    return now.isSameOrAfter(startOfAttestationByDay);
-  } else {
-    return false;
-  }
 };

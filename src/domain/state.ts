@@ -48,12 +48,7 @@ import {
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 import { AppConfig } from '../config';
 import { getUpdateAuthor, mergeKnown } from '../utils/misc';
-import {
-  getAttestationByDate,
-  getDaysElapsed,
-  isAttestable,
-  isPauseableDueToAttestation,
-} from '../utils/calculations';
+import { getAttestationByDate, getDaysElapsed, isAttestable } from '../utils/calculations';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -1061,32 +1056,28 @@ function updateAppStateForApprovedApplication(
 ) {
   if (updatePart.state === 'CLOSED') {
     return transitionToClosed(currentApplication, updatedBy);
-  }
-  if (updatePart.state === 'PAUSED') {
-    if (updatedBy.role === DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
-    }
-    // admin pause configurable for testing. In general only SYSTEM role will be pausing applications
-    // reason must be ADMIN_PAUSE
-    if (isReviewer) {
-      if (updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
-        return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
-      } else {
-        throw new BadRequest('Invalid pause reason.');
-      }
-    }
-    // right now SYSTEM can only pause because of PENDING_ATTESTATION
-    // system doesn't necessarily need a reason but good to have very specific controls here
-    if (updatedBy.role === DacoRole.SYSTEM) {
-      if (updatePart.pauseReason === PauseReason.PENDING_ATTESTATION) {
-        if (isPauseableDueToAttestation(currentApplication, config)) {
+  } else if (updatePart.state === 'PAUSED') {
+    switch (updatedBy.role) {
+      case DacoRole.ADMIN:
+        // admin pause configurable for testing. In general only SYSTEM role will be pausing applications
+        // reason must be ADMIN_PAUSE
+        if (updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
           return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
         } else {
-          throw new Error('Not allowed: Application is not pauseable at this time.');
+          throw new BadRequest('Invalid pause reason.');
         }
-      } else {
-        throw new BadRequest('Invalid pause reason.');
-      }
+        break;
+      case DacoRole.SYSTEM:
+        // Only admins may use ADMIN_PAUSE PauseReason, so long as thats not the reason we accept whatever the System says.
+        if (updatePart.pauseReason !== PauseReason.ADMIN_PAUSE) {
+          return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+        } else {
+          throw new BadRequest('Invalid pause reason.');
+        }
+        break;
+      default:
+        // This user type can't pause
+        throw new Error('Not allowed');
     }
   }
 

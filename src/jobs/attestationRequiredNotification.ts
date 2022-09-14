@@ -1,6 +1,6 @@
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
-import moment, { unitOfTime } from 'moment';
+import moment from 'moment';
 import { FilterQuery } from 'mongoose';
 import { chunk } from 'lodash';
 
@@ -115,7 +115,7 @@ const getAttestableQuery = (
   // find all apps that are APPROVED with an approval date matching the configured time period minus configured daysToAttestation
   // default is 1 year less 45 days to match DACO
   const attestationStartDate = moment(currentDate)
-    .subtract(count, unitOfTime as unitOfTime.DurationConstructor)
+    .subtract(count, unitOfTime)
     .add(daysToAttestation, NOTIFICATION_UNIT_OF_TIME);
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',

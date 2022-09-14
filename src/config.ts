@@ -18,6 +18,7 @@
  */
 
 import * as dotenv from 'dotenv';
+import moment from 'moment';
 import { c } from './utils/misc';
 import * as vault from './vault';
 
@@ -74,16 +75,20 @@ export interface AppConfig {
     bucket: string;
     timeout: number;
   };
+  // unitOfTime must be one of these keys https://momentjs.com/docs/#/manipulating/add/
   durations: {
     expiry: {
       daysToExpiry1: number;
       daysToExpiry2: number;
       daysPostExpiry: number;
       count: number; // period length
-      unitOfTime: string; // period units
+      unitOfTime: moment.unitOfTime.DurationConstructor;
     };
-    // unitOfTime must be one of these keys https://momentjs.com/docs/#/manipulating/add/
-    attestation: { count: number; unitOfTime: string; daysToAttestation: number };
+    attestation: {
+      count: number;
+      unitOfTime: moment.unitOfTime.DurationConstructor;
+      daysToAttestation: number;
+    };
   };
   adminPause: boolean;
 }
@@ -209,11 +214,15 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
         daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
         daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
         count: Number(process.env.EXPIRY_UNIT_COUNT) || 2,
-        unitOfTime: process.env.EXPIRY_UNIT_OF_TIME || 'years',
+        unitOfTime: isUnitOfTime(process.env.EXPIRY_UNIT_OF_TIME)
+          ? process.env.EXPIRY_UNIT_OF_TIME
+          : 'years',
       },
       attestation: {
         count: Number(process.env.ATTESTATION_UNIT_COUNT) || 1,
-        unitOfTime: process.env.ATTESTATION_UNIT_OF_TIME || 'years',
+        unitOfTime: isUnitOfTime(process.env.ATTESTATION_UNIT_OF_TIME)
+          ? process.env.ATTESTATION_UNIT_OF_TIME
+          : 'years',
         daysToAttestation: Number(process.env.DAYS_TO_ATTESTATION) || 45,
       },
     },
@@ -221,6 +230,36 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
   };
   return config;
 };
+
+// This validates our environment variable matches a unit from the `moment` library
+// We only accept years, months, weeks, or days - minutes etc. are considered too short for our application's logic
+function isUnitOfTime(input?: string): input is moment.unitOfTime.DurationConstructor {
+  if (input === undefined || input === '') {
+    // will use default value
+    return false;
+  } else if (
+    input &&
+    [
+      'year',
+      'years',
+      'y',
+      'month',
+      'months',
+      'M',
+      'week',
+      'weeks',
+      'w',
+      'day',
+      'days',
+      'd',
+    ].includes(input)
+  ) {
+    return true;
+  } else {
+    // Stop startup if our env variables would break our code.
+    throw new Error(`App cannot use the provided unitOfTime: ${input}`);
+  }
+}
 
 export const getAppConfig = async (): Promise<AppConfig> => {
   if (currentConfig) {
