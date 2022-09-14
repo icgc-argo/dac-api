@@ -10,6 +10,7 @@ import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 import renderAttestationRequiredEmail from '../emails/attestation-required';
 import renderApplicationPausedEmail from '../emails/application-paused';
+import renderAttestationReceivedEmail from '../emails/attestation-received';
 
 import {
   getAppInReview,
@@ -30,6 +31,7 @@ const stub = {
   dacoSurvey: '',
   accessRenewalGuide: '',
   attestationGuide: '',
+  generalApplicationGuide: '',
 };
 
 const durationsStub = {
@@ -65,6 +67,7 @@ describe('emails', () => {
         dacoSurvey: '',
         accessRenewalGuide: '',
         attestationGuide: '',
+        generalApplicationGuide: '',
       });
       console.log(email.emailMjml);
     });
@@ -201,6 +204,13 @@ describe('emails', () => {
       const configStub = { durations: durationsStub, email: { links: stub } } as AppConfig;
       const app = getPausedApplication(configStub);
       const email = await renderApplicationPausedEmail(app, uiLinksStub, configStub);
+      console.log(email.emailMjml);
+    });
+
+    it('should render an attestation received email', async () => {
+      const app = getApprovedApplication();
+      app.attestedAtUtc = new Date();
+      const email = await renderAttestationReceivedEmail(app, stub);
       console.log(email.emailMjml);
     });
   });

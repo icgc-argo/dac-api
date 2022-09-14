@@ -6,6 +6,7 @@ import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import moment from 'moment';
 import _ from 'lodash';
+import { chunk, difference, isEmpty } from 'lodash';
 import { Attachment } from 'nodemailer/lib/mailer';
 import { UploadedFile } from 'express-fileupload';
 import nodemail from 'nodemailer';
@@ -46,6 +47,7 @@ import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 import renderAttestationRequiredEmail from '../emails/attestation-required';
 import renderApplicationPausedEmail from '../emails/application-paused';
+import renderAttestationReceivedEmail from '../emails/attestation-received';
 
 import { c, getUpdateAuthor } from '../utils/misc';
 import { getAttestationByDate, isAttestable, sortByDate } from '../utils/calculations';
@@ -309,6 +311,14 @@ export async function updatePartial(
   if (stateChanged) {
     await onStateChange(updatedApp, appDocObj, emailClient, config);
   }
+  // triggering this here to ensure attestedAtUtc value has been properly updated in the db before sending email
+  // cannot rely on stateChanged result because attestation does not imply a state change has occurred
+  // i.e. an approved app can be attested and stay in approved state
+  const wasAttested = isEmpty(appDocObj.attestedAtUtc) && !!updatedApp.attestedAtUtc;
+  if (wasAttested) {
+    await sendAttestationReceivedEmail(updatedApp, config, emailClient);
+  }
+
   const deleted = checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
   // this can be a result of application getting updated :
@@ -348,7 +358,9 @@ export async function onStateChange(
   if (updatedApp.state === 'REJECTED') {
     await sendRejectedEmail(updatedApp, emailClient, config);
   }
-  if (updatedApp.state === 'APPROVED') {
+
+  // prevent usual approval emails going out when state changes from PAUSED to APPROVED, as this is not a new approval event
+  if (updatedApp.state === 'APPROVED' && oldApplication.state !== 'PAUSED') {
     await sendApplicationApprovedEmail(updatedApp, config, emailClient);
     Promise.all(
       updatedApp.sections.collaborators.list.map((collab) => {
@@ -621,7 +633,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const ethicsArrayAfter = result.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
-  const ethicsDiff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
+  const ethicsDiff = difference(ethicsArrayBefore, ethicsArrayAfter);
   ethicsDiff.forEach((o) => removedIds.push(o));
 
   if (
@@ -637,7 +649,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const approvedArrayAfter = result.approvedAppDocs
     .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
     .map((e) => e.approvedAppDocObjId);
-  const approvedDiff = _.difference(approvedArrayBefore, approvedArrayAfter);
+  const approvedDiff = difference(approvedArrayBefore, approvedArrayAfter);
   approvedDiff.forEach((o) => removedIds.push(o));
 
   console.log('removing docs: ', removedIds);
@@ -1030,6 +1042,27 @@ export async function sendApplicationPausedEmail(
     emailContent,
   );
   return updatedApp;
+}
+
+async function sendAttestationReceivedEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const title = `We have Received your Annual Attestation`;
+  const attestationEmail = await renderAttestationReceivedEmail(updatedApp, config.email.links);
+  const emailContent = attestationEmail.html;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    subject,
+    emailContent,
+    new Set([config.email.dacoAddress]),
+  );
 }
 
 async function sendAccessExpiringEmail(
