@@ -109,6 +109,7 @@ const getPauseableQuery = (
 
   // default is 1 year to match DACO but we will need this for testing
   const approvalThreshold = approvalReferenceDate.subtract(count, unitOfTime).toDate();
+  logger.info(`${JOB_NAME} - Approval threshold date is ${approvalThreshold}`);
   // TODO: depending on how expiry/renewal is handled for applications that are never attested, will need to modify this query
   // to check for PAUSED state and date range of attestationByUtc to expiresAtUtc
   const query: FilterQuery<ApplicationDocument> = {
