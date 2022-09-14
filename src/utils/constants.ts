@@ -269,5 +269,5 @@ export const ICGC_DACO_URL = 'https://daco.icgc-argo.org/';
 export const ICGC_ARGO_CONTACT_URL = urlJoin(ICGC_ARGO_PLATFORM_URL, 'contact');
 
 // batch job
-export const NOTIFICATION_UNIT_OF_TIME = 'days' as unitOfTime.DurationConstructor;
+export const NOTIFICATION_UNIT_OF_TIME: unitOfTime.DurationConstructor = 'days';
 export const REQUEST_CHUNK_SIZE = 5;
