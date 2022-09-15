@@ -22,6 +22,11 @@ export type SectionStatus =
 
 export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP' | 'APPROVED_PDF';
 
+export enum PauseReason {
+  PENDING_ATTESTATION = 'PENDING ATTESTATION',
+  ADMIN_PAUSE = 'ADMIN PAUSE',
+}
+
 export interface Meta {
   updated?: boolean;
   status: SectionStatus;
@@ -270,7 +275,7 @@ export interface Application {
   attestationByUtc?: Date; // calculated from approvedAtUtc
   attestedAtUtc?: Date | null;
   isAttestable?: boolean;
-  pauseReason?: string;
+  pauseReason?: PauseReason | null;
 }
 
 export type AppSections = keyof Application['sections'];
@@ -291,7 +296,7 @@ export interface UpdateApplication {
   expiresAtUtc?: Date;
   denialReason?: string;
   revisionRequest?: RevisionRequestUpdate;
-  pauseReason?: string;
+  pauseReason?: PauseReason;
   attestedAtUtc?: Date;
   sections: {
     applicant?: {

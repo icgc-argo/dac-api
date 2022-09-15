@@ -4,6 +4,7 @@ import {
   Application,
   Collaborator,
   DacoRole,
+  PauseReason,
   TERMS_AGREEMENT_NAME,
   UpdateApplication,
 } from '../domain/interface';
@@ -13,6 +14,7 @@ import _ from 'lodash';
 import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 import { AppConfig } from '../config';
+import moment from 'moment';
 
 const nonAttestableConfig = {
   durations: {
@@ -432,9 +434,14 @@ describe('state manager', () => {
 
   it('should transition an approved app to PAUSED state', () => {
     const app: Application = getApprovedApplication();
+    app.approvedAtUtc = moment.utc(new Date()).subtract(380, 'days').toDate();
     const state = new ApplicationStateManager(app, nonAttestableConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
-    state.updateApp({ state: 'PAUSED', pauseReason: 'PENDING ATTESTATION' }, false, systemUser);
+    state.updateApp(
+      { state: 'PAUSED', pauseReason: PauseReason.PENDING_ATTESTATION },
+      false,
+      systemUser,
+    );
     const userApp = state.prepareApplicationForUser(true);
 
     expect(userApp.state).to.eq('PAUSED');
@@ -448,7 +455,11 @@ describe('state manager', () => {
     const app: Application = getAppInRevisionRequested();
     const state = new ApplicationStateManager(app, nonAttestableConfig);
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
-    state.updateApp({ state: 'PAUSED', pauseReason: 'PENDING ATTESTATION' }, false, systemUser);
+    state.updateApp(
+      { state: 'PAUSED', pauseReason: PauseReason.PENDING_ATTESTATION },
+      false,
+      systemUser,
+    );
     const userApp = state.prepareApplicationForUser(true);
 
     expect(userApp.state).to.eq('REVISIONS REQUESTED');
@@ -457,11 +468,12 @@ describe('state manager', () => {
   });
 
   it('should not modify an app already in PAUSED state', () => {
-    const app: Application = getPausedApplication();
+    const app: Application = getPausedApplication(nonAttestableConfig);
     const state = new ApplicationStateManager(app, nonAttestableConfig);
+    expect(app.state).to.eq('PAUSED');
     const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.SYSTEM };
     state.updateApp(
-      { state: 'PAUSED', pauseReason: 'A different reason to pause' },
+      { state: 'PAUSED', pauseReason: PauseReason.PENDING_ATTESTATION },
       false,
       systemUser,
     );
@@ -471,8 +483,25 @@ describe('state manager', () => {
     expect(userApp.pauseReason).to.eq('PENDING ATTESTATION');
   });
 
+  it('should not PAUSE an app with an invalid ADMIN pauseReason', () => {
+    const app: Application = getApprovedApplication();
+    const state = new ApplicationStateManager(app, nonAttestableConfig);
+    const systemUser = { id: 'DACO-SYSTEM-1', role: DacoRole.ADMIN };
+
+    expect(() =>
+      state.updateApp(
+        { state: 'PAUSED', pauseReason: 'Invalid pause reason' as PauseReason },
+        false,
+        systemUser,
+      ),
+    ).to.throw(BadRequest, 'Invalid pause reason');
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.state).to.eq('APPROVED');
+    expect(userApp.pauseReason).to.be.undefined;
+  });
+
   it('should be able to attest a PAUSED application', () => {
-    const app: Application = getPausedApplication();
+    const app: Application = getPausedApplication(attestableConfig);
     const state = new ApplicationStateManager(app, attestableConfig);
     const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
     const currentDate = new Date();
@@ -486,11 +515,13 @@ describe('state manager', () => {
       user,
     );
     const userApp = state.prepareApplicationForUser(false);
-
     expect(userApp.state).to.eq('APPROVED');
     expect(userApp.attestedAtUtc).to.not.eq(undefined);
     expect(userApp.attestedAtUtc).to.eq(currentDate);
     expect(userApp.isAttestable).to.be.false;
+    // NOTE: when an app is transitioned from PAUSED to APPROVED, the pauseReason is deleted
+    // in practice the app is refetched from the db after an update and would return null for this field
+    expect(userApp.pauseReason).to.be.undefined;
   });
 
   // this is not working yet because you're not handling updateAppState for approved apps
@@ -668,17 +699,22 @@ export function getApprovedApplication() {
   return result;
 }
 
-export function getPausedApplication() {
+export function getPausedApplication(config: AppConfig) {
   const app = getApprovedApplication();
-  const state = new ApplicationStateManager(app, nonAttestableConfig);
+  app.approvedAtUtc = moment
+    .utc(new Date())
+    .subtract(config.durations.attestation.count, config.durations.attestation.unitOfTime)
+    .toDate();
+  const state = new ApplicationStateManager(app, attestableConfig);
   const updatePart: Partial<UpdateApplication> = {
     state: 'PAUSED',
-    pauseReason: 'PENDING ATTESTATION',
+    pauseReason: PauseReason.PENDING_ATTESTATION,
   };
-  const result = state.updateApp(updatePart, true, { id: 'DACO-SYSTEM', role: DacoRole.SYSTEM });
+  const result = state.updateApp(updatePart, false, { id: 'DACO-SYSTEM', role: DacoRole.SYSTEM });
   expect(result.state).to.eq('PAUSED');
   expect(result.approvedAtUtc).to.not.eq(undefined);
-  expect(result.pauseReason).to.exist;
+  expect(result.pauseReason).to.not.be.undefined;
+  expect(result.pauseReason).to.eq(PauseReason.PENDING_ATTESTATION);
   return result;
 }
 

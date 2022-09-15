@@ -1,4 +1,4 @@
-import moment, { unitOfTime } from 'moment';
+import moment from 'moment';
 import { AppConfig } from '../config';
 import { Application } from '../domain/interface';
 
@@ -11,9 +11,7 @@ export const getAttestationByDate: (approvalDate: Date, config: AppConfig) => Da
   config,
 ) => {
   const { unitOfTime, count } = config.durations?.attestation;
-  return moment(approvalDate)
-    .add(count as number, unitOfTime as unitOfTime.DurationConstructor)
-    .toDate();
+  return moment(approvalDate).add(count, unitOfTime).toDate();
 };
 
 export const getDaysElapsed: (baseDate: Date, dateToDiff: Date) => number = (
@@ -26,6 +24,17 @@ export const getDaysElapsed: (baseDate: Date, dateToDiff: Date) => number = (
   const end = moment.utc(dateToDiff).startOf('day');
   const daysElapsed = begin.diff(end, 'days');
   return daysElapsed;
+};
+
+export const getDayRange: (targetDate: moment.Moment) => { $gte: Date; $lte: Date } = (
+  targetDate,
+) => {
+  const start = moment(targetDate).startOf('day').toDate();
+  const end = moment(targetDate).endOf('day').toDate();
+  return {
+    $gte: start,
+    $lte: end,
+  };
 };
 
 export const isAttestable: (currentApp: Application, config: AppConfig) => boolean = (

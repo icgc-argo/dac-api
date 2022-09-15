@@ -467,15 +467,6 @@ paths:
       responses:
         '200':
           description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  pausedApps:
-                    $ref: '#/components/schemas/Report'
-                  expiredApps:
-                    $ref: '#/components/schemas/Report'
 
 tags:
   - name: Health
@@ -972,17 +963,3 @@ components:
                     format: date
                   isCurrent:
                     type: boolean
-
-    Report:
-      type: object
-      properties:
-        count:
-          type: number
-        appIds:
-          type: array
-          items:
-            type: string
-        errors:
-          type: array
-          items:
-            type: string

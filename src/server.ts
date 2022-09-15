@@ -73,7 +73,7 @@ import { Storage } from './storage';
     logger.warn('Connection Closed');
     setDBStatus(Status.ERROR);
   });
-  mongoose.connection.on('error', error => {
+  mongoose.connection.on('error', (error) => {
     logger.error('MongoDB Connection Error:' + error);
     setDBStatus(Status.ERROR);
   });
@@ -95,6 +95,9 @@ import { Storage } from './storage';
       pass: appConfig.mongoProperties.dbPassword,
       w: appConfig.mongoProperties.writeConcern,
       wtimeout: appConfig.mongoProperties.writeAckTimeout,
+      // To fix deprecation warning on findOneAndUpdate() https://mongoosejs.com/docs/5.x/docs/deprecations.html#findandmodify
+      // when system pauses an application, we want to return the updated application object (pauseApplication call in pauseAppCheck.ts)
+      useFindAndModify: false,
     });
   } catch (err) {
     logger.error('MongoDB connection error. Please make sure MongoDB is running. ' + err);
@@ -113,10 +116,12 @@ import { Storage } from './storage';
   const emailClient = nodemailer.createTransport({
     host: appConfig.email.host,
     port: appConfig.email.port,
-    auth: appConfig.email.auth.user ? {
-      user: appConfig.email.auth?.user, // generated ethereal user
-      pass: appConfig.email.auth?.password, // generated ethereal password
-    } : undefined,
+    auth: appConfig.email.auth.user
+      ? {
+          user: appConfig.email.auth?.user, // generated ethereal user
+          pass: appConfig.email.auth?.password, // generated ethereal password
+        }
+      : undefined,
   } as any);
   /**
    * Start Express server.
@@ -130,7 +135,7 @@ import { Storage } from './storage';
 
 const errorTypes = ['unhandledRejection', 'uncaughtException'];
 const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
-errorTypes.map(type => {
+errorTypes.map((type) => {
   process.on(type as any, (e: Error) => {
     try {
       logger.error(`unhandled error: ${type}`);
@@ -143,7 +148,7 @@ errorTypes.map(type => {
   });
 });
 
-signalTraps.map(type => {
+signalTraps.map((type) => {
   process.once(type as any, () => {
     try {
       logger.info(`received signal ${type} shutting down..`);

@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import moment, { unitOfTime } from 'moment';
+import moment from 'moment';
 import { AppConfig } from '../config';
 import { getDaysElapsed, isAttestable } from '../utils/calculations';
 import { getApprovedApplication, getPausedApplication } from './state.spec';
@@ -69,7 +69,7 @@ describe('utils', () => {
     });
 
     it('should be attestable after attestationByUtc date', () => {
-      const pausedApp = getPausedApplication();
+      const pausedApp = getPausedApplication(mockConfig);
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(13, 'months').toDate();
       pausedApp.approvedAtUtc = mockApprovalDate;
@@ -78,7 +78,7 @@ describe('utils', () => {
     });
 
     it('should be attestable on the attestationByUtc date', () => {
-      const pausedApp = getPausedApplication();
+      const pausedApp = getPausedApplication(mockConfig);
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(1, 'year').toDate();
       pausedApp.approvedAtUtc = mockApprovalDate;
