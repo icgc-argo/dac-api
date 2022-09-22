@@ -1,8 +1,8 @@
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
 import moment from 'moment';
-import { cloneDeep } from 'lodash';
 
+import { cloneDeep } from 'lodash';
 import { newApplication } from '../domain/state';
 import { AppConfig } from '../config';
 import { getDaysElapsed, isAttestable, isRenewable } from '../utils/calculations';
@@ -94,7 +94,7 @@ describe('utils', () => {
     });
 
     it('should be attestable after attestationByUtc date', () => {
-      const pausedApp = getPausedApplication();
+      const pausedApp = getPausedApplication(mockConfig);
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(13, 'months').toDate();
       pausedApp.approvedAtUtc = mockApprovalDate;
@@ -103,7 +103,7 @@ describe('utils', () => {
     });
 
     it('should be attestable on the attestationByUtc date', () => {
-      const pausedApp = getPausedApplication();
+      const pausedApp = getPausedApplication(mockConfig);
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(1, 'year').toDate();
       pausedApp.approvedAtUtc = mockApprovalDate;

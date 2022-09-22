@@ -32,6 +32,7 @@ import {
   Meta,
   Sections,
   DacoRole,
+  PauseReason,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -948,7 +949,7 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
 const transitionToPaused: (
   current: Application,
   pausedBy: UpdateAuthor,
-  reason?: string,
+  reason?: PauseReason,
 ) => Application = (current, pausedBy, reason) => {
   current.state = 'PAUSED';
   if (reason) {
@@ -1067,15 +1068,28 @@ function updateAppStateForApprovedApplication(
     return transitionToClosed(currentApplication, updatedBy);
   }
   if (updatePart.state === 'PAUSED') {
-    // right now only SYSTEM role will be able to pause applications
-    // admin pause configurable for testing
-    if (
-      updatedBy.role !== DacoRole.SYSTEM &&
-      !(isReviewer && updatePart.pauseReason === 'ADMIN-PAUSE')
-    ) {
-      throw new Error('Not allowed');
+    switch (updatedBy.role) {
+      case DacoRole.ADMIN:
+        // admin pause configurable for testing. In general only SYSTEM role will be pausing applications
+        // reason must be ADMIN_PAUSE
+        if (updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
+          return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+        } else {
+          throw new BadRequest('Invalid pause reason.');
+        }
+        break;
+      case DacoRole.SYSTEM:
+        // Only admins may use ADMIN_PAUSE PauseReason, so long as thats not the reason we accept whatever the System says.
+        if (updatePart.pauseReason !== PauseReason.ADMIN_PAUSE) {
+          return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+        } else {
+          throw new BadRequest('Invalid pause reason.');
+        }
+        break;
+      default:
+        // This user type can't pause
+        throw new Error('Not allowed');
     }
-    return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
   }
 
   if (updatePart.attestedAtUtc) {
