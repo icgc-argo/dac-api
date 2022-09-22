@@ -55,7 +55,7 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   const elapsed = getDaysElapsed(now, attestationByDate);
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
-('');
+
 export const isRenewable: (currentApp: Application, config: AppConfig) => boolean = (
   currentApp,
   config,
