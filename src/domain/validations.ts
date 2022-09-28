@@ -370,14 +370,3 @@ function validateRequired(
   }
   return true;
 }
-
-export function validateDate(val?: string) {
-  if (!val) {
-    throw new BadRequest('Missing date value');
-  }
-  const test = Date.parse(val);
-  if (isNaN(test)) {
-    throw new BadRequest('Invalid date');
-  }
-  return true;
-}

@@ -40,7 +40,6 @@ import {
   validateApplicantSection,
   validateCollaborator,
   validateDataAccessAgreement,
-  validateDate,
   validateEthicsLetterSection,
   validateProjectInfo,
   validateRepresentativeSection,
@@ -903,8 +902,8 @@ function transitionFromPausedToApproved(
   // reset pauseReason if no longer in PAUSED state
   // TODO: right now there is no other transition for a PAUSED app, but may need to revisit this for a possible PAUSED -> EXPIRED transition
   current.pauseReason = undefined;
-  if (updatePart?.attestedAtUtc) {
-    updateAttestedAtUtc(current, updatePart, updatedBy);
+  if (updatePart?.isAttesting === true) {
+    updateAttestedAtUtc(current, updatedBy);
   }
   return current;
 }
@@ -1082,14 +1081,14 @@ function updateAppStateForApprovedApplication(
     }
   }
 
-  if (updatePart.attestedAtUtc) {
+  if (updatePart.isAttesting === true) {
     if (!isAttestable(currentApplication, config)) {
       throw new Error('Application is not attestable');
     }
     if (updatedBy.role !== DacoRole.SUBMITTER) {
       throw new Error('Not allowed');
     }
-    return updateAttestedAtUtc(currentApplication, updatePart, updatedBy);
+    return updateAttestedAtUtc(currentApplication, updatedBy);
   }
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
@@ -1097,13 +1096,7 @@ function updateAppStateForApprovedApplication(
   }
 }
 
-function updateAttestedAtUtc(
-  currentApplication: Application,
-  updatePart: Partial<UpdateApplication>,
-  updatedBy: UpdateAuthor,
-) {
-  // TODO: change request body from ui so date validation is not needed, i.e. {attesting: true} or similar
-  validateDate(updatePart.attestedAtUtc?.toString());
+function updateAttestedAtUtc(currentApplication: Application, updatedBy: UpdateAuthor) {
   currentApplication.attestedAtUtc = new Date();
   currentApplication.updates.push(
     createUpdateEvent(currentApplication, updatedBy, UpdateEvent.ATTESTED),
@@ -1127,7 +1120,7 @@ function updateAppStateForPausedApplication(
   }
 
   // can only attest if it is the configured # of days to attestationByUtc date or later
-  if (updatePart.attestedAtUtc && isAttestable(currentApplication, config)) {
+  if (updatePart.isAttesting === true && isAttestable(currentApplication, config)) {
     // only submitters can attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
       return transitionFromPausedToApproved(currentApplication, updatedBy, updatePart);
