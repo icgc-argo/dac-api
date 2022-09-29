@@ -79,6 +79,6 @@ export const isRenewable: (currentApp: Application, config: AppConfig) => boolea
     .endOf('day')
     .add(config.durations.expiry.daysPostExpiry, 'days');
 
-  // between 90 days prior to today and 90 days after
+  // between DAYS_TO_EXPIRY_1 days prior to today and DAYS_POST_EXPIRY after
   return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
 };
