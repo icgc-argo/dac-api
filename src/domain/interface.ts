@@ -299,7 +299,7 @@ export interface UpdateApplication {
   denialReason?: string;
   revisionRequest?: RevisionRequestUpdate;
   pauseReason?: PauseReason;
-  attestedAtUtc?: Date;
+  isAttesting?: boolean;
   sections: {
     applicant?: {
       info?: Partial<PersonalInfo>;

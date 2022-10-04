@@ -515,12 +515,11 @@ describe('state manager', () => {
     const app: Application = getPausedApplication(attestableConfig);
     const state = new ApplicationStateManager(app, attestableConfig);
     const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
-    const currentDate = new Date();
     const beforeApp = state.prepareApplicationForUser(false);
     expect(beforeApp.isAttestable).to.be.true;
     state.updateApp(
       {
-        attestedAtUtc: currentDate,
+        isAttesting: true,
       },
       false,
       user,
@@ -539,12 +538,11 @@ describe('state manager', () => {
     const app: Application = getApprovedApplication();
     const state = new ApplicationStateManager(app, attestableConfig);
     const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
-    const currentDate = new Date();
     const beforeApp = state.prepareApplicationForUser(false);
     expect(beforeApp.isAttestable).to.be.true;
     state.updateApp(
       {
-        attestedAtUtc: currentDate,
+        isAttesting: true,
       },
       false,
       user,
@@ -567,13 +565,12 @@ describe('state manager', () => {
     const app: Application = getApprovedApplication();
     const state = new ApplicationStateManager(app, nonAttestableConfig);
     const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
-    const currentDate = new Date();
     const beforeApp = state.prepareApplicationForUser(false);
     expect(beforeApp.isAttestable).to.be.false;
     expect(() =>
       state.updateApp(
         {
-          attestedAtUtc: currentDate,
+          isAttesting: true,
         },
         false,
         user,
@@ -589,13 +586,12 @@ describe('state manager', () => {
     app.attestedAtUtc = new Date();
     const state = new ApplicationStateManager(app, attestableConfig);
     const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
-    const currentDate = new Date();
     const beforeApp = state.prepareApplicationForUser(false);
     expect(beforeApp.isAttestable).to.be.false;
     expect(() =>
       state.updateApp(
         {
-          attestedAtUtc: currentDate,
+          isAttesting: true,
         },
         false,
         user,
@@ -603,26 +599,23 @@ describe('state manager', () => {
     ).to.throw(Error, 'Application is not attestable');
   });
 
-  it('should not attest with an invalid date', () => {
-    const app: Application = getApprovedApplication();
+  it('should not attest with an invalid request body', () => {
+    const app: Application = getPausedApplication(attestableConfig);
     const state = new ApplicationStateManager(app, attestableConfig);
     const user = { id: 'Mlle Submitter', role: DacoRole.SUBMITTER };
-    const currentDate = ('notADate' as unknown) as Date;
     const beforeApp = state.prepareApplicationForUser(false);
     expect(beforeApp.isAttestable).to.be.true;
 
-    expect(() =>
-      state.updateApp(
-        {
-          attestedAtUtc: currentDate,
-        },
-        false,
-        user,
-      ),
-    ).to.throw(Error, '"Invalid date"');
+    state.updateApp(
+      {
+        isAttesting: false,
+      },
+      false,
+      user,
+    );
 
     const userApp = state.prepareApplicationForUser(false);
-    expect(userApp.state).to.eq('APPROVED');
+    expect(userApp.state).to.eq('PAUSED');
     expect(userApp.attestedAtUtc).to.eq(undefined);
   });
 
@@ -630,13 +623,12 @@ describe('state manager', () => {
     const app: Application = getApprovedApplication();
     const state = new ApplicationStateManager(app, attestableConfig);
     const user = { id: 'Mme Admin', role: DacoRole.ADMIN };
-    const currentDate = new Date();
     const beforeApp = state.prepareApplicationForUser(false);
     expect(beforeApp.isAttestable).to.be.true;
     expect(() =>
       state.updateApp(
         {
-          attestedAtUtc: currentDate,
+          isAttesting: true,
         },
         false,
         user,
