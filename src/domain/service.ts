@@ -49,7 +49,7 @@ import renderApplicationPausedEmail from '../emails/application-paused';
 import renderAttestationReceivedEmail from '../emails/attestation-received';
 
 import { getAttestationByDate, isAttestable, isRenewable, sortByDate } from '../utils/calculations';
-import { c, getUpdateAuthor } from '../utils/misc';
+import { c, getLastPausedAtDate, getUpdateAuthor } from '../utils/misc';
 
 export async function deleteDocument(
   appId: string,
@@ -522,6 +522,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         ...(app.approvedAtUtc && {
           attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
         }),
+        lastPausedAtUtc: getLastPausedAtDate(app),
       } as ApplicationSummary),
   );
 

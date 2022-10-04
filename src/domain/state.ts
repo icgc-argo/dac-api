@@ -46,13 +46,13 @@ import {
 } from './validations';
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
 import { AppConfig } from '../config';
-import { getUpdateAuthor, mergeKnown } from '../utils/misc';
 import {
   getAttestationByDate,
   getDaysElapsed,
   isAttestable,
   isRenewable,
 } from '../utils/calculations';
+import { getLastPausedAtDate, getUpdateAuthor, mergeKnown } from '../utils/misc';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -175,11 +175,16 @@ export class ApplicationStateManager {
       this.currentApplication,
       this.currentAppConfig,
     );
+
     // calculate renewable status
     this.currentApplication.ableToRenew = isRenewable(
       this.currentApplication,
       this.currentAppConfig,
     );
+
+    // adding to response for convenience in FE, so it doesn't need to parse value from updates array
+    this.currentApplication.lastPausedAtUtc = getLastPausedAtDate(this.currentApplication);
+
     return this.currentApplication;
   }
 

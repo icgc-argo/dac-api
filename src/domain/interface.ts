@@ -173,6 +173,7 @@ export interface ApplicationSummary {
   attestedAtUtc?: Date | null;
   isAttestable: boolean;
   ableToRenew: boolean;
+  lastPausedAtUtc?: Date;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -276,8 +277,9 @@ export interface Application {
   approvedAppDocs: ApprovedAppDocument[];
   attestationByUtc?: Date; // calculated from approvedAtUtc
   attestedAtUtc?: Date | null;
-  isAttestable?: boolean;
+  isAttestable: boolean;
   pauseReason?: PauseReason | null;
+  lastPausedAtUtc?: Date;
 }
 
 export type AppSections = keyof Application['sections'];
