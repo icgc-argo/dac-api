@@ -275,7 +275,7 @@ export interface Application {
   approvedAppDocs: ApprovedAppDocument[];
   attestationByUtc?: Date; // calculated from approvedAtUtc
   attestedAtUtc?: Date | null;
-  isAttestable?: boolean;
+  isAttestable: boolean;
   pauseReason?: PauseReason | null;
   lastPausedAtUtc?: Date;
 }
