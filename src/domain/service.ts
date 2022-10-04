@@ -48,8 +48,8 @@ import renderAttestationRequiredEmail from '../emails/attestation-required';
 import renderApplicationPausedEmail from '../emails/application-paused';
 import renderAttestationReceivedEmail from '../emails/attestation-received';
 
+import { getAttestationByDate, isAttestable, isRenewable, sortByDate } from '../utils/calculations';
 import { c, getLastPausedAtDate, getUpdateAuthor } from '../utils/misc';
-import { getAttestationByDate, isAttestable, sortByDate } from '../utils/calculations';
 
 export async function deleteDocument(
   appId: string,
@@ -516,6 +516,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
+        ableToRenew: isRenewable(app, config),
         revisionsRequested: wasInRevisionRequestState(app),
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
         ...(app.approvedAtUtc && {

@@ -1,4 +1,7 @@
 import { Identity } from '@overture-stack/ego-token-middleware';
+import { expect } from 'chai';
+import { isDate, pick, cloneDeep, omit } from 'lodash';
+
 import {
   Address,
   Application,
@@ -9,8 +12,6 @@ import {
   UpdateApplication,
 } from '../domain/interface';
 import { ApplicationStateManager, newApplication } from '../domain/state';
-import { expect } from 'chai';
-import _ from 'lodash';
 import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 import { AppConfig } from '../config';
@@ -23,6 +24,11 @@ const nonAttestableConfig = {
       unitOfTime: 'years',
       daysToAttestation: 45,
     },
+    expiry: {
+      daysToExpiry1: 90,
+      daysToExpiry2: 45,
+      daysPostExpiry: 90,
+    },
   },
 } as AppConfig;
 
@@ -32,6 +38,11 @@ const attestableConfig = {
       count: 10,
       unitOfTime: 'days',
       daysToAttestation: 45,
+    },
+    expiry: {
+      daysToExpiry1: 90,
+      daysToExpiry2: 45,
+      daysPostExpiry: 90,
     },
   },
 } as AppConfig;
@@ -49,7 +60,7 @@ const newApplication1: Partial<Application> = newApplication({
 
 describe('state manager', () => {
   it('should update applicant info', () => {
-    const emptyApp: Application = _.cloneDeep({
+    const emptyApp: Application = cloneDeep({
       ...newApplication1,
       appId: 'DACO-1',
       appNumber: 1,
@@ -109,7 +120,7 @@ describe('state manager', () => {
 
   describe('collaborators', () => {
     it('1) should add collaborator', () => {
-      const emptyApp: Application = _.cloneDeep({
+      const emptyApp: Application = cloneDeep({
         ...newApplication1,
         appId: 'DACO-1',
         appNumber: 1,
@@ -143,7 +154,7 @@ describe('state manager', () => {
     });
 
     it('2) should not add duplicate collaborator', () => {
-      const emptyApp: Application = _.cloneDeep({
+      const emptyApp: Application = cloneDeep({
         ...newApplication1,
         appId: 'DACO-1',
         appNumber: 1,
@@ -206,7 +217,7 @@ describe('state manager', () => {
     });
 
     it('3) should check collaborator primary affiliation', () => {
-      const app: Application = _.cloneDeep({
+      const app: Application = cloneDeep({
         ...newApplication1,
         appId: 'DACO-1',
         appNumber: 1,
@@ -516,6 +527,7 @@ describe('state manager', () => {
     const userApp = state.prepareApplicationForUser(false);
     expect(userApp.state).to.eq('APPROVED');
     expect(userApp.attestedAtUtc).to.not.eq(undefined);
+    expect(isDate(userApp.attestedAtUtc)).to.be.true;
     expect(userApp.isAttestable).to.be.false;
     // NOTE: when an app is transitioned from PAUSED to APPROVED, the pauseReason is deleted
     // in practice the app is refetched from the db after an update and would return null for this field
@@ -538,6 +550,7 @@ describe('state manager', () => {
     const userApp = state.prepareApplicationForUser(false);
     expect(userApp.state).to.eq('APPROVED');
     expect(userApp.attestedAtUtc).to.not.eq(undefined);
+    expect(isDate(userApp.attestedAtUtc)).to.be.true;
     expect(userApp.isAttestable).to.be.false;
   });
 
@@ -627,16 +640,16 @@ describe('state manager', () => {
 });
 
 export function getReadyToSignApp() {
-  const app: Application = _.cloneDeep({
+  const app: Application = cloneDeep({
     ...newApplication1,
     appId: 'DACO-2341',
     appNumber: 1,
   }) as Application;
-  const updatePart: UpdateApplication['sections'] = _.pick(_.cloneDeep(app), 'sections').sections;
+  const updatePart: UpdateApplication['sections'] = pick(cloneDeep(app), 'sections').sections;
   c(updatePart.applicant).info = getRandomInfo();
   c(updatePart.applicant).address = getAddress();
   c(updatePart.representative).address = getAddress();
-  c(updatePart.representative).info = _.omit(getRandomInfo(), 'googleEmail');
+  c(updatePart.representative).info = omit(getRandomInfo(), 'googleEmail');
   c(updatePart.dataAccessAgreement).agreements.forEach((ag) => (ag.accepted = true));
   c(updatePart.appendices).agreements.forEach((ag) => (ag.accepted = true));
   c(updatePart.ethicsLetter).declaredAsRequired = false;
@@ -717,6 +730,30 @@ export function getRejectedApplication() {
   const result = state.updateApp(updatePart, true, { id: '1', role: DacoRole.ADMIN });
   expect(result.state).to.eq('REJECTED');
   expect(result.lastUpdatedAtUtc).to.not.eq(undefined);
+  return result;
+}
+
+export function getClosedAfterApprovalApplication() {
+  const app = getApprovedApplication();
+  const state = new ApplicationStateManager(app, nonAttestableConfig);
+  const updatePart: Partial<UpdateApplication> = {
+    state: 'CLOSED',
+  };
+  const result = state.updateApp(updatePart, true, { id: '1', role: DacoRole.ADMIN });
+  expect(result.state).to.eq('CLOSED');
+  expect(result.expiresAtUtc).to.not.eq(undefined);
+  return result;
+}
+
+export function getClosedBeforeApprovalApplication() {
+  const app = getReadyToSignApp();
+  const state = new ApplicationStateManager(app, nonAttestableConfig);
+  const updatePart: Partial<UpdateApplication> = {
+    state: 'CLOSED',
+  };
+  const result = state.updateApp(updatePart, false, { id: '1', role: DacoRole.SUBMITTER });
+  expect(result.state).to.eq('CLOSED');
+  expect(result.expiresAtUtc).to.eq(undefined);
   return result;
 }
 

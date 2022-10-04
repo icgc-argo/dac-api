@@ -122,7 +122,6 @@ const ApplicationSchema = new mongoose.Schema(
     denialReason: { type: String, required: false },
     searchValues: { type: [String], index: true, required: false },
     isRenewal: { type: Boolean, required: true },
-    ableToRenew: { type: Boolean, required: true },
     attestedAtUtc: { type: Date, required: false },
     pauseReason: { type: String, required: false },
     revisionRequest: {

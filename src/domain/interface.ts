@@ -172,6 +172,7 @@ export interface ApplicationSummary {
   attestationByUtc?: Date;
   attestedAtUtc?: Date | null;
   isAttestable: boolean;
+  ableToRenew: boolean;
   lastPausedAtUtc?: Date;
 }
 
@@ -241,6 +242,7 @@ export interface Sections {
     signedDocName: string;
   };
 }
+
 export interface Application {
   appId: string;
   appNumber: number;
