@@ -48,7 +48,7 @@ import renderAttestationRequiredEmail from '../emails/attestation-required';
 import renderApplicationPausedEmail from '../emails/application-paused';
 import renderAttestationReceivedEmail from '../emails/attestation-received';
 
-import { c, getUpdateAuthor } from '../utils/misc';
+import { c, getLastPausedAtDate, getUpdateAuthor } from '../utils/misc';
 import { getAttestationByDate, isAttestable, sortByDate } from '../utils/calculations';
 
 export async function deleteDocument(
@@ -521,6 +521,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         ...(app.approvedAtUtc && {
           attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
         }),
+        lastPausedAtUtc: getLastPausedAtDate(app),
       } as ApplicationSummary),
   );
 
