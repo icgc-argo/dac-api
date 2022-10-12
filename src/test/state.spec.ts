@@ -1,14 +1,14 @@
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
-import { isDate, pick, cloneDeep, omit } from 'lodash';
+import { isDate, pick, cloneDeep, omit, get, every } from 'lodash';
 
 import {
   Address,
+  AgreementItem,
   Application,
   Collaborator,
   DacoRole,
   PauseReason,
-  TERMS_AGREEMENT_NAME,
   UpdateApplication,
 } from '../domain/interface';
 import { ApplicationStateManager, newApplication } from '../domain/state';
@@ -16,6 +16,7 @@ import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 import { AppConfig } from '../config';
 import moment from 'moment';
+import { isRenewable } from '../utils/calculations';
 
 const nonAttestableConfig = {
   durations: {
@@ -28,6 +29,8 @@ const nonAttestableConfig = {
       daysToExpiry1: 90,
       daysToExpiry2: 45,
       daysPostExpiry: 90,
+      count: 100,
+      unitOfTime: 'days',
     },
   },
 } as AppConfig;
@@ -43,6 +46,8 @@ const attestableConfig = {
       daysToExpiry1: 90,
       daysToExpiry2: 45,
       daysPostExpiry: 90,
+      count: 100,
+      unitOfTime: 'days',
     },
   },
 } as AppConfig;
@@ -636,6 +641,84 @@ describe('state manager', () => {
     ).to.throw(Error, 'Not allowed');
     const userApp = state.prepareApplicationForUser(false);
     expect(userApp.attestedAtUtc).to.eq(undefined);
+  });
+
+  function verifyRenewedSectionsStatus(app: Application): void {
+    expect(
+      every(
+        pick(app.sections, [
+          'applicant',
+          'representative',
+          'projectInfo',
+          'ethicsLetter',
+          'collaborators',
+        ]),
+        (section) => section.meta.status === 'COMPLETE',
+      ),
+    ).is.true;
+    expect(get(app, 'sections.appendices.meta.status')).to.eq('PRISTINE');
+    expect(every(get(app, 'sections.appendices.agreements'), (ag: AgreementItem) => !ag.accepted))
+      .to.be.true;
+    expect(get(app, 'sections.appendices.meta.lastUpdatedAtUtc')).to.not.be.undefined;
+    expect(get(app, 'sections.dataAccessAgreement.meta.status')).to.eq('PRISTINE');
+    expect(
+      every(
+        get(app, 'sections.dataAccessAgreement.agreements'),
+        (ag: AgreementItem) => !ag.accepted,
+      ),
+    ).to.be.true;
+    expect(get(app, 'sections.dataAccessAgreement.meta.lastUpdatedAtUtc')).to.not.be.undefined;
+    expect(get(app, 'sections.signature.meta.status')).to.eq('DISABLED');
+    expect(get(app, 'sections.signature.meta.lastUpdatedAtUtc')).to.not.be.undefined;
+  }
+
+  it.only('should renew a renewable APPROVED application', () => {
+    const app: Application = getApprovedApplication();
+    const mockExpiryDate = moment(app.expiresAtUtc).subtract(20, 'days').toDate();
+    app.expiresAtUtc = mockExpiryDate;
+    expect(isRenewable(app, attestableConfig)).to.be.true;
+
+    const state = new ApplicationStateManager(app, attestableConfig);
+    state.updateApp(
+      {
+        isRenewal: true,
+      },
+      false,
+      { id: '123', role: DacoRole.SUBMITTER },
+    );
+
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.isRenewal).to.be.true;
+    expect(userApp.state).to.eq('DRAFT');
+    verifyRenewedSectionsStatus(userApp);
+    expect(isRenewable(userApp, attestableConfig)).to.be.false;
+  });
+
+  it('should renew an EXPIRED application', () => {
+    // TODO: EXPIRED state to be implemented
+  });
+
+  it.only('should not renew a non-renewable application', () => {
+    const app: Application = getApprovedApplication();
+    expect(isRenewable(app, attestableConfig)).to.be.false;
+    const state = new ApplicationStateManager(app, attestableConfig);
+
+    expect(() =>
+      state.updateApp(
+        {
+          isRenewal: true,
+        },
+        false,
+        { id: '123', role: DacoRole.SUBMITTER },
+      ),
+    ).to.throw(Error, 'Application is not renewable');
+
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.state).to.eq('APPROVED');
+  });
+
+  it('should renew an application that has been previously renewed', () => {
+    // TODO: to be implemented
   });
 });
 
