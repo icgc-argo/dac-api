@@ -117,9 +117,13 @@ const getAttestableQuery = (
   const attestationStartDate = moment(currentDate)
     .subtract(count, unitOfTime)
     .add(daysToAttestation, NOTIFICATION_UNIT_OF_TIME);
+  const approvalDayRange = getDayRange(attestationStartDate);
+  logger.info(
+    `${JOB_NAME} - Approval day period is ${approvalDayRange.$gte} to ${approvalDayRange.$lte}`,
+  );
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',
-    approvedAtUtc: getDayRange(attestationStartDate),
+    approvedAtUtc: approvalDayRange,
     // tslint:disable-next-line:no-null-keyword
     $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
   };
