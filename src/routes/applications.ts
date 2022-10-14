@@ -25,11 +25,17 @@ import {
 } from '../domain/service';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
-import { FileFormat, UpdateApplication, UploadDocumentType } from '../domain/interface';
+import {
+  FileFormat,
+  PauseReason,
+  UpdateApplication,
+  UploadDocumentType,
+} from '../domain/interface';
 import { AppConfig, getAppConfig } from '../config';
 import { Storage } from '../storage';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
 import { Readable } from 'stream';
+import runAllJobs from '../jobs/runAllJobs';
 
 export interface IRequest extends Request {
   identity: Identity;
@@ -276,13 +282,13 @@ const createApplicationsRouter = (
         // build the zip package
         const zip = new JSZip();
         [
-          {name: 'iv.txt', stream: ivStream},
-          {name: 'approved_users.csv.enc', stream: contentStream }
+          { name: 'iv.txt', stream: ivStream },
+          { name: 'approved_users.csv.enc', stream: contentStream },
         ].forEach((a) => {
           zip.file(a.name, a.stream);
         });
         const zipFileOut = await zip.generateAsync({
-          type: 'nodebuffer'
+          type: 'nodebuffer',
         });
         const zipName = `icgc_daco_users.zip`;
 
@@ -378,6 +384,33 @@ const createApplicationsRouter = (
     }),
   );
 
+  // for TESTING ONLY
+  config.adminPause &&
+    router.patch(
+      '/applications/:id/admin-pause',
+      authFilter([config.auth.reviewScope]),
+      wrapAsync(async (req: Request, res: Response) => {
+        const id = req.params.id;
+        const validatedId = validateId(id);
+        const pauseReq = {
+          state: 'PAUSED',
+          pauseReason: (req.body.pauseReason || '') as PauseReason,
+        } as Partial<UpdateApplication>;
+        logger.info(
+          `updating application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+        );
+
+        const updated = await updatePartial(
+          id,
+          pauseReq,
+          (req as IRequest).identity,
+          storageClient,
+          emailClient,
+        );
+        return res.status(200).send(updated);
+      }),
+    );
+
   router.get(
     '/collaborators/applications',
     authFilter([]),
@@ -385,6 +418,19 @@ const createApplicationsRouter = (
       const user = (req as IRequest).identity;
       const applications = await searchCollaboratorApplications(user);
       return res.status(200).send(applications);
+    }),
+  );
+
+  router.get(
+    '/jobs/batch-transitions/',
+    authFilter([config.auth.dacoSystemScope]),
+    wrapAsync(async (req: Request, res: Response) => {
+      // respond immediately so cron job doesn't time out
+      res.status(200).send('Starting all batch jobs...');
+
+      // initiate jobs, they can run after response
+      const user = (req as IRequest).identity;
+      return runAllJobs(emailClient, user);
     }),
   );
 

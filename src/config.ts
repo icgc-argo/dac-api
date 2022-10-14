@@ -18,6 +18,7 @@
  */
 
 import * as dotenv from 'dotenv';
+import moment from 'moment';
 import { c } from './utils/misc';
 import * as vault from './vault';
 
@@ -51,6 +52,8 @@ export interface AppConfig {
       revisionsRequestedGuide: string;
       dacoSurvey: string;
       accessRenewalGuide: string;
+      attestationGuide: string;
+      generalApplicationGuide: string;
     };
   };
   ui: {
@@ -63,6 +66,7 @@ export interface AppConfig {
     jwtKey: string;
     reviewScope: string;
     dacoEncryptionKey: string;
+    dacoSystemScope: string;
   };
   storage: {
     endpoint: string;
@@ -72,11 +76,22 @@ export interface AppConfig {
     bucket: string;
     timeout: number;
   };
+  // unitOfTime must be one of these keys https://momentjs.com/docs/#/manipulating/add/
   durations: {
-    daysToExpiry1: number;
-    daysToExpiry2: number;
-    daysPostExpiry: number;
+    expiry: {
+      daysToExpiry1: number;
+      daysToExpiry2: number;
+      daysPostExpiry: number;
+      count: number; // period length
+      unitOfTime: moment.unitOfTime.DurationConstructor;
+    };
+    attestation: {
+      count: number;
+      unitOfTime: moment.unitOfTime.DurationConstructor;
+      daysToAttestation: number;
+    };
   };
+  adminPause: boolean;
 }
 
 export interface MongoProps {
@@ -141,6 +156,7 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       jwtKey: process.env.JWT_KEY || '',
       reviewScope: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
       dacoEncryptionKey: secrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY,
+      dacoSystemScope: process.env.DACO_SYSTEM_SCOPE || '',
     },
     ui: {
       baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org',
@@ -186,18 +202,68 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
         accessRenewalGuide:
           process.env.ACCESS_RENEWAL_GUIDE ||
           'https://docs.icgc-argo.org/docs/data-access/daco/renew-close#renewing-an-application',
+        attestationGuide:
+          process.env.ATTESTATION_GUIDE ||
+          'https://docs.icgc-argo.org/docs/data-access/daco/renew-close#annual-attestation',
+        generalApplicationGuide:
+          process.env.GENERAL_APPLICATION_GUIDE ||
+          'https://docs.icgc-argo.org/docs/data-access/daco/applying',
       },
       reviewerFirstName: process.env.EMAIL_REVIEWER_FIRSTNAME || 'DACO',
       reviewerLastName: process.env.EMAIL_REVIEWER_LASTNAME || 'administrator',
     },
     durations: {
-      daysToExpiry1: Number(process.env.DAYS_TO_EXPIRY_1) || 90,
-      daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
-      daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
+      expiry: {
+        daysToExpiry1: Number(process.env.DAYS_TO_EXPIRY_1) || 90,
+        daysToExpiry2: Number(process.env.DAYS_TO_EXPIRY_2) || 45,
+        daysPostExpiry: Number(process.env.DAYS_POST_EXPIRY) || 90,
+        count: Number(process.env.EXPIRY_UNIT_COUNT) || 2,
+        unitOfTime: isUnitOfTime(process.env.EXPIRY_UNIT_OF_TIME)
+          ? process.env.EXPIRY_UNIT_OF_TIME
+          : 'years',
+      },
+      attestation: {
+        count: Number(process.env.ATTESTATION_UNIT_COUNT) || 1,
+        unitOfTime: isUnitOfTime(process.env.ATTESTATION_UNIT_OF_TIME)
+          ? process.env.ATTESTATION_UNIT_OF_TIME
+          : 'years',
+        daysToAttestation: Number(process.env.DAYS_TO_ATTESTATION) || 45,
+      },
     },
+    adminPause: process.env.ADMIN_PAUSE === 'true' || false,
   };
   return config;
 };
+
+// This validates our environment variable matches a unit from the `moment` library
+// We only accept years, months, weeks, or days - minutes etc. are considered too short for our application's logic
+function isUnitOfTime(input?: string): input is moment.unitOfTime.DurationConstructor {
+  if (input === undefined || input === '') {
+    // will use default value
+    return false;
+  } else if (
+    input &&
+    [
+      'year',
+      'years',
+      'y',
+      'month',
+      'months',
+      'M',
+      'week',
+      'weeks',
+      'w',
+      'day',
+      'days',
+      'd',
+    ].includes(input)
+  ) {
+    return true;
+  } else {
+    // Stop startup if our env variables would break our code.
+    throw new Error(`App cannot use the provided unitOfTime: ${input}`);
+  }
+}
 
 export const getAppConfig = async (): Promise<AppConfig> => {
   if (currentConfig) {

@@ -458,6 +458,16 @@ paths:
               example: |
                 "Application #  Date of Status Change  Application Status  Application Type  Action Performed By  Days Since Last Status Change  Institution Country Applicant Project Title Ethics Letter
                 DACO-1  2021-10-21  CREATED NEW SUBMITTER 0 OICR  Canada  Johnny Applicant  Research Title  Yes"
+
+  /jobs/batch-transitions/:
+    get:
+      tags:
+        - System
+      summary: Trigger batch jobs for PAUSING, EXPIRING applications
+      responses:
+        '200':
+          description: OK
+
 tags:
   - name: Health
     description: Service status monitoring
@@ -663,6 +673,7 @@ components:
             - APPROVED
             - CLOSED
             - EXPIRED
+            - PAUSED
         applicant:
           type: object
           properties:
@@ -713,6 +724,12 @@ components:
         currentApprovedAppDoc:
           type: boolean
           readOnly: true
+        attestationByUtc:
+          type: string
+          format: data-time
+        attestedAtUtc:
+          type: string
+          format: data-time
 
     Application:
       type: object
@@ -731,6 +748,7 @@ components:
             - APPROVED
             - CLOSED
             - EXPIRED
+            - PAUSED
         submitterId:
           readOnly: true
           type: string
@@ -774,6 +792,12 @@ components:
         ableToRenew:
           type: boolean
           readOnly: true
+        attestationByUtc:
+          type: string
+          format: data-time
+        attestedAtUtc:
+          type: string
+          format: data-time
         revisionRequests:
           type: object
           properties:

@@ -1,4 +1,4 @@
-import _, { uniqBy } from 'lodash';
+import { findLast, sortBy, uniqBy, cloneDeep, isArray } from 'lodash';
 import { Request } from 'express';
 import {
   State,
@@ -7,9 +7,11 @@ import {
   ColumnHeader,
   DacoRole,
   UpdateAuthor,
+  Application,
+  UpdateEvent,
 } from '../domain/interface';
 import moment from 'moment';
-import { search, SearchParams } from '../domain/service';
+import { hasDacoSystemScope, hasReviewScope, search, SearchParams } from '../domain/service';
 import { IRequest } from '../routes/applications';
 import { createCipheriv, randomBytes } from 'crypto';
 import {
@@ -18,6 +20,7 @@ import {
   EMAIL_CONTENT_ENCODING,
   IV_LENGTH,
 } from './constants';
+import { Identity } from '@overture-stack/ego-token-middleware';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -27,7 +30,7 @@ export function c<T>(val: T | undefined | null): T {
 }
 
 export function mergeKnown<T>(a: T, b: any) {
-  const t = _.cloneDeep(a);
+  const t = cloneDeep(a);
   _mergeKnown(t, b);
   return t;
 }
@@ -44,8 +47,8 @@ const _mergeKnown = (a: any, b: any) => {
       return;
     }
 
-    if (_.isArray(a[k])) {
-      a[k] = _.cloneDeep(b[k]);
+    if (isArray(a[k])) {
+      a[k] = cloneDeep(b[k]);
       return;
     }
 
@@ -159,6 +162,7 @@ export const encrypt: (
   }
 };
 
+// TODO: update to handle SYSTEM role
 export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor = (
   id,
   isReviewer,
@@ -167,6 +171,17 @@ export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor 
   role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
 });
 
-export const sortByDate = (a: any, b: any) => {
-  return b.date.getTime() - a.date.getTime();
+export const getDacoRole: (identity: Identity) => Promise<DacoRole> = async (identity) => {
+  const isSystem = await hasDacoSystemScope(identity);
+  const isAdmin = await hasReviewScope(identity);
+  return isSystem ? DacoRole.SYSTEM : isAdmin ? DacoRole.ADMIN : DacoRole.SUBMITTER;
+};
+
+export const getLastPausedAtDate = (app: Application): Date | undefined => {
+  // updates should appear in asc order by date but just ensuring it
+  // retrieving the most recent PAUSED event; in future applications could be paused several times
+  return findLast(
+    sortBy(app.updates, (u) => u.date),
+    (update) => update.eventType === UpdateEvent.PAUSED,
+  )?.date;
 };

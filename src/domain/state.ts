@@ -1,4 +1,3 @@
-import { getUpdateAuthor, mergeKnown } from '../utils/misc';
 import moment from 'moment';
 import 'moment-timezone';
 import { cloneDeep, last } from 'lodash';
@@ -32,6 +31,8 @@ import {
   UserViewApplicationUpdate,
   Meta,
   Sections,
+  DacoRole,
+  PauseReason,
 } from './interface';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import {
@@ -44,6 +45,14 @@ import {
   validateRepresentativeSection,
 } from './validations';
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
+import { AppConfig } from '../config';
+import {
+  getAttestationByDate,
+  getDaysElapsed,
+  isAttestable,
+  isRenewable,
+} from '../utils/calculations';
+import { getLastPausedAtDate, getUpdateAuthor, mergeKnown } from '../utils/misc';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -112,13 +121,19 @@ const stateToLockedSectionsMap: Record<
     APPLICANT: allSections,
     REVIEWER: allSections,
   },
+  PAUSED: {
+    APPLICANT: allSections,
+    REVIEWER: allSections,
+  },
 };
 
 export class ApplicationStateManager {
   public readonly currentApplication: Application;
+  public readonly currentAppConfig: AppConfig;
 
-  constructor(application: Application) {
+  constructor(application: Application, config: AppConfig) {
     this.currentApplication = cloneDeep(application);
+    this.currentAppConfig = cloneDeep(config);
   }
 
   prepareApplicationForUser(isReviewer: boolean) {
@@ -148,6 +163,27 @@ export class ApplicationStateManager {
     this.currentApplication.revisionsRequested =
       this.currentApplication.state == 'REVISIONS REQUESTED' ||
       wasInRevisionRequestState(this.currentApplication);
+
+    if (this.currentApplication.approvedAtUtc) {
+      this.currentApplication.attestationByUtc = getAttestationByDate(
+        this.currentApplication.approvedAtUtc,
+        this.currentAppConfig,
+      );
+    }
+    // add isAttestable so FE doesn't need to do the calculation
+    this.currentApplication.isAttestable = isAttestable(
+      this.currentApplication,
+      this.currentAppConfig,
+    );
+
+    // calculate renewable status
+    this.currentApplication.ableToRenew = isRenewable(
+      this.currentApplication,
+      this.currentAppConfig,
+    );
+
+    // adding to response for convenience in FE, so it doesn't need to parse value from updates array
+    this.currentApplication.lastPausedAtUtc = getLastPausedAtDate(this.currentApplication);
 
     return this.currentApplication;
   }
@@ -192,7 +228,13 @@ export class ApplicationStateManager {
     }
 
     if (type == 'ETHICS') {
-      uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
+      uploadEthicsLetter(
+        current,
+        id,
+        name,
+        getUpdateAuthor(updatedBy, isReviewer),
+        this.currentAppConfig,
+      );
       return current;
     }
 
@@ -445,7 +487,14 @@ export class ApplicationStateManager {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
-        updateAppStateForApprovedApplication(current, updatePart, isReviewer, updatedBy);
+        updateAppStateForApprovedApplication(
+          current,
+          updatePart,
+          isReviewer,
+          updatedBy,
+          this.currentAppConfig,
+          false,
+        );
         break;
 
       case 'REVISIONS REQUESTED':
@@ -466,6 +515,10 @@ export class ApplicationStateManager {
 
       case 'DRAFT':
         updateAppStateForDraftApplication(current, updatePart, updatedBy);
+        break;
+
+      case 'PAUSED':
+        updateAppStateForPausedApplication(current, updatePart, updatedBy, this.currentAppConfig);
         break;
 
       default:
@@ -689,6 +742,7 @@ function uploadEthicsLetter(
   id: string,
   name: string,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
 ) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
@@ -717,7 +771,7 @@ function uploadEthicsLetter(
   } else if (current.state == 'REVISIONS REQUESTED') {
     updateAppStateForReturnedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'APPROVED') {
-    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, true);
+    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, config, true);
   } else if (current.state == 'SIGN AND SUBMIT') {
     updateAppStateForSignAndSubmit(current, updatePart, updatedBy, true);
   } else {
@@ -813,11 +867,7 @@ const createUpdateEvent: (
   // daysElapsed will be 0 if there is no previous update event
   let daysElapsed = 0;
   if (lastUpdateEvent) {
-    // create new moment values so currentDate is not mutated
-    // convert to start of day to ignore the time when calculating the diff: https://stackoverflow.com/a/9130040
-    const begin = moment.utc(currentDate).startOf('day');
-    const end = moment.utc(lastUpdateEvent.date).startOf('day');
-    daysElapsed = begin.diff(end, 'days');
+    daysElapsed = getDaysElapsed(currentDate, lastUpdateEvent.date);
   }
 
   // some values are recorded separately here (eg. projectTitle, country) since we want a snapshot of these at the time the event occurred
@@ -857,6 +907,22 @@ function transitionToRejected(
   return current;
 }
 
+function transitionFromPausedToApproved(
+  current: Application,
+  updatedBy: UpdateAuthor,
+  updatePart?: Partial<UpdateApplication>,
+) {
+  // this transition does not equal an APPROVED update event
+  current.state = 'APPROVED';
+  // reset pauseReason if no longer in PAUSED state
+  // TODO: right now there is no other transition for a PAUSED app, but may need to revisit this for a possible PAUSED -> EXPIRED transition
+  current.pauseReason = undefined;
+  if (updatePart?.isAttesting === true) {
+    updateAttestedAtUtc(current, updatedBy);
+  }
+  return current;
+}
+
 function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
@@ -881,6 +947,19 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
   if (current.expiresAtUtc) {
     current.expiresAtUtc = closedDate;
   }
+  return current;
+};
+
+const transitionToPaused: (
+  current: Application,
+  pausedBy: UpdateAuthor,
+  reason?: PauseReason,
+) => Application = (current, pausedBy, reason) => {
+  current.state = 'PAUSED';
+  if (reason) {
+    current.pauseReason = reason;
+  }
+  current.updates.push(createUpdateEvent(current, pausedBy, UpdateEvent.PAUSED));
   return current;
 };
 
@@ -986,14 +1065,81 @@ function updateAppStateForApprovedApplication(
   updatePart: Partial<UpdateApplication>,
   isReviewer: boolean,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
     return transitionToClosed(currentApplication, updatedBy);
   }
+  if (updatePart.state === 'PAUSED') {
+    switch (updatedBy.role) {
+      case DacoRole.ADMIN:
+        // admin pause configurable for testing. In general only SYSTEM role will be pausing applications
+        // reason must be ADMIN_PAUSE
+        if (updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
+          return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+        } else {
+          throw new BadRequest('Invalid pause reason.');
+        }
+        break;
+      case DacoRole.SYSTEM:
+        // Only admins may use ADMIN_PAUSE PauseReason, so long as thats not the reason we accept whatever the System says.
+        if (updatePart.pauseReason !== PauseReason.ADMIN_PAUSE) {
+          return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
+        } else {
+          throw new BadRequest('Invalid pause reason.');
+        }
+        break;
+      default:
+        // This user type can't pause
+        throw new Error('Not allowed');
+    }
+  }
+
+  if (updatePart.isAttesting === true) {
+    if (!isAttestable(currentApplication, config)) {
+      throw new Error('Application is not attestable');
+    }
+    if (updatedBy.role !== DacoRole.SUBMITTER) {
+      throw new Error('Not allowed');
+    }
+    return updateAttestedAtUtc(currentApplication, updatedBy);
+  }
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
     updateEthics(updatePart, currentApplication, updateDocs);
+  }
+}
+
+function updateAttestedAtUtc(currentApplication: Application, updatedBy: UpdateAuthor) {
+  currentApplication.attestedAtUtc = new Date();
+  currentApplication.updates.push(
+    createUpdateEvent(currentApplication, updatedBy, UpdateEvent.ATTESTED),
+  );
+  return currentApplication;
+}
+
+function updateAppStateForPausedApplication(
+  currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  updatedBy: UpdateAuthor,
+  config: AppConfig,
+  updateDocs?: boolean,
+) {
+  if (updatePart.state === 'APPROVED') {
+    // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
+    if (updatedBy.role === DacoRole.SUBMITTER) {
+      throw new Error('Not allowed');
+    }
+    return transitionFromPausedToApproved(currentApplication, updatedBy);
+  }
+
+  // can only attest if it is the configured # of days to attestationByUtc date or later
+  if (updatePart.isAttesting === true && isAttestable(currentApplication, config)) {
+    // only submitters can attest
+    if (updatedBy.role === DacoRole.SUBMITTER) {
+      return transitionFromPausedToApproved(currentApplication, updatedBy, updatePart);
+    }
   }
 }
 
@@ -1010,8 +1156,10 @@ function updateAppStateForReturnedApplication(
     updateApplicantSection(updatePart, current);
   }
   // if the representative section became incomplete when there is no rev requested (happens because of Primary affiliation)
-  if (current.revisionRequest.representative.requested
-    || current.sections.representative.meta.status == 'INCOMPLETE') {
+  if (
+    current.revisionRequest.representative.requested ||
+    current.sections.representative.meta.status == 'INCOMPLETE'
+  ) {
     updateRepresentative(updatePart, current);
   }
   if (current.revisionRequest.projectInfo.requested) {

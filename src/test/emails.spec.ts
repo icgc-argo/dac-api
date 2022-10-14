@@ -8,14 +8,19 @@ import renderClosedEmail from '../emails/closed-approved';
 import rejected from '../emails/rejected';
 import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
+import renderAttestationRequiredEmail from '../emails/attestation-required';
+import renderApplicationPausedEmail from '../emails/application-paused';
+import renderAttestationReceivedEmail from '../emails/attestation-received';
 
 import {
   getAppInReview,
   getAppInRevisionRequested,
   getApprovedApplication,
+  getPausedApplication,
   getRejectedApplication,
 } from './state.spec';
 import { Collaborator } from '../domain/interface';
+import { AppConfig } from '../config';
 
 const stub = {
   dataAccessGuide: '',
@@ -25,12 +30,24 @@ const stub = {
   approvalGuide: '',
   dacoSurvey: '',
   accessRenewalGuide: '',
+  attestationGuide: '',
+  generalApplicationGuide: '',
 };
-const expiryStub = {
-  daysToExpiry1: 90,
-  daysToExpiry2: 45,
-  daysPostExpiry: 90,
-};
+
+const durationsStub = {
+  expiry: {
+    daysToExpiry1: 90,
+    daysToExpiry2: 45,
+    daysPostExpiry: 90,
+    count: 2,
+    unitOfTime: 'years',
+  },
+  attestation: {
+    count: 1,
+    unitOfTime: 'year',
+    daysToAttestation: 45,
+  },
+} as AppConfig['durations'];
 
 const uiLinksStub = {
   baseUrl: 'http://daco.icgc-argo.org',
@@ -49,6 +66,8 @@ describe('emails', () => {
         revisionsRequestedGuide: '',
         dacoSurvey: '',
         accessRenewalGuide: '',
+        attestationGuide: '',
+        generalApplicationGuide: '',
       });
       console.log(email.emailMjml);
     });
@@ -158,19 +177,40 @@ describe('emails', () => {
 
     it('should render an access expiring in 45 days email', async () => {
       const app = getApprovedApplication();
-      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, expiryStub, 45);
+      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, durationsStub, 45);
       console.log(email.emailMjml);
     });
 
     it('should render an access expiring in 90 days email', async () => {
       const app = getApprovedApplication();
-      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, expiryStub, 90);
+      const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, durationsStub, 90);
       console.log(email.emailMjml);
     });
 
     it('should render an access has expired email', async () => {
       const app = getApprovedApplication();
-      const email = await renderAccessHasExpiredEmail(app, stub, uiLinksStub, expiryStub);
+      const email = await renderAccessHasExpiredEmail(app, stub, uiLinksStub, durationsStub);
+      console.log(email.emailMjml);
+    });
+
+    it('should render an attestation required email', async () => {
+      const app = getApprovedApplication();
+      const configStub = { durations: durationsStub, email: { links: stub } } as AppConfig;
+      const email = await renderAttestationRequiredEmail(app, uiLinksStub, configStub);
+      console.log(email.emailMjml);
+    });
+
+    it('should render an application paused email', async () => {
+      const configStub = { durations: durationsStub, email: { links: stub } } as AppConfig;
+      const app = getPausedApplication(configStub);
+      const email = await renderApplicationPausedEmail(app, uiLinksStub, configStub);
+      console.log(email.emailMjml);
+    });
+
+    it('should render an attestation received email', async () => {
+      const app = getApprovedApplication();
+      app.attestedAtUtc = new Date();
+      const email = await renderAttestationReceivedEmail(app, stub);
       console.log(email.emailMjml);
     });
   });

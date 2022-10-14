@@ -8,7 +8,7 @@ import {
   SectionError,
 } from './interface';
 import validator from 'validate.js';
-import _ from 'lodash';
+import _, { isNaN } from 'lodash';
 import { countriesList } from '../utils/constants';
 import { c } from '../utils/misc';
 

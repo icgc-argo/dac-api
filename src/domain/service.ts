@@ -5,7 +5,12 @@ import { AppConfig, getAppConfig } from '../config';
 import { ApplicationDocument, ApplicationModel } from './model';
 import 'moment-timezone';
 import moment from 'moment';
-import _ from 'lodash';
+import { difference, isEmpty } from 'lodash';
+import { Attachment } from 'nodemailer/lib/mailer';
+import { UploadedFile } from 'express-fileupload';
+import nodemail from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
+
 import {
   ApplicationStateManager,
   getSearchFieldValues,
@@ -23,16 +28,13 @@ import {
   UpdateApplication,
   UploadDocumentType,
 } from './interface';
-import { c, getUpdateAuthor, sortByDate } from '../utils/misc';
-import { UploadedFile } from 'express-fileupload';
 import { Storage } from '../storage';
 import logger from '../logger';
 import renderReviewEmail from '../emails/review-new';
 import renderReviewRevisedEmail from '../emails/review-revised';
 import renderEthicsLetterEmail from '../emails/ethics-letter';
 import renderCollaboratorAdded from '../emails/collaborator-added';
-import nodemail from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
+
 import renderSubmittedEmail from '../emails/submitted';
 import renderRevisionsEmail from '../emails/revisions-requested';
 import renderApprovedEmail from '../emails/application-approved';
@@ -42,8 +44,12 @@ import renderApplicationClosedEmail from '../emails/closed-approved';
 import renderRejectedEmail from '../emails/rejected';
 import renderAccessExpiringEmail from '../emails/access-expiring';
 import renderAccessHasExpiredEmail from '../emails/access-has-expired';
+import renderAttestationRequiredEmail from '../emails/attestation-required';
+import renderApplicationPausedEmail from '../emails/application-paused';
+import renderAttestationReceivedEmail from '../emails/attestation-received';
 
-import { Attachment } from 'nodemailer/lib/mailer';
+import { getAttestationByDate, isAttestable, isRenewable, sortByDate } from '../utils/calculations';
+import { c, getLastPausedAtDate, getUpdateAuthor } from '../utils/misc';
 
 export async function deleteDocument(
   appId: string,
@@ -52,10 +58,11 @@ export async function deleteDocument(
   identity: Identity,
   storageClient: Storage,
 ) {
+  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
-  const stateManager = new ApplicationStateManager(appDocObj);
+  const stateManager = new ApplicationStateManager(appDocObj, config);
   const result = stateManager.deleteDocument(
     objectId,
     type,
@@ -67,6 +74,7 @@ export async function deleteDocument(
   const updated = await findApplication(c(result.appId), identity);
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
+    config,
   ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
@@ -79,6 +87,7 @@ export async function uploadDocument(
   storageClient: Storage,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
+  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
@@ -99,7 +108,7 @@ export async function uploadDocument(
   }
 
   const id = await storageClient.upload(file, existingId);
-  const stateManager = new ApplicationStateManager(appDocObj);
+  const stateManager = new ApplicationStateManager(appDocObj, config);
   const result = stateManager.addDocument(
     id,
     file.name,
@@ -112,13 +121,13 @@ export async function uploadDocument(
 
   if (updated.state == 'APPROVED') {
     if (type == 'ETHICS') {
-      const config = await getAppConfig();
       sendEthicsLetterSubmitted(updated, config, emailClient);
     }
   }
 
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
+    config,
   ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
@@ -178,13 +187,14 @@ export async function createCollaborator(
   identity: Identity,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
+  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
-  const stateManager = new ApplicationStateManager(appDocObj);
+  const stateManager = new ApplicationStateManager(appDocObj, config);
   const result = stateManager.addCollaborator(
     collaborator,
     identity.userId,
@@ -192,7 +202,6 @@ export async function createCollaborator(
   );
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
-    const config = await getAppConfig();
     sendCollaboratorAddedEmail(result, config, emailClient);
     // send notification email to new collaborator if application already approved
     sendCollaboratorApprovedEmail(result, collaborator, config, emailClient);
@@ -205,6 +214,7 @@ export async function updateCollaborator(
   collaborator: Collaborator,
   identity: Identity,
 ) {
+  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -214,7 +224,7 @@ export async function updateCollaborator(
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
-  const stateManager = new ApplicationStateManager(appDocObj);
+  const stateManager = new ApplicationStateManager(appDocObj, config);
   const result = stateManager.updateCollaborator(
     collaborator,
     getUpdateAuthor(identity.userId, isAdminOrReviewerResult),
@@ -228,13 +238,14 @@ export async function deleteCollaborator(
   identity: Identity,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
+  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
-  const stateManager = new ApplicationStateManager(appDocObj);
+  const stateManager = new ApplicationStateManager(appDocObj, config);
   const result = stateManager.deleteCollaborator(
     collaboratorId,
     identity.userId,
@@ -249,13 +260,13 @@ export async function deleteCollaborator(
 
     if (collaborator) {
       logger.info('Collaborator was found, sending notification of access removal.');
-      const config = await getAppConfig();
       sendCollaboratorRemovedEmail(result, collaborator, config, emailClient);
     }
   }
 }
 
 export async function create(identity: Identity) {
+  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -266,7 +277,7 @@ export async function create(identity: Identity) {
   appDoc.searchValues = getSearchFieldValues(appDoc);
   await appDoc.save();
   const copy = appDoc.toObject();
-  const viewableApp = new ApplicationStateManager(copy).prepareApplicationForUser(
+  const viewableApp = new ApplicationStateManager(copy, config).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
   return viewableApp;
@@ -279,6 +290,7 @@ export async function updatePartial(
   storageClient: Storage,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
+  const config = await getAppConfig();
   const isReviewer = await hasReviewScope(identity);
   const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
@@ -287,7 +299,7 @@ export async function updatePartial(
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
-  const stateManager = new ApplicationStateManager(appDocObj);
+  const stateManager = new ApplicationStateManager(appDocObj, config);
   const updatedApp = stateManager.updateApp(
     appPart,
     isReviewer,
@@ -295,10 +307,17 @@ export async function updatePartial(
   );
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
   const stateChanged = appDocObj.state != updatedApp.state;
-  const config = await getAppConfig();
   if (stateChanged) {
     await onStateChange(updatedApp, appDocObj, emailClient, config);
   }
+  // triggering this here to ensure attestedAtUtc value has been properly updated in the db before sending email
+  // cannot rely on stateChanged result because attestation does not imply a state change has occurred
+  // i.e. an approved app can be attested and stay in approved state
+  const wasAttested = isEmpty(appDocObj.attestedAtUtc) && !!updatedApp.attestedAtUtc;
+  if (wasAttested) {
+    await sendAttestationReceivedEmail(updatedApp, config, emailClient);
+  }
+
   const deleted = checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
   // this can be a result of application getting updated :
@@ -310,13 +329,14 @@ export async function updatePartial(
   );
   const updated = await findApplication(c(updatedApp.appId), identity);
   const updatedObj = updated.toObject();
-  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
-    isReviewer,
-  );
+  const viewAbleApplication = new ApplicationStateManager(
+    updatedObj,
+    config,
+  ).prepareApplicationForUser(isReviewer);
   return viewAbleApplication;
 }
 
-async function onStateChange(
+export async function onStateChange(
   updatedApp: Application,
   oldApplication: Application,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
@@ -337,7 +357,9 @@ async function onStateChange(
   if (updatedApp.state === 'REJECTED') {
     await sendRejectedEmail(updatedApp, emailClient, config);
   }
-  if (updatedApp.state === 'APPROVED') {
+
+  // prevent usual approval emails going out when state changes from PAUSED to APPROVED, as this is not a new approval event
+  if (updatedApp.state === 'APPROVED' && oldApplication.state !== 'PAUSED') {
     await sendApplicationApprovedEmail(updatedApp, config, emailClient);
     Promise.all(
       updatedApp.sections.collaborators.list.map((collab) => {
@@ -358,6 +380,9 @@ async function onStateChange(
       }),
     ).catch((err) => logger.error(err));
   }
+  if (updatedApp.state === 'PAUSED') {
+    await sendApplicationPausedEmail(updatedApp, config, emailClient);
+  }
 }
 
 export type SearchParams = {
@@ -372,6 +397,7 @@ export type SearchParams = {
 };
 
 export async function search(params: SearchParams, identity: Identity): Promise<SearchResult> {
+  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
@@ -422,6 +448,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
     REVIEW: 0,
     'REVISIONS REQUESTED': 0,
     'SIGN AND SUBMIT': 0,
+    PAUSED: 0,
   };
   if (count == 0) {
     return {
@@ -484,11 +511,18 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         },
         submittedAtUtc: app.submittedAtUtc,
         lastUpdatedAtUtc: app.lastUpdatedAtUtc,
+        attestedAtUtc: app.attestedAtUtc,
+        isAttestable: isAttestable(app, config),
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
+        ableToRenew: isRenewable(app, config),
         revisionsRequested: wasInRevisionRequestState(app),
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
+        ...(app.approvedAtUtc && {
+          attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
+        }),
+        lastPausedAtUtc: getLastPausedAtDate(app),
       } as ApplicationSummary),
   );
 
@@ -543,6 +577,7 @@ export async function deleteApp(id: string, identity: Identity) {
 }
 
 export async function getById(id: string, identity: Identity) {
+  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId: id,
@@ -556,7 +591,7 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
+  const viewAbleApplication = new ApplicationStateManager(copy, config).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
   return viewAbleApplication;
@@ -579,10 +614,16 @@ async function findApplication(appId: string, identity: Identity) {
   return appDoc;
 }
 
-async function hasReviewScope(identity: Identity) {
+export async function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = (await getAppConfig()).auth.reviewScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((v) => v == REVIEW_SCOPE);
+}
+
+export async function hasDacoSystemScope(identity: Identity) {
+  const DACO_SYSTEM_SCOPE = await (await getAppConfig()).auth.dacoSystemScope;
+  const scopes = identity.tokenInfo.context.scope;
+  return scopes.some((scope) => scope === DACO_SYSTEM_SCOPE);
 }
 
 function checkDeletedDocuments(appDocObj: Application, result: Application) {
@@ -593,7 +634,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const ethicsArrayAfter = result.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
-  const ethicsDiff = _.difference(ethicsArrayBefore, ethicsArrayAfter);
+  const ethicsDiff = difference(ethicsArrayBefore, ethicsArrayAfter);
   ethicsDiff.forEach((o) => removedIds.push(o));
 
   if (
@@ -609,7 +650,7 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const approvedArrayAfter = result.approvedAppDocs
     .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
     .map((e) => e.approvedAppDocObjId);
-  const approvedDiff = _.difference(approvedArrayBefore, approvedArrayAfter);
+  const approvedDiff = difference(approvedArrayBefore, approvedArrayAfter);
   approvedDiff.forEach((o) => removedIds.push(o));
 
   console.log('removing docs: ', removedIds);
@@ -949,10 +990,86 @@ async function sendReviewEmail(
   );
 }
 
+export async function sendAttestationRequiredEmail(
+  currentApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+): Promise<Application> {
+  const title = 'An Annual Attestation is Required';
+  const email = await renderAttestationRequiredEmail(
+    currentApp,
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+    config,
+  );
+  const emailContent = email.html;
+  const subject = `[${currentApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(currentApp),
+    subject,
+    emailContent,
+  );
+  return currentApp;
+}
+
+export async function sendApplicationPausedEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+): Promise<Application> {
+  const title = 'Your Access to ICGC Controlled Data has been Paused';
+  const email = await renderApplicationPausedEmail(
+    updatedApp,
+    {
+      baseUrl: config.ui.baseUrl,
+      pathTemplate: config.ui.sectionPath,
+    },
+    config,
+  );
+  const emailContent = email.html;
+  const subject = `[${updatedApp.appId}] ${title}`;
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    subject,
+    emailContent,
+  );
+  return updatedApp;
+}
+
+async function sendAttestationReceivedEmail(
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  const title = `We have Received your Annual Attestation`;
+  const attestationEmail = await renderAttestationReceivedEmail(updatedApp, config.email.links);
+  const emailContent = attestationEmail.html;
+  const subject = `[${updatedApp.appId}] ${title}`;
+
+  await sendEmail(
+    emailClient,
+    config.email.fromAddress,
+    config.email.fromName,
+    getApplicantEmails(updatedApp),
+    subject,
+    emailContent,
+    new Set([config.email.dacoAddress]),
+  );
+}
+
 async function sendAccessExpiringEmail(
   updatedApp: Application,
   config: AppConfig,
-  daysToExpiry: number,
+  daysToExpiry: number, // this will come from the cronjob that is executing, i.e. first (90 days) or second (45 days) warning
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const title = `Your Access is Expiring in ${daysToExpiry} days`;

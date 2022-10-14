@@ -6,7 +6,8 @@ export type State =
   | 'APPROVED'
   | 'REJECTED'
   | 'CLOSED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'PAUSED';
 
 export type SectionStatus =
   | 'PRISTINE'
@@ -20,6 +21,11 @@ export type SectionStatus =
   | 'AMMENDABLE';
 
 export type UploadDocumentType = 'ETHICS' | 'SIGNED_APP' | 'APPROVED_PDF';
+
+export enum PauseReason {
+  PENDING_ATTESTATION = 'PENDING ATTESTATION',
+  ADMIN_PAUSE = 'ADMIN PAUSE',
+}
 
 export interface Meta {
   updated?: boolean;
@@ -75,6 +81,7 @@ export type CollaboratorDto = {
 export enum DacoRole {
   SUBMITTER = 'SUBMITTER',
   ADMIN = 'ADMIN',
+  SYSTEM = 'SYSTEM',
 }
 
 export type UpdateAuthor = {
@@ -162,6 +169,11 @@ export interface ApplicationSummary {
   revisionsRequested: boolean;
   currentApprovedAppDoc: boolean;
   isRenewal: boolean;
+  attestationByUtc?: Date;
+  attestedAtUtc?: Date | null;
+  isAttestable: boolean;
+  ableToRenew: boolean;
+  lastPausedAtUtc?: Date;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -230,6 +242,7 @@ export interface Sections {
     signedDocName: string;
   };
 }
+
 export interface Application {
   appId: string;
   appNumber: number;
@@ -262,6 +275,11 @@ export interface Application {
   sections: Sections;
   updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
+  attestationByUtc?: Date; // calculated from approvedAtUtc
+  attestedAtUtc?: Date | null;
+  isAttestable: boolean;
+  pauseReason?: PauseReason | null;
+  lastPausedAtUtc?: Date;
 }
 
 export type AppSections = keyof Application['sections'];
@@ -282,6 +300,8 @@ export interface UpdateApplication {
   expiresAtUtc?: Date;
   denialReason?: string;
   revisionRequest?: RevisionRequestUpdate;
+  pauseReason?: PauseReason;
+  isAttesting?: boolean;
   sections: {
     applicant?: {
       info?: Partial<PersonalInfo>;
