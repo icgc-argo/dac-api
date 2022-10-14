@@ -672,7 +672,7 @@ describe('state manager', () => {
     expect(get(app, 'sections.signature.meta.lastUpdatedAtUtc')).to.not.be.undefined;
   }
 
-  it.only('should renew a renewable APPROVED application', () => {
+  it('should renew a renewable APPROVED application', () => {
     const app: Application = getApprovedApplication();
     const mockExpiryDate = moment(app.expiresAtUtc).subtract(20, 'days').toDate();
     app.expiresAtUtc = mockExpiryDate;
@@ -698,7 +698,7 @@ describe('state manager', () => {
     // TODO: EXPIRED state to be implemented
   });
 
-  it.only('should not renew a non-renewable application', () => {
+  it('should not renew a non-renewable application', () => {
     const app: Application = getApprovedApplication();
     expect(isRenewable(app, attestableConfig)).to.be.false;
     const state = new ApplicationStateManager(app, attestableConfig);
@@ -718,7 +718,27 @@ describe('state manager', () => {
   });
 
   it('should renew an application that has been previously renewed', () => {
-    // TODO: to be implemented
+    const app = getApprovedApplication();
+    const mockExpiryDate = moment(app.expiresAtUtc).subtract(20, 'days').toDate();
+    app.expiresAtUtc = mockExpiryDate;
+    app.isRenewal = true;
+    expect(isRenewable(app, attestableConfig)).to.be.true;
+
+    const state = new ApplicationStateManager(app, attestableConfig);
+
+    state.updateApp(
+      {
+        isRenewal: true,
+      },
+      false,
+      { id: '123', role: DacoRole.SUBMITTER },
+    );
+
+    const userApp = state.prepareApplicationForUser(false);
+    expect(userApp.isRenewal).to.be.true;
+    expect(userApp.state).to.eq('DRAFT');
+    verifyRenewedSectionsStatus(userApp);
+    expect(isRenewable(userApp, attestableConfig)).to.be.false;
   });
 });
 
