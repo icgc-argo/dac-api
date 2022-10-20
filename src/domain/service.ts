@@ -1066,7 +1066,7 @@ async function sendAttestationReceivedEmail(
   );
 }
 
-async function sendAccessExpiringEmail(
+export async function sendAccessExpiringEmail(
   updatedApp: Application,
   config: AppConfig,
   daysToExpiry: number, // this will come from the cronjob that is executing, i.e. first (90 days) or second (45 days) warning
