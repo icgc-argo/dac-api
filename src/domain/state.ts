@@ -897,6 +897,29 @@ function deleteApprovedAppDocument(current: Application, objectId: string) {
   return current;
 }
 
+function resetAgreementsSections(currentApp: Application): Application {
+  const currentDate = new Date();
+  // Manually setting these section statuses to PRISTINE so the ui does not immediately show an error on renewal
+  // modify lastUpdatedAtUtc to preserve that these sections are not untouched
+  const pristineMeta: Meta = {
+    status: 'PRISTINE' as SectionStatus,
+    errorsList: [],
+    lastUpdatedAtUtc: currentDate,
+  };
+  const blankAppendices: Sections['appendices'] = {
+    agreements: getAppendixAgreements(),
+    meta: pristineMeta,
+  };
+  const blankDataAccessAgreement: Sections['dataAccessAgreement'] = {
+    agreements: getDataAccessAgreement(),
+    meta: pristineMeta,
+  };
+  currentApp.sections.appendices = blankAppendices;
+  currentApp.sections.dataAccessAgreement = blankDataAccessAgreement;
+
+  return currentApp;
+}
+
 function transitionToRejected(
   current: Application,
   updatePart: Partial<UpdateApplication>,
@@ -968,6 +991,14 @@ const transitionToPaused: (
   current.updates.push(createUpdateEvent(current, pausedBy, UpdateEvent.PAUSED));
   return current;
 };
+
+function transitionToRenewalDraft(application: Application): Application {
+  application.isRenewal = true;
+  resetAgreementsSections(application);
+  // rollback check will transition application to DRAFT state because agreements sections are now incomplete
+  transitionToSignAndSubmitOrRollBack(application, 'PRISTINE', 'DISABLED', 'DRAFT');
+  return application;
+}
 
 function validateRevisionRequest(revisionRequest: RevisionRequestUpdate) {
   const atleastOneRequested = Object.keys(revisionRequest)
@@ -1066,36 +1097,6 @@ function isReadyForReview(application: Application) {
   return application.sections.signature.meta.status === 'COMPLETE';
 }
 
-function resetAgreementsSections(currentApp: Application): Application {
-  const currentDate = new Date();
-  // Manually setting these section statuses to PRISTINE so the ui does not immediately show an error on renewal
-  // modify lastUpdatedAtUtc to preserve that these sections are not untouched
-  const pristineMeta: Meta = {
-    status: 'PRISTINE' as SectionStatus,
-    errorsList: [],
-    lastUpdatedAtUtc: currentDate,
-  };
-  const blankAppendices: Sections['appendices'] = {
-    agreements: getAppendixAgreements(),
-    meta: pristineMeta,
-  };
-  const blankDataAccessAgreement: Sections['dataAccessAgreement'] = {
-    agreements: getDataAccessAgreement(),
-    meta: pristineMeta,
-  };
-  currentApp.sections.appendices = blankAppendices;
-  currentApp.sections.dataAccessAgreement = blankDataAccessAgreement;
-
-  return currentApp;
-}
-
-function transitionToRenewalDraft(application: Application): Application {
-  application.isRenewal = true;
-  application.state = 'DRAFT';
-  transitionToSignAndSubmitOrRollBack(application, 'PRISTINE', 'DISABLED', 'DRAFT');
-  return application;
-}
-
 function updateAppStateForApprovedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
@@ -1144,7 +1145,6 @@ function updateAppStateForApprovedApplication(
 
   if (updatePart.isRenewal === true) {
     if (isRenewable(currentApplication, config)) {
-      resetAgreementsSections(currentApplication);
       transitionToRenewalDraft(currentApplication);
     } else {
       throw new Error('Application is not renewable');
