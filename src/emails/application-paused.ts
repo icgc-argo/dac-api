@@ -11,6 +11,7 @@ import {
 } from './common';
 import { compileMjmlInPromise } from './mjml';
 import { getAttestationByDate } from '../utils/calculations';
+import { getLastPausedAtDate } from '../utils/misc';
 
 export default async function (app: Application, uiLinksInfo: UILinksInfo, config: AppConfig) {
   const info = app.sections.applicant.info;
@@ -57,7 +58,9 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo, config: AppConf
     },
     {
       label: 'Access Paused on',
-      value: formatDate(getAttestationByDate(app.approvedAtUtc, config)),
+      value: formatDate(
+        getLastPausedAtDate(app) || getAttestationByDate(app.approvedAtUtc, config),
+      ),
     },
   ];
 
