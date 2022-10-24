@@ -114,7 +114,7 @@ const getQuery = (config: AppConfig, currentDate: Date): FilterQuery<Application
   } = config;
   // find all apps that are APPROVED with an expiry date that is the configured daysToExpiry2 in the future
   // default is 2 years less 45 days to match DACO
-  // at this point an app approaching expiry may already be in the renewal flow, so we still limit query by APPROVED state, which indicates no action has been taken by the applicant
+  // at this point an app approaching expiry may already be in the renewal flow, so we query by APPROVED + any pre-REVIEW state
   // query uses expiresAtUtc, because this date may be custom (not matching the configured access period of 2 years)
   const expiryStartDate = moment(currentDate).add(daysToExpiry2, NOTIFICATION_UNIT_OF_TIME);
   const expiryDayRange = getDayRange(expiryStartDate);
@@ -122,7 +122,7 @@ const getQuery = (config: AppConfig, currentDate: Date): FilterQuery<Application
     `${JOB_NAME} - Expiry day period is ${expiryDayRange.$gte} to ${expiryDayRange.$lte}`,
   );
   const query: FilterQuery<ApplicationDocument> = {
-    state: 'APPROVED',
+    state: { $in: ['APPROVED', 'DRAFT', 'SIGN AND SUBMIT', 'REVISIONS REQUESTED'] },
     expiresAtUtc: expiryDayRange,
   };
 
