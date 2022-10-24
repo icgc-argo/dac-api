@@ -7,6 +7,8 @@ import logger from '../logger';
 import attestationRequiredNotification from './attestationRequiredNotification';
 import runPauseAppsCheck from './pauseAppCheck';
 import firstExpiryNotificationCheck from './firstExpiryNotification';
+import secondExpiryNotificationCheck from './secondExpiryNotification';
+
 import { Report, JobReport } from './types';
 
 const JOB_NAME = 'ALL BATCH JOBS';
@@ -29,6 +31,10 @@ export default async function (
       currentDate,
       emailClient,
     );
+    const secondExpiryNotificationReport = await secondExpiryNotificationCheck(
+      currentDate,
+      emailClient,
+    );
     // define report to collect all affected appIds
     // each job will return its own report
     // this function will build a complete summary
@@ -46,7 +52,7 @@ export default async function (
       pausedApps: pausedAppReport,
       // TODO: implement expiry/renewal jobs. Add to report
       expiryNotifications1: firstExpiryNotificationReport,
-      expiryNotifications2: getReportToBeImplemented('SECOND EXPIRY NOTIFICATIONS'),
+      expiryNotifications2: secondExpiryNotificationReport,
       expiredApps: getReportToBeImplemented('EXPIRING APPLICATIONS'),
     };
     logger.info(`${JOB_NAME} - Logging report`);

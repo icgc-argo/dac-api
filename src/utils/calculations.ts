@@ -67,6 +67,8 @@ export const isRenewable: (currentApp: Application, config: AppConfig) => boolea
     return false;
   }
   const now = moment.utc();
+
+  // need to calculate renewability relative to expiry date, because this date may be custom (not matching the configured access period of 2 years)
   // expiry - DAYS_TO_EXPIRY_1
   const expiryPeriodStart = moment
     .utc(currentApp.expiresAtUtc)

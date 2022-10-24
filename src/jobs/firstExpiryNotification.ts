@@ -109,21 +109,20 @@ const getReportDetails = async (
 const getQuery = (config: AppConfig, currentDate: Date): FilterQuery<ApplicationDocument> => {
   const {
     durations: {
-      expiry: { count, unitOfTime, daysToExpiry1 },
+      expiry: { daysToExpiry1 },
     },
   } = config;
-  // find all apps that are APPROVED with an approval date matching the configured time period minus configured daysToExpiry1
-  // default is 2 year less 90 days to match DACO
-  const approvalStartDate = moment(currentDate)
-    .subtract(count, unitOfTime)
-    .add(daysToExpiry1, NOTIFICATION_UNIT_OF_TIME);
-  const approvalDayRange = getDayRange(approvalStartDate);
+  // find all apps that are APPROVED with an expiry date that is the configured daysToExpiry1 in the future
+  // default is 2 years less 90 days to match DACO
+  // query uses expiresAtUtc, because this date may be custom (not matching the configured access period of 2 years)
+  const expiryDate = moment(currentDate).add(daysToExpiry1, NOTIFICATION_UNIT_OF_TIME);
+  const expiryDayRange = getDayRange(expiryDate);
   logger.info(
-    `${JOB_NAME} - Approval day period is ${approvalDayRange.$gte} to ${approvalDayRange.$lte}`,
+    `${JOB_NAME} - Expiry day period is ${expiryDayRange.$gte} to ${expiryDayRange.$lte}`,
   );
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',
-    approvedAtUtc: approvalDayRange,
+    expiresAtUtc: expiryDayRange,
   };
 
   return query;
