@@ -506,7 +506,7 @@ export class ApplicationStateManager {
         if (!isReviewer) {
           throw new Error('not allowed');
         }
-        updateAppStateForReviewApplication(current, updatePart, updatedBy);
+        updateAppStateForReviewApplication(current, updatePart, updatedBy, this.currentAppConfig);
         break;
 
       case 'SIGN AND SUBMIT':
@@ -787,6 +787,7 @@ function updateAppStateForReviewApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
+  config: AppConfig,
 ) {
   // if the admin has chosen a custom expiry date and asked to save
   if (updatePart.expiresAtUtc) {
@@ -796,7 +797,7 @@ function updateAppStateForReviewApplication(
 
   // admin wants to approve the app
   if (updatePart.state == 'APPROVED') {
-    return transitionToApproved(current, updatedBy);
+    return transitionToApproved(current, updatedBy, config);
   }
 
   if (updatePart.state == 'REJECTED') {
@@ -896,6 +897,29 @@ function deleteApprovedAppDocument(current: Application, objectId: string) {
   return current;
 }
 
+function resetAgreementsSections(currentApp: Application): Application {
+  const currentDate = new Date();
+  // Manually setting these section statuses to PRISTINE so the ui does not immediately show an error on renewal
+  // modify lastUpdatedAtUtc to preserve that these sections are not untouched
+  const pristineMeta: Meta = {
+    status: 'PRISTINE' as SectionStatus,
+    errorsList: [],
+    lastUpdatedAtUtc: currentDate,
+  };
+  const blankAppendices: Sections['appendices'] = {
+    agreements: getAppendixAgreements(),
+    meta: pristineMeta,
+  };
+  const blankDataAccessAgreement: Sections['dataAccessAgreement'] = {
+    agreements: getDataAccessAgreement(),
+    meta: pristineMeta,
+  };
+  currentApp.sections.appendices = blankAppendices;
+  currentApp.sections.dataAccessAgreement = blankDataAccessAgreement;
+
+  return currentApp;
+}
+
 function transitionToRejected(
   current: Application,
   updatePart: Partial<UpdateApplication>,
@@ -923,13 +947,18 @@ function transitionFromPausedToApproved(
   return current;
 }
 
-function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
+function transitionToApproved(current: Application, approvedBy: UpdateAuthor, config: AppConfig) {
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
   current.updates.push(createUpdateEvent(current, approvedBy, UpdateEvent.APPROVED));
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
-    current.expiresAtUtc = moment().add(2, 'year').toDate();
+    const {
+      durations: {
+        expiry: { count, unitOfTime },
+      },
+    } = config;
+    current.expiresAtUtc = moment().add(count, unitOfTime).toDate();
   }
   return current;
 }
@@ -962,6 +991,14 @@ const transitionToPaused: (
   current.updates.push(createUpdateEvent(current, pausedBy, UpdateEvent.PAUSED));
   return current;
 };
+
+function transitionToRenewalDraft(application: Application): Application {
+  application.isRenewal = true;
+  resetAgreementsSections(application);
+  // rollback check will transition application to DRAFT state because agreements sections are now incomplete
+  transitionToSignAndSubmitOrRollBack(application, 'PRISTINE', 'DISABLED', 'DRAFT');
+  return application;
+}
 
 function validateRevisionRequest(revisionRequest: RevisionRequestUpdate) {
   const atleastOneRequested = Object.keys(revisionRequest)
@@ -1105,6 +1142,15 @@ function updateAppStateForApprovedApplication(
     }
     return updateAttestedAtUtc(currentApplication, updatedBy);
   }
+
+  if (updatePart.isRenewal === true) {
+    if (isRenewable(currentApplication, config)) {
+      transitionToRenewalDraft(currentApplication);
+    } else {
+      throw new Error('Application is not renewable');
+    }
+  }
+
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
     updateEthics(updatePart, currentApplication, updateDocs);

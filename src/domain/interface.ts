@@ -295,6 +295,7 @@ export type RevisionSections =
     >
   | 'general';
 export type RevisionRequestUpdate = Partial<Record<RevisionSections, RevisionRequest>>;
+
 export interface UpdateApplication {
   state?: State;
   expiresAtUtc?: Date;
@@ -302,6 +303,7 @@ export interface UpdateApplication {
   revisionRequest?: RevisionRequestUpdate;
   pauseReason?: PauseReason;
   isAttesting?: boolean;
+  isRenewal?: boolean;
   sections: {
     applicant?: {
       info?: Partial<PersonalInfo>;

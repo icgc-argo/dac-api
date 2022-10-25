@@ -523,6 +523,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
           attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
         }),
         lastPausedAtUtc: getLastPausedAtDate(app),
+        isRenewal: app.isRenewal,
       } as ApplicationSummary),
   );
 
