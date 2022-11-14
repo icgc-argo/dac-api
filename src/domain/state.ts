@@ -3,7 +3,6 @@ import 'moment-timezone';
 import { cloneDeep, last } from 'lodash';
 import {
   Application,
-  TERMS_AGREEMENT_NAME,
   IT_AGREEMENT_PROTECT_DATA,
   IT_AGREEMENT_MONITOR_ACCESS,
   IT_AGREEMENT_SOFTWARE_UPDATES,
@@ -45,7 +44,7 @@ import {
   validateRepresentativeSection,
 } from './validations';
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
-import { AppConfig } from '../config';
+import { AppConfig, getAppConfig } from '../config';
 import {
   getAttestationByDate,
   getDaysElapsed,
@@ -129,11 +128,9 @@ const stateToLockedSectionsMap: Record<
 
 export class ApplicationStateManager {
   public readonly currentApplication: Application;
-  public readonly currentAppConfig: AppConfig;
 
-  constructor(application: Application, config: AppConfig) {
+  constructor(application: Application) {
     this.currentApplication = cloneDeep(application);
-    this.currentAppConfig = cloneDeep(config);
   }
 
   prepareApplicationForUser(isReviewer: boolean) {
@@ -167,20 +164,13 @@ export class ApplicationStateManager {
     if (this.currentApplication.approvedAtUtc) {
       this.currentApplication.attestationByUtc = getAttestationByDate(
         this.currentApplication.approvedAtUtc,
-        this.currentAppConfig,
       );
     }
     // add isAttestable so FE doesn't need to do the calculation
-    this.currentApplication.isAttestable = isAttestable(
-      this.currentApplication,
-      this.currentAppConfig,
-    );
+    this.currentApplication.isAttestable = isAttestable(this.currentApplication);
 
     // calculate renewable status
-    this.currentApplication.ableToRenew = isRenewable(
-      this.currentApplication,
-      this.currentAppConfig,
-    );
+    this.currentApplication.ableToRenew = isRenewable(this.currentApplication);
 
     // adding to response for convenience in FE, so it doesn't need to parse value from updates array
     this.currentApplication.lastPausedAtUtc = getLastPausedAtDate(this.currentApplication);
@@ -228,13 +218,7 @@ export class ApplicationStateManager {
     }
 
     if (type == 'ETHICS') {
-      uploadEthicsLetter(
-        current,
-        id,
-        name,
-        getUpdateAuthor(updatedBy, isReviewer),
-        this.currentAppConfig,
-      );
+      uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
       return current;
     }
 
@@ -487,14 +471,7 @@ export class ApplicationStateManager {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
-        updateAppStateForApprovedApplication(
-          current,
-          updatePart,
-          isReviewer,
-          updatedBy,
-          this.currentAppConfig,
-          false,
-        );
+        updateAppStateForApprovedApplication(current, updatePart, isReviewer, updatedBy, false);
         break;
 
       case 'REVISIONS REQUESTED':
@@ -506,7 +483,7 @@ export class ApplicationStateManager {
         if (!isReviewer) {
           throw new Error('not allowed');
         }
-        updateAppStateForReviewApplication(current, updatePart, updatedBy, this.currentAppConfig);
+        updateAppStateForReviewApplication(current, updatePart, updatedBy);
         break;
 
       case 'SIGN AND SUBMIT':
@@ -518,7 +495,7 @@ export class ApplicationStateManager {
         break;
 
       case 'PAUSED':
-        updateAppStateForPausedApplication(current, updatePart, updatedBy, this.currentAppConfig);
+        updateAppStateForPausedApplication(current, updatePart, updatedBy);
         break;
 
       default:
@@ -742,7 +719,6 @@ function uploadEthicsLetter(
   id: string,
   name: string,
   updatedBy: UpdateAuthor,
-  config: AppConfig,
 ) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
@@ -771,7 +747,7 @@ function uploadEthicsLetter(
   } else if (current.state == 'REVISIONS REQUESTED') {
     updateAppStateForReturnedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'APPROVED') {
-    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, config, true);
+    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, true);
   } else if (current.state == 'SIGN AND SUBMIT') {
     updateAppStateForSignAndSubmit(current, updatePart, updatedBy, true);
   } else {
@@ -787,7 +763,6 @@ function updateAppStateForReviewApplication(
   current: Application,
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
-  config: AppConfig,
 ) {
   // if the admin has chosen a custom expiry date and asked to save
   if (updatePart.expiresAtUtc) {
@@ -797,7 +772,7 @@ function updateAppStateForReviewApplication(
 
   // admin wants to approve the app
   if (updatePart.state == 'APPROVED') {
-    return transitionToApproved(current, updatedBy, config);
+    return transitionToApproved(current, updatedBy);
   }
 
   if (updatePart.state == 'REJECTED') {
@@ -947,7 +922,8 @@ function transitionFromPausedToApproved(
   return current;
 }
 
-function transitionToApproved(current: Application, approvedBy: UpdateAuthor, config: AppConfig) {
+function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
+  const config = getAppConfig();
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
   current.updates.push(createUpdateEvent(current, approvedBy, UpdateEvent.APPROVED));
@@ -1102,7 +1078,6 @@ function updateAppStateForApprovedApplication(
   updatePart: Partial<UpdateApplication>,
   isReviewer: boolean,
   updatedBy: UpdateAuthor,
-  config: AppConfig,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -1134,7 +1109,7 @@ function updateAppStateForApprovedApplication(
   }
 
   if (updatePart.isAttesting === true) {
-    if (!isAttestable(currentApplication, config)) {
+    if (!isAttestable(currentApplication)) {
       throw new Error('Application is not attestable');
     }
     if (updatedBy.role !== DacoRole.SUBMITTER) {
@@ -1144,7 +1119,7 @@ function updateAppStateForApprovedApplication(
   }
 
   if (updatePart.isRenewal === true) {
-    if (isRenewable(currentApplication, config)) {
+    if (isRenewable(currentApplication)) {
       transitionToRenewalDraft(currentApplication);
     } else {
       throw new Error('Application is not renewable');
@@ -1169,8 +1144,6 @@ function updateAppStateForPausedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
-  config: AppConfig,
-  updateDocs?: boolean,
 ) {
   if (updatePart.state === 'APPROVED') {
     // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
@@ -1181,7 +1154,7 @@ function updateAppStateForPausedApplication(
   }
 
   // can only attest if it is the configured # of days to attestationByUtc date or later
-  if (updatePart.isAttesting === true && isAttestable(currentApplication, config)) {
+  if (updatePart.isAttesting === true && isAttestable(currentApplication)) {
     // only submitters can attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
       return transitionFromPausedToApproved(currentApplication, updatedBy, updatePart);

@@ -58,11 +58,10 @@ export async function deleteDocument(
   identity: Identity,
   storageClient: Storage,
 ) {
-  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
-  const stateManager = new ApplicationStateManager(appDocObj, config);
+  const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.deleteDocument(
     objectId,
     type,
@@ -74,7 +73,6 @@ export async function deleteDocument(
   const updated = await findApplication(c(result.appId), identity);
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
-    config,
   ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
@@ -87,7 +85,7 @@ export async function uploadDocument(
   storageClient: Storage,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
-  const config = await getAppConfig();
+  const config = getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
@@ -108,7 +106,7 @@ export async function uploadDocument(
   }
 
   const id = await storageClient.upload(file, existingId);
-  const stateManager = new ApplicationStateManager(appDocObj, config);
+  const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.addDocument(
     id,
     file.name,
@@ -127,7 +125,6 @@ export async function uploadDocument(
 
   const viewAbleApplication = new ApplicationStateManager(
     updated.toObject(),
-    config,
   ).prepareApplicationForUser(false);
   return viewAbleApplication;
 }
@@ -187,14 +184,14 @@ export async function createCollaborator(
   identity: Identity,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
-  const config = await getAppConfig();
+  const config = getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
-  const stateManager = new ApplicationStateManager(appDocObj, config);
+  const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.addCollaborator(
     collaborator,
     identity.userId,
@@ -214,7 +211,6 @@ export async function updateCollaborator(
   collaborator: Collaborator,
   identity: Identity,
 ) {
-  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -224,7 +220,7 @@ export async function updateCollaborator(
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
-  const stateManager = new ApplicationStateManager(appDocObj, config);
+  const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.updateCollaborator(
     collaborator,
     getUpdateAuthor(identity.userId, isAdminOrReviewerResult),
@@ -238,14 +234,14 @@ export async function deleteCollaborator(
   identity: Identity,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
-  const config = await getAppConfig();
+  const config = getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
-  const stateManager = new ApplicationStateManager(appDocObj, config);
+  const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.deleteCollaborator(
     collaboratorId,
     identity.userId,
@@ -266,7 +262,7 @@ export async function deleteCollaborator(
 }
 
 export async function create(identity: Identity) {
-  const config = await getAppConfig();
+  const config = getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
@@ -277,7 +273,7 @@ export async function create(identity: Identity) {
   appDoc.searchValues = getSearchFieldValues(appDoc);
   await appDoc.save();
   const copy = appDoc.toObject();
-  const viewableApp = new ApplicationStateManager(copy, config).prepareApplicationForUser(
+  const viewableApp = new ApplicationStateManager(copy).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
   return viewableApp;
@@ -290,7 +286,7 @@ export async function updatePartial(
   storageClient: Storage,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
-  const config = await getAppConfig();
+  const config = getAppConfig();
   const isReviewer = await hasReviewScope(identity);
   const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
@@ -299,7 +295,7 @@ export async function updatePartial(
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
-  const stateManager = new ApplicationStateManager(appDocObj, config);
+  const stateManager = new ApplicationStateManager(appDocObj);
   const updatedApp = stateManager.updateApp(
     appPart,
     isReviewer,
@@ -329,10 +325,9 @@ export async function updatePartial(
   );
   const updated = await findApplication(c(updatedApp.appId), identity);
   const updatedObj = updated.toObject();
-  const viewAbleApplication = new ApplicationStateManager(
-    updatedObj,
-    config,
-  ).prepareApplicationForUser(isReviewer);
+  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
+    isReviewer,
+  );
   return viewAbleApplication;
 }
 
@@ -397,7 +392,6 @@ export type SearchParams = {
 };
 
 export async function search(params: SearchParams, identity: Identity): Promise<SearchResult> {
-  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
@@ -512,15 +506,15 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         submittedAtUtc: app.submittedAtUtc,
         lastUpdatedAtUtc: app.lastUpdatedAtUtc,
         attestedAtUtc: app.attestedAtUtc,
-        isAttestable: isAttestable(app, config),
+        isAttestable: isAttestable(app),
         ...(params.includeCollaborators && {
           collaborators: app.sections.collaborators.list.map((collab: Collaborator) => collab.info),
         }),
-        ableToRenew: isRenewable(app, config),
+        ableToRenew: isRenewable(app),
         revisionsRequested: wasInRevisionRequestState(app),
         currentApprovedAppDoc: !!app.approvedAppDocs.find((doc) => doc.isCurrent),
         ...(app.approvedAtUtc && {
-          attestationByUtc: getAttestationByDate(app.approvedAtUtc, config),
+          attestationByUtc: getAttestationByDate(app.approvedAtUtc),
         }),
         lastPausedAtUtc: getLastPausedAtDate(app),
         isRenewal: app.isRenewal,
@@ -578,7 +572,6 @@ export async function deleteApp(id: string, identity: Identity) {
 }
 
 export async function getById(id: string, identity: Identity) {
-  const config = await getAppConfig();
   const isAdminOrReviewerResult = await hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId: id,
@@ -592,7 +585,7 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy, config).prepareApplicationForUser(
+  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
   return viewAbleApplication;
@@ -616,13 +609,13 @@ async function findApplication(appId: string, identity: Identity) {
 }
 
 export async function hasReviewScope(identity: Identity) {
-  const REVIEW_SCOPE = (await getAppConfig()).auth.reviewScope;
+  const REVIEW_SCOPE = getAppConfig().auth.reviewScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((v) => v == REVIEW_SCOPE);
 }
 
 export async function hasDacoSystemScope(identity: Identity) {
-  const DACO_SYSTEM_SCOPE = await (await getAppConfig()).auth.dacoSystemScope;
+  const DACO_SYSTEM_SCOPE = getAppConfig().auth.dacoSystemScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((scope) => scope === DACO_SYSTEM_SCOPE);
 }

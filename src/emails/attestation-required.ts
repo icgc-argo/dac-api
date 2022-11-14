@@ -57,7 +57,7 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo, config: AppConf
     },
     {
       label: 'Annual Attestation Due',
-      value: formatDate(getAttestationByDate(app.approvedAtUtc, config)),
+      value: formatDate(getAttestationByDate(app.approvedAtUtc)),
     },
   ];
 

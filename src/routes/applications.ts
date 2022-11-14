@@ -31,11 +31,12 @@ import {
   UpdateApplication,
   UploadDocumentType,
 } from '../domain/interface';
-import { AppConfig, getAppConfig } from '../config';
+import { AppConfig } from '../config';
 import { Storage } from '../storage';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
 import { Readable } from 'stream';
 import runAllJobs from '../jobs/runAllJobs';
+import getAppSecrets from '../secrets';
 
 export interface IRequest extends Request {
   identity: Identity;
@@ -264,10 +265,10 @@ const createApplicationsRouter = (
       // generate CSV file from approved users
       const csv = await createDacoCSVFile(req);
       // encrypt csv content, return {content, iv}
-      const config = await getAppConfig();
+      const secrets = await getAppSecrets();
       try {
         // encrypt the contents
-        const encrypted = await encrypt(csv, config.auth.dacoEncryptionKey);
+        const encrypted = await encrypt(csv, secrets.auth.dacoEncryptionKey);
 
         // build streams to zip later
         const ivStream = new Readable();

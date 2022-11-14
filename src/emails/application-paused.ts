@@ -58,9 +58,7 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo, config: AppConf
     },
     {
       label: 'Access Paused on',
-      value: formatDate(
-        getLastPausedAtDate(app) || getAttestationByDate(app.approvedAtUtc, config),
-      ),
+      value: formatDate(getLastPausedAtDate(app) || getAttestationByDate(app.approvedAtUtc)),
     },
   ];
 
