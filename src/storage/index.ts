@@ -1,20 +1,16 @@
 import { UploadedFile } from 'express-fileupload';
-import { AppConfig, getAppConfig } from '../config';
-import _ from 'lodash';
 import fetch from 'node-fetch';
 import AWS, { S3 } from 'aws-sdk';
 import * as uuid from 'uuid';
-import logger from '../logger';
-let config: AppConfig;
 
-async () => {
-  config = await getAppConfig();
-};
+import logger from '../logger';
+import { AppConfig } from '../config';
+import { AppSecrets } from '../secrets';
 
 export class Storage {
   private s3Client: S3;
   private readonly bucket: string;
-  constructor(readonly config: AppConfig) {
+  constructor(readonly config: AppConfig, readonly secrets: AppSecrets) {
     this.bucket = config.storage.bucket;
     this.s3Client = new AWS.S3({
       apiVersion: '2006-03-01',
@@ -23,8 +19,8 @@ export class Storage {
       signatureVersion: 'v4',
       s3ForcePathStyle: true,
       credentials: {
-        accessKeyId: config.storage.key,
-        secretAccessKey: config.storage.secret,
+        accessKeyId: secrets.storage.key,
+        secretAccessKey: secrets.storage.secret,
       },
     });
   }

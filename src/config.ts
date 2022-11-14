@@ -16,11 +16,9 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-import * as dotenv from 'dotenv';
 import moment from 'moment';
+
 import { c } from './utils/misc';
-import * as vault from './vault';
 
 let currentConfig: AppConfig;
 
@@ -40,10 +38,6 @@ export interface AppConfig {
     reviewerFirstName: string;
     reviewerLastName: string;
     dccMailingList: string;
-    auth: {
-      user: string | undefined;
-      password: string | undefined;
-    };
     links: {
       approvalGuide: string;
       reviewGuide: string;
@@ -65,14 +59,11 @@ export interface AppConfig {
     jwtKeyUrl: string;
     jwtKey: string;
     reviewScope: string;
-    dacoEncryptionKey: string;
     dacoSystemScope: string;
   };
   storage: {
     endpoint: string;
     region: string;
-    key: string;
-    secret: string;
     bucket: string;
     timeout: number;
   };
@@ -94,54 +85,25 @@ export interface AppConfig {
   adminPause: boolean;
 }
 
+// Mongo
 export interface MongoProps {
-  // Mongo
-  dbUser: string;
-  dbPassword: string;
-  dbName: string;
-  dbUrl: string; // allow overriding all the url
   writeConcern: string;
   writeAckTimeout: number;
 }
+
 export interface KafkaConfigurations {
   kafkaMessagingEnabled: boolean;
   kafkaClientId: string;
   kafkaBrokers: string[];
 }
 
-const buildBootstrapContext = async () => {
-  dotenv.config();
-
-  const vaultEnabled = process.env.VAULT_ENABLED || false;
-  let secrets: any = {};
-  /** Vault */
-  if (vaultEnabled) {
-    if (process.env.VAULT_ENABLED && process.env.VAULT_ENABLED == 'true') {
-      if (!process.env.VAULT_SECRETS_PATH) {
-        throw new Error('Path to secrets not specified but vault is enabled');
-      }
-      try {
-        secrets = await vault.loadSecret(process.env.VAULT_SECRETS_PATH);
-      } catch (err) {
-        console.error(err);
-        throw new Error('failed to load secrets from vault.');
-      }
-    }
-  }
-  return secrets;
-};
-
-const buildAppContext = async (secrets: any): Promise<AppConfig> => {
+const buildAppContext = (): AppConfig => {
   console.log('building app context');
   const config: AppConfig = {
     serverPort: process.env.PORT || '3000',
     basePath: process.env.BASE_PATH || '/',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
     mongoProperties: {
-      dbName: secrets.DB_NAME || process.env.DB_NAME,
-      dbUser: secrets.DB_USERNAME || process.env.DB_USERNAME,
-      dbPassword: secrets.DB_PASSWORD || process.env.DB_PASSWORD,
-      dbUrl: secrets.DB_URL || process.env.DB_URL || `mongodb://localhost:27027/appdb`,
       writeConcern: process.env.DEFAULT_WRITE_CONCERN || 'majority',
       writeAckTimeout: Number(process.env.DEFAULT_WRITE_ACK_TIMEOUT) || 5000,
     },
@@ -155,7 +117,6 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
       reviewScope: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
-      dacoEncryptionKey: secrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY,
       dacoSystemScope: process.env.DACO_SYSTEM_SCOPE || '',
     },
     ui: {
@@ -167,8 +128,6 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       endpoint: process.env.OBJECT_STORAGE_ENDPOINT || '',
       region: process.env.OBJECT_STORAGE_REGION || 'nova',
       bucket: process.env.OBJECT_STORAGE_BUCKET || 'daco',
-      key: secrets.OBJECT_STORAGE_KEY || process.env.OBJECT_STORAGE_KEY,
-      secret: secrets.OBJECT_STORAGE_SECRET || process.env.OBJECT_STORAGE_SECRET,
       timeout: Number(process.env.OBJECT_STORAGE_TIMEOUT_MILLIS) || 5000,
     },
     email: {
@@ -178,10 +137,6 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       fromName: process.env.EMAIL_FROM_NAME || 'ICGC DACO',
       fromAddress: process.env.EMAIL_FROM_ADDRESS || 'no-reply-daco@icgc-argo.org',
       dccMailingList: process.env.DCC_MAILING_LIST || '',
-      auth: {
-        user: secrets.EMAIL_USER || process.env.EMAIL_USER,
-        password: secrets.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD,
-      },
       links: {
         approvalGuide:
           process.env.EMAIL_APPROVAL_GUIDE ||
@@ -265,11 +220,10 @@ function isUnitOfTime(input?: string): input is moment.unitOfTime.DurationConstr
   }
 }
 
-export const getAppConfig = async (): Promise<AppConfig> => {
+export const getAppConfig = (): AppConfig => {
   if (currentConfig) {
     return currentConfig;
   }
-  const secrets = await buildBootstrapContext();
-  currentConfig = await buildAppContext(secrets);
+  currentConfig = buildAppContext();
   return currentConfig;
 };
