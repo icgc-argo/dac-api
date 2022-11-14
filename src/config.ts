@@ -17,6 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 import moment from 'moment';
+import * as dotenv from 'dotenv';
 
 import { c } from './utils/misc';
 
@@ -98,7 +99,9 @@ export interface KafkaConfigurations {
 }
 
 const buildAppContext = (): AppConfig => {
+  dotenv.config();
   console.log('building app context');
+
   const config: AppConfig = {
     serverPort: process.env.PORT || '3000',
     basePath: process.env.BASE_PATH || '/',
