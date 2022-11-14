@@ -16,8 +16,8 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-import moment from 'moment';
 import * as dotenv from 'dotenv';
+import moment from 'moment';
 
 import { c } from './utils/misc';
 
