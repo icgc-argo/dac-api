@@ -10,7 +10,7 @@ import { NOTIFICATION_UNIT_OF_TIME, REQUEST_CHUNK_SIZE } from '../utils/constant
 import { ApplicationDocument, ApplicationModel } from '../domain/model';
 import { Application } from '../domain/interface';
 import { buildReportDetails, getEmptyReportDetails } from './utils';
-import { sendAttestationRequiredEmail } from '../domain/service';
+import { sendAttestationRequiredEmail } from '../domain/service/emails';
 import { getDayRange } from '../utils/calculations';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 

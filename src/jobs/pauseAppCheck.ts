@@ -12,7 +12,7 @@ import { Application, PauseReason } from '../domain/interface';
 import { ApplicationStateManager } from '../domain/state';
 import { getDacoRole } from '../utils/misc';
 import { REQUEST_CHUNK_SIZE } from '../utils/constants';
-import { onStateChange } from '../domain/service';
+import { onStateChange } from '../domain/service/application';
 import { buildReportDetails, getEmptyReportDetails } from './utils';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 

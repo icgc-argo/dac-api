@@ -4,25 +4,29 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import moment from 'moment';
 import { Identity } from '@overture-stack/ego-token-middleware';
 import JSZip from 'jszip';
-import _ from 'lodash';
+import { isArray } from 'lodash';
+import { Readable } from 'stream';
 
 import wrapAsync from '../utils/wrapAsync';
+import { create, updatePartial } from '../domain/service/application';
 import {
-  create,
   createCollaborator,
-  deleteApp,
   deleteCollaborator,
-  getById,
-  search,
   updateCollaborator,
-  uploadDocument,
-  updatePartial,
+} from '../domain/service/collaborators';
+import {
   deleteDocument,
   getApplicationAssetsAsStream,
-  sendEmail,
-  searchCollaboratorApplications,
+  uploadDocument,
   createAppHistoryTSV,
-} from '../domain/service';
+} from '../domain/service/files';
+import { sendEmail } from '../domain/service/emails';
+import {
+  deleteApp,
+  getById,
+  search,
+  searchCollaboratorApplications,
+} from '../domain/service/search';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import {
@@ -34,7 +38,6 @@ import {
 import { AppConfig } from '../config';
 import { Storage } from '../storage';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
-import { Readable } from 'stream';
 import runAllJobs from '../jobs/runAllJobs';
 import getAppSecrets from '../secrets';
 
@@ -129,7 +132,7 @@ const createApplicationsRouter = (
       if (!uploadedFile) {
         throw new BadRequest('File is required');
       }
-      if (_.isArray(uploadedFile)) {
+      if (isArray(uploadedFile)) {
         throw new BadRequest('Only one file');
       }
       const appId = validateId(req.params.id);

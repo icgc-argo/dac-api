@@ -1,5 +1,9 @@
 import { findLast, sortBy, uniqBy, cloneDeep, isArray } from 'lodash';
 import { Request } from 'express';
+import { Identity } from '@overture-stack/ego-token-middleware';
+import { createCipheriv, randomBytes } from 'crypto';
+import moment from 'moment';
+
 import {
   State,
   PersonalInfo,
@@ -10,17 +14,15 @@ import {
   Application,
   UpdateEvent,
 } from '../domain/interface';
-import moment from 'moment';
-import { hasDacoSystemScope, hasReviewScope, search, SearchParams } from '../domain/service';
+import { search, SearchParams } from '../domain/service/search';
 import { IRequest } from '../routes/applications';
-import { createCipheriv, randomBytes } from 'crypto';
 import {
   EMAIL_ENCRYPTION_CREDENTIALS_ENCODING,
   DACO_ENCRYPTION_ALGO,
   EMAIL_CONTENT_ENCODING,
   IV_LENGTH,
 } from './constants';
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
