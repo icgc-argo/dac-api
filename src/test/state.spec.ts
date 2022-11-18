@@ -1,6 +1,7 @@
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { EgoJwtData, Identity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
 import { isDate, pick, cloneDeep, omit, get, every } from 'lodash';
+import moment, { unitOfTime } from 'moment';
 
 import {
   Address,
@@ -15,9 +16,23 @@ import { ApplicationStateManager, newApplication } from '../domain/state';
 import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
 import { AppConfig } from '../config';
-import moment, { unitOfTime } from 'moment';
-import { isRenewable } from '../utils/calculations';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
+
+const mockApplicantJwtData = {
+  sub: 'user45678',
+  context: {
+    scope: [''],
+    user: {
+      name: 'Applicant User',
+      email: 'applicant@example.com',
+    },
+  },
+} as EgoJwtData;
+
+const mockApplicantIdentity = {
+  userId: mockApplicantJwtData.sub,
+  tokenInfo: mockApplicantJwtData,
+} as Identity;
 
 const mockConfig = {
   durations: {
@@ -40,6 +55,7 @@ const newApplication1: Partial<Application> = newApplication({
   userId: 'abc123',
   tokenInfo: {
     context: {
+      scope: [''],
       user: {
         email: 'test@example.com',
       },
@@ -173,7 +189,8 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, 'user123', false);
+      const result = state.addCollaborator(collab, mockApplicantIdentity);
+
       expect(result.sections.collaborators.list[0]).to.deep.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
@@ -207,7 +224,8 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, 'user123', false);
+      const result = state.addCollaborator(collab, mockApplicantIdentity);
+
       expect(result.sections.collaborators.list[0]).to.deep.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
@@ -233,7 +251,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
       try {
-        state.addCollaborator(collab, 'user123', false);
+        state.addCollaborator(collab, mockApplicantIdentity);
       } catch (err) {
         if (err instanceof ConflictError) {
           return true;
@@ -272,7 +290,7 @@ describe('state manager', () => {
       };
 
       try {
-        state.addCollaborator(collab, 'user123', false);
+        state.addCollaborator(collab, mockApplicantIdentity);
       } catch (e) {
         expect((e as BadRequest).info.errors[0]).to.include({
           field: 'primaryAffiliation',
@@ -282,7 +300,7 @@ describe('state manager', () => {
 
       // add with correct PA
       collab.info.primaryAffiliation = 'ACME';
-      const app2 = state.addCollaborator(collab, 'user123', false);
+      const app2 = state.addCollaborator(collab, mockApplicantIdentity);
       app2.sections.collaborators.list[0].id = 'collab-1';
       expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
 
@@ -335,7 +353,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, 'user123', false);
+      const result = state.addCollaborator(collab, mockApplicantIdentity);
       result.sections.collaborators.list[0].id = 'collab-1';
       expect(result.state).to.eq('SIGN AND SUBMIT');
 
@@ -752,7 +770,12 @@ export function getReadyToSignApp() {
 export function getAppInReview() {
   const app = getReadyToSignApp();
   const state = new ApplicationStateManager(app);
-  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', 'user123', false);
+  const appAfterSign = state.addDocument(
+    '12345',
+    'signed.pdf',
+    'SIGNED_APP',
+    mockApplicantIdentity,
+  );
   const updatePart: Partial<UpdateApplication> = {
     state: 'REVIEW',
   };

@@ -10,7 +10,7 @@ import { AppConfig, getAppConfig } from '../config';
 import { ApplicationModel, ApplicationDocument } from '../domain/model';
 import { Application, PauseReason } from '../domain/interface';
 import { ApplicationStateManager } from '../domain/state';
-import { getDacoRole } from '../utils/misc';
+import { getDacoRole } from '../utils/permissions';
 import { REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { onStateChange } from '../domain/service/applications';
 import { buildReportDetails, getEmptyReportDetails } from './utils';
