@@ -31,7 +31,7 @@ import { Application, ApplicationUpdate, ColumnHeader, UploadDocumentType } from
 import { Storage } from '../../storage';
 import logger from '../../logger';
 import { hasReviewScope } from '../../utils/permissions';
-import { findApplication, getApplicationUpdates } from './search';
+import { findApplication, getApplicationUpdates } from './applications/search';
 import { sendEthicsLetterSubmitted } from './emails';
 import { c } from '../../utils/misc';
 import { sortByDate } from '../../utils/calculations';

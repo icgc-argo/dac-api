@@ -8,7 +8,7 @@ import { isArray } from 'lodash';
 import { Readable } from 'stream';
 
 import wrapAsync from '../utils/wrapAsync';
-import { create, updatePartial } from '../domain/service/application';
+import { create, updatePartial } from '../domain/service/applications';
 import {
   createCollaborator,
   deleteCollaborator,
@@ -26,7 +26,7 @@ import {
   getById,
   search,
   searchCollaboratorApplications,
-} from '../domain/service/search';
+} from '../domain/service/applications/search';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import {

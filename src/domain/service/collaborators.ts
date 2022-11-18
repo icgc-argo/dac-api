@@ -28,7 +28,7 @@ import { getAppConfig } from '../../config';
 import { ApplicationModel } from '../model';
 import { getUpdateAuthor } from '../../utils/misc';
 import { hasReviewScope } from '../../utils/permissions';
-import { findApplication } from './search';
+import { findApplication } from './applications/search';
 import { throwApplicationClosedError } from '../../utils/errors';
 import {
   sendCollaboratorAddedEmail,

@@ -20,14 +20,14 @@
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
 
-import { NotFound } from '../../utils/errors';
-import { ApplicationDocument, ApplicationModel } from '../model';
-import { ApplicationStateManager, wasInRevisionRequestState } from '../state';
-import { ApplicationSummary, Collaborator, SearchResult, State } from '../interface';
+import { NotFound } from '../../../utils/errors';
+import { ApplicationDocument, ApplicationModel } from '../../model';
+import { ApplicationStateManager, wasInRevisionRequestState } from '../../state';
+import { ApplicationSummary, Collaborator, SearchResult, State } from '../../interface';
 
-import { getAttestationByDate, isAttestable, isRenewable } from '../../utils/calculations';
-import { c, getLastPausedAtDate } from '../../utils/misc';
-import { hasReviewScope } from '../../utils/permissions';
+import { getAttestationByDate, isAttestable, isRenewable } from '../../../utils/calculations';
+import { c, getLastPausedAtDate } from '../../../utils/misc';
+import { hasReviewScope } from '../../../utils/permissions';
 
 export type SearchParams = {
   query: string;

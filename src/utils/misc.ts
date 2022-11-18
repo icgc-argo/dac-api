@@ -14,7 +14,7 @@ import {
   Application,
   UpdateEvent,
 } from '../domain/interface';
-import { search, SearchParams } from '../domain/service/search';
+import { search, SearchParams } from '../domain/service/applications/search';
 import { IRequest } from '../routes/applications';
 import {
   EMAIL_ENCRYPTION_CREDENTIALS_ENCODING,

@@ -22,13 +22,13 @@ import { difference, isEmpty } from 'lodash';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
-import { AppConfig, getAppConfig } from '../../config';
-import { ApplicationModel } from '../model';
-import { ApplicationStateManager, getSearchFieldValues, newApplication } from '../state';
-import { Application, UpdateApplication } from '../interface';
-import { Storage } from '../../storage';
-import logger from '../../logger';
-import { c, getUpdateAuthor } from '../../utils/misc';
+import { AppConfig, getAppConfig } from '../../../config';
+import { ApplicationModel } from '../../model';
+import { ApplicationStateManager, getSearchFieldValues, newApplication } from '../../state';
+import { Application, UpdateApplication } from '../../interface';
+import { Storage } from '../../../storage';
+import logger from '../../../logger';
+import { c, getUpdateAuthor } from '../../../utils/misc';
 import {
   sendAttestationReceivedEmail,
   sendReviewEmail,
@@ -40,10 +40,10 @@ import {
   sendCollaboratorRemovedEmail,
   sendApplicationClosedEmail,
   sendApplicationPausedEmail,
-} from './emails';
+} from '../emails';
 import { findApplication } from './search';
-import { hasReviewScope } from '../../utils/permissions';
-import { throwApplicationClosedError } from '../../utils/errors';
+import { hasReviewScope } from '../../../utils/permissions';
+import { throwApplicationClosedError } from '../../../utils/errors';
 
 export async function create(identity: Identity) {
   const config = getAppConfig();
