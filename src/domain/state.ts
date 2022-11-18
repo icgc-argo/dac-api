@@ -1,6 +1,8 @@
 import moment from 'moment';
 import 'moment-timezone';
 import { cloneDeep, last } from 'lodash';
+import { Identity } from '@overture-stack/ego-token-middleware';
+
 import {
   Application,
   IT_AGREEMENT_PROTECT_DATA,
@@ -33,7 +35,6 @@ import {
   DacoRole,
   PauseReason,
 } from './interface';
-import { Identity } from '@overture-stack/ego-token-middleware';
 import {
   validateAppendices,
   validateApplicantSection,
@@ -44,14 +45,15 @@ import {
   validateRepresentativeSection,
 } from './validations';
 import { BadRequest, ConflictError, NotFound } from '../utils/errors';
-import { AppConfig, getAppConfig } from '../config';
+import { getAppConfig } from '../config';
 import {
   getAttestationByDate,
   getDaysElapsed,
   isAttestable,
   isRenewable,
 } from '../utils/calculations';
-import { getLastPausedAtDate, getUpdateAuthor, mergeKnown } from '../utils/misc';
+import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
+import { getUpdateAuthor, hasReviewScope } from '../utils/permissions';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -178,18 +180,15 @@ export class ApplicationStateManager {
     return this.currentApplication;
   }
 
-  deleteDocument(
-    objectId: string,
-    type: UploadDocumentType,
-    updatedBy: string,
-    isReviewer: boolean,
-  ) {
+  deleteDocument(objectId: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
+    const isReviewer = hasReviewScope(identity);
+
     if (isReviewer && current.state !== 'APPROVED') {
       throw new Error('not allowed');
     }
     if (type == 'ETHICS') {
-      return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(updatedBy, isReviewer));
+      return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(identity));
     }
 
     if (type == 'SIGNED_APP' && current.state == 'SIGN AND SUBMIT') {
@@ -205,20 +204,16 @@ export class ApplicationStateManager {
     throw new BadRequest('Operation not allowed');
   }
 
-  addDocument(
-    id: string,
-    name: string,
-    type: UploadDocumentType,
-    updatedBy: string,
-    isReviewer: boolean,
-  ) {
+  addDocument(id: string, name: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
+    const isReviewer = hasReviewScope(identity);
+
     if (isReviewer && current.state !== 'APPROVED') {
       throw new Error('not allowed');
     }
 
     if (type == 'ETHICS') {
-      uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
+      uploadEthicsLetter(current, id, name, getUpdateAuthor(identity));
       return current;
     }
 
@@ -270,8 +265,9 @@ export class ApplicationStateManager {
     throw new BadRequest('Unknown file type');
   }
 
-  deleteCollaborator(collaboratorId: string, updatedBy: string, isReviewer: boolean) {
+  deleteCollaborator(collaboratorId: string, identity: Identity) {
     const current = this.currentApplication;
+    const isReviewer = hasReviewScope(identity);
     if (isReviewer && current.state !== 'APPROVED') {
       throw new Error('not allowed');
     }
@@ -287,7 +283,7 @@ export class ApplicationStateManager {
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
-      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(identity));
     } else if (current.state == 'DRAFT') {
       // This is to handle the scenario where changing the primary affiliation in applicant section in an application that is in the state 'SIGN & SUBMIT'
       // will invalidate the collaborators section
@@ -370,8 +366,10 @@ export class ApplicationStateManager {
     return current;
   }
 
-  addCollaborator(collaborator: CollaboratorDto, updatedBy: string, isReviewer: boolean) {
+  addCollaborator(collaborator: CollaboratorDto, identity: Identity) {
     const current = this.currentApplication;
+    const isReviewer = hasReviewScope(identity);
+
     if (isReviewer && current.state !== 'APPROVED') {
       throw new Error('not allowed');
     }
@@ -460,7 +458,7 @@ export class ApplicationStateManager {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
       // trigger transition in application state and sign and submit check
-      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(identity));
     }
 
     onAppUpdate(current);
@@ -674,7 +672,7 @@ export function newApplication(identity: Identity): Partial<Application> {
     ableToRenew: false,
   };
 
-  const author = getUpdateAuthor(identity.userId, false); // set to false as we already know user scopes have been checked
+  const author = getUpdateAuthor(identity);
   const createdEvent = createUpdateEvent(app as Application, author, UpdateEvent.CREATED);
   app.updates?.push(createdEvent);
 

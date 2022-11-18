@@ -26,8 +26,7 @@ import { Application, Collaborator } from '../interface';
 import logger from '../../logger';
 import { getAppConfig } from '../../config';
 import { ApplicationModel } from '../model';
-import { getUpdateAuthor } from '../../utils/misc';
-import { hasReviewScope } from '../../utils/permissions';
+import { hasReviewScope, getUpdateAuthor } from '../../utils/permissions';
 import { findApplication } from './applications/search';
 import { throwApplicationClosedError } from '../../utils/errors';
 import {
@@ -43,18 +42,13 @@ export async function createCollaborator(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const config = getAppConfig();
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addCollaborator(
-    collaborator,
-    identity.userId,
-    isAdminOrReviewerResult,
-  );
+  const result = stateManager.addCollaborator(collaborator, identity);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   if (result.state == 'APPROVED') {
     sendCollaboratorAddedEmail(result, config, emailClient);
@@ -79,10 +73,7 @@ export async function updateCollaborator(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.updateCollaborator(
-    collaborator,
-    getUpdateAuthor(identity.userId, isAdminOrReviewerResult),
-  );
+  const result = stateManager.updateCollaborator(collaborator, getUpdateAuthor(identity));
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 }
 
@@ -93,18 +84,13 @@ export async function deleteCollaborator(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const config = getAppConfig();
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   if (appDocObj.state === 'CLOSED') {
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteCollaborator(
-    collaboratorId,
-    identity.userId,
-    isAdminOrReviewerResult,
-  );
+  const result = stateManager.deleteCollaborator(collaboratorId, identity);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
 
   if (result.state === 'APPROVED') {
