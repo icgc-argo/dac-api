@@ -18,16 +18,29 @@
  */
 
 import { Identity } from '@overture-stack/ego-token-middleware';
+
+import { DacoRole, UpdateAuthor } from '../domain/interface';
 import { getAppConfig } from '../config';
 
-export async function hasReviewScope(identity: Identity) {
+export function hasReviewScope(identity: Identity) {
   const REVIEW_SCOPE = getAppConfig().auth.reviewScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((v) => v == REVIEW_SCOPE);
 }
 
-export async function hasDacoSystemScope(identity: Identity) {
+export function hasDacoSystemScope(identity: Identity) {
   const DACO_SYSTEM_SCOPE = getAppConfig().auth.dacoSystemScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((scope) => scope === DACO_SYSTEM_SCOPE);
 }
+
+export const getUpdateAuthor = (identity: Identity): UpdateAuthor => ({
+  id: identity.userId,
+  role: getDacoRole(identity),
+});
+
+export const getDacoRole: (identity: Identity) => DacoRole = (identity) => {
+  const isSystem = hasDacoSystemScope(identity);
+  const isAdmin = hasReviewScope(identity);
+  return isSystem ? DacoRole.SYSTEM : isAdmin ? DacoRole.ADMIN : DacoRole.SUBMITTER;
+};

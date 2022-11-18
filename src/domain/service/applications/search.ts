@@ -59,7 +59,7 @@ function mapField(field: string) {
 }
 
 export async function search(params: SearchParams, identity: Identity): Promise<SearchResult> {
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  const isAdminOrReviewerResult = hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
     query.submitterId = identity.userId;
@@ -239,7 +239,7 @@ export async function deleteApp(id: string, identity: Identity) {
 }
 
 export async function getById(id: string, identity: Identity) {
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  const isAdminOrReviewerResult = hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId: id,
   };
@@ -259,7 +259,7 @@ export async function getById(id: string, identity: Identity) {
 }
 
 export async function findApplication(appId: string, identity: Identity) {
-  const isReviewer = await hasReviewScope(identity);
+  const isReviewer = hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId,
   };

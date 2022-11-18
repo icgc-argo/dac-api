@@ -28,7 +28,7 @@ import { ApplicationStateManager, getSearchFieldValues, newApplication } from '.
 import { Application, UpdateApplication } from '../../interface';
 import { Storage } from '../../../storage';
 import logger from '../../../logger';
-import { c, getUpdateAuthor } from '../../../utils/misc';
+import { c } from '../../../utils/misc';
 import {
   sendAttestationReceivedEmail,
   sendReviewEmail,
@@ -42,12 +42,11 @@ import {
   sendApplicationPausedEmail,
 } from '../emails';
 import { findApplication } from './search';
-import { hasReviewScope } from '../../../utils/permissions';
+import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
 import { throwApplicationClosedError } from '../../../utils/errors';
 
 export async function create(identity: Identity) {
-  const config = getAppConfig();
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  const isAdminOrReviewerResult = hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
   }
@@ -71,7 +70,7 @@ export async function updatePartial(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const config = getAppConfig();
-  const isReviewer = await hasReviewScope(identity);
+  const isReviewer = hasReviewScope(identity);
   const appDoc = await findApplication(c(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
 
@@ -80,11 +79,7 @@ export async function updatePartial(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const updatedApp = stateManager.updateApp(
-    appPart,
-    isReviewer,
-    getUpdateAuthor(identity.userId, isReviewer),
-  );
+  const updatedApp = stateManager.updateApp(appPart, isReviewer, getUpdateAuthor(identity));
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
   const stateChanged = appDocObj.state != updatedApp.state;
   if (stateChanged) {
@@ -109,10 +104,10 @@ export async function updatePartial(
   );
   const updated = await findApplication(c(updatedApp.appId), identity);
   const updatedObj = updated.toObject();
-  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
+  const viewableApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
     isReviewer,
   );
-  return viewAbleApplication;
+  return viewableApplication;
 }
 
 export async function onStateChange(
