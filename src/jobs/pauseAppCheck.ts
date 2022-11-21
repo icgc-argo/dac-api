@@ -74,7 +74,7 @@ const pauseApplication = async (
 ): Promise<Application> => {
   // set app in state
   const appObj = new ApplicationStateManager(currentApp);
-  const role = await getDacoRole(identity);
+  const role = getDacoRole(identity);
   logger.info(
     `${JOB_NAME} - Role ${role} is trying to PAUSE appId ${currentApp.appId} with pause reason ${reason}`,
   );

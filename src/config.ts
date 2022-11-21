@@ -19,8 +19,6 @@
 import * as dotenv from 'dotenv';
 import moment from 'moment';
 
-import { c } from './utils/misc';
-
 let currentConfig: AppConfig;
 
 export interface AppConfig {
@@ -134,8 +132,8 @@ const buildAppContext = (): AppConfig => {
       timeout: Number(process.env.OBJECT_STORAGE_TIMEOUT_MILLIS) || 5000,
     },
     email: {
-      host: c(process.env.EMAIL_HOST),
-      port: Number(c(process.env.EMAIL_PORT)),
+      host: process.env.EMAIL_HOST || 'localhost',
+      port: Number(process.env.EMAIL_PORT) || 1025,
       dacoAddress: process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org',
       fromName: process.env.EMAIL_FROM_NAME || 'ICGC DACO',
       fromAddress: process.env.EMAIL_FROM_ADDRESS || 'no-reply-daco@icgc-argo.org',

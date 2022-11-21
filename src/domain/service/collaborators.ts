@@ -63,7 +63,7 @@ export async function updateCollaborator(
   collaborator: Collaborator,
   identity: Identity,
 ) {
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  const isAdminOrReviewerResult = hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
   }

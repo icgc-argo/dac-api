@@ -39,6 +39,8 @@ export const getUpdateAuthor = (identity: Identity): UpdateAuthor => ({
   role: getDacoRole(identity),
 });
 
+// it is assumed a user can have only one role. If system scope is present in the jwt, it will take precedent over the admin scope
+// a regular user has neither system nor admin scope
 export const getDacoRole: (identity: Identity) => DacoRole = (identity) => {
   const isSystem = hasDacoSystemScope(identity);
   const isAdmin = hasReviewScope(identity);

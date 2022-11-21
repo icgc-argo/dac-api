@@ -469,7 +469,7 @@ export class ApplicationStateManager {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
-        updateAppStateForApprovedApplication(current, updatePart, isReviewer, updatedBy, false);
+        updateAppStateForApprovedApplication(current, updatePart, updatedBy, false);
         break;
 
       case 'REVISIONS REQUESTED':
@@ -745,7 +745,7 @@ function uploadEthicsLetter(
   } else if (current.state == 'REVISIONS REQUESTED') {
     updateAppStateForReturnedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'APPROVED') {
-    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, true);
+    updateAppStateForApprovedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'SIGN AND SUBMIT') {
     updateAppStateForSignAndSubmit(current, updatePart, updatedBy, true);
   } else {
@@ -1074,7 +1074,6 @@ function isReadyForReview(application: Application) {
 function updateAppStateForApprovedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
-  isReviewer: boolean,
   updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
