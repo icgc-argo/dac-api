@@ -26,7 +26,7 @@ import { Application, Collaborator } from '../interface';
 import logger from '../../logger';
 import { getAppConfig } from '../../config';
 import { ApplicationModel } from '../model';
-import { hasReviewScope, getUpdateAuthor } from '../../utils/permissions';
+import { hasReviewScope, getUpdateAuthor, hasDacoSystemScope } from '../../utils/permissions';
 import { findApplication } from './applications/search';
 import { throwApplicationClosedError } from '../../utils/errors';
 import {
@@ -64,7 +64,9 @@ export async function updateCollaborator(
   identity: Identity,
 ) {
   const isAdminOrReviewerResult = hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
+  const isSystem = hasDacoSystemScope(identity);
+
+  if (isAdminOrReviewerResult || isSystem) {
     throw new Error('not allowed');
   }
   const appDoc = await findApplication(appId, identity);

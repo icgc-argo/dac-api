@@ -42,12 +42,13 @@ import {
   sendApplicationPausedEmail,
 } from '../emails';
 import { findApplication } from './search';
-import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
+import { hasReviewScope, getUpdateAuthor, hasDacoSystemScope } from '../../../utils/permissions';
 import { throwApplicationClosedError } from '../../../utils/errors';
 
 export async function create(identity: Identity) {
   const isAdminOrReviewerResult = hasReviewScope(identity);
-  if (isAdminOrReviewerResult) {
+  const isSystem = hasDacoSystemScope(identity);
+  if (isAdminOrReviewerResult || isSystem) {
     throw new Error('not allowed');
   }
   const app = newApplication(identity);

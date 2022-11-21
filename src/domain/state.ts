@@ -53,7 +53,7 @@ import {
   isRenewable,
 } from '../utils/calculations';
 import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
-import { getUpdateAuthor, hasReviewScope } from '../utils/permissions';
+import { getUpdateAuthor, hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -183,8 +183,9 @@ export class ApplicationStateManager {
   deleteDocument(objectId: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
     const isReviewer = hasReviewScope(identity);
+    const isSystem = hasDacoSystemScope(identity);
 
-    if (isReviewer && current.state !== 'APPROVED') {
+    if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
       throw new Error('not allowed');
     }
     if (type == 'ETHICS') {
@@ -207,8 +208,9 @@ export class ApplicationStateManager {
   addDocument(id: string, name: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
     const isReviewer = hasReviewScope(identity);
+    const isSystem = hasDacoSystemScope(identity);
 
-    if (isReviewer && current.state !== 'APPROVED') {
+    if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
       throw new Error('not allowed');
     }
 
@@ -268,7 +270,9 @@ export class ApplicationStateManager {
   deleteCollaborator(collaboratorId: string, identity: Identity) {
     const current = this.currentApplication;
     const isReviewer = hasReviewScope(identity);
-    if (isReviewer && current.state !== 'APPROVED') {
+    const isSystem = hasDacoSystemScope(identity);
+
+    if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
       throw new Error('not allowed');
     }
     current.sections.collaborators.list = current.sections.collaborators.list.filter(
@@ -369,8 +373,9 @@ export class ApplicationStateManager {
   addCollaborator(collaborator: CollaboratorDto, identity: Identity) {
     const current = this.currentApplication;
     const isReviewer = hasReviewScope(identity);
+    const isSystem = hasDacoSystemScope(identity);
 
-    if (isReviewer && current.state !== 'APPROVED') {
+    if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
       throw new Error('not allowed');
     }
     const defaultCollaboratorInfo = {
