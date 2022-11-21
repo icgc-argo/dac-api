@@ -22,6 +22,7 @@ const newApplication1: Partial<Application> = newApplication({
   userId: 'abc123',
   tokenInfo: {
     context: {
+      scope: [''],
       user: {
         email: 'test@example.com',
       },
