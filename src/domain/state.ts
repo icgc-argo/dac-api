@@ -128,6 +128,17 @@ const stateToLockedSectionsMap: Record<
   },
 };
 
+// SYSTEM role is not allowed to do any modifications to collaborators or documents no matter what state the app is in
+// ADMIN role can add or delete collaborators and documents under certain conditions
+// ADMIN scope is checked first as it would supersede the SYSTEM scope if both are present (but ideally this should never be the case)
+function checkAppIsApprovedAndUserCanAmend(current: Application, identity: Identity): void {
+  const isReviewer = hasReviewScope(identity);
+  const isSystem = hasDacoSystemScope(identity);
+  if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
+    throw new Error('not allowed');
+  }
+}
+
 export class ApplicationStateManager {
   public readonly currentApplication: Application;
 
@@ -182,12 +193,9 @@ export class ApplicationStateManager {
 
   deleteDocument(objectId: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
+    checkAppIsApprovedAndUserCanAmend(current, identity);
     const isReviewer = hasReviewScope(identity);
-    const isSystem = hasDacoSystemScope(identity);
 
-    if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
-      throw new Error('not allowed');
-    }
     if (type == 'ETHICS') {
       return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(identity));
     }
@@ -207,12 +215,7 @@ export class ApplicationStateManager {
 
   addDocument(id: string, name: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
-    const isReviewer = hasReviewScope(identity);
-    const isSystem = hasDacoSystemScope(identity);
-
-    if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend;
 
     if (type == 'ETHICS') {
       uploadEthicsLetter(current, id, name, getUpdateAuthor(identity));
@@ -232,6 +235,7 @@ export class ApplicationStateManager {
     }
 
     if (type === 'APPROVED_PDF') {
+      const isReviewer = hasReviewScope(identity);
       if (current.state === 'APPROVED' && isReviewer) {
         const currentApprovedDoc = current.approvedAppDocs.find((doc) => doc.isCurrent);
         if (currentApprovedDoc) {
@@ -269,12 +273,8 @@ export class ApplicationStateManager {
 
   deleteCollaborator(collaboratorId: string, identity: Identity) {
     const current = this.currentApplication;
-    const isReviewer = hasReviewScope(identity);
-    const isSystem = hasDacoSystemScope(identity);
+    checkAppIsApprovedAndUserCanAmend(current, identity);
 
-    if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
-      throw new Error('not allowed');
-    }
     current.sections.collaborators.list = current.sections.collaborators.list.filter(
       (c) => c.id?.toString() !== collaboratorId,
     );
@@ -372,12 +372,8 @@ export class ApplicationStateManager {
 
   addCollaborator(collaborator: CollaboratorDto, identity: Identity) {
     const current = this.currentApplication;
-    const isReviewer = hasReviewScope(identity);
-    const isSystem = hasDacoSystemScope(identity);
+    checkAppIsApprovedAndUserCanAmend(current, identity);
 
-    if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
-      throw new Error('not allowed');
-    }
     const defaultCollaboratorInfo = {
       title: '',
       firstName: '',
