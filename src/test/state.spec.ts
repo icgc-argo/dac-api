@@ -1,4 +1,4 @@
-import { EgoJwtData, Identity } from '@overture-stack/ego-token-middleware';
+import { UserIdentity } from '@overture-stack/ego-token-middleware/dist/types';
 import { expect } from 'chai';
 import { isDate, pick, cloneDeep, omit, get, every } from 'lodash';
 import moment, { unitOfTime } from 'moment';
@@ -15,53 +15,12 @@ import {
 import { ApplicationStateManager, newApplication } from '../domain/state';
 import { BadRequest, ConflictError } from '../utils/errors';
 import { c } from '../utils/misc';
-import { AppConfig } from '../config';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
+import { mockApplicantToken, mockedConfig } from './mocks.spec';
 
-const mockApplicantJwtData = {
-  sub: 'user45678',
-  context: {
-    scope: [''],
-    user: {
-      name: 'Applicant User',
-      email: 'applicant@example.com',
-    },
-  },
-} as EgoJwtData;
+const stateTestConfig = mockedConfig();
 
-const mockApplicantIdentity = {
-  userId: mockApplicantJwtData.sub,
-  tokenInfo: mockApplicantJwtData,
-} as Identity;
-
-const mockConfig = {
-  durations: {
-    attestation: {
-      count: 1,
-      unitOfTime: 'year',
-      daysToAttestation: 45,
-    },
-    expiry: {
-      daysToExpiry1: 90,
-      daysToExpiry2: 45,
-      daysPostExpiry: 90,
-      count: 1,
-      unitOfTime: 'year',
-    },
-  },
-} as AppConfig;
-
-const newApplication1: Partial<Application> = newApplication({
-  userId: 'abc123',
-  tokenInfo: {
-    context: {
-      scope: [''],
-      user: {
-        email: 'test@example.com',
-      },
-    },
-  },
-} as Identity);
+const newApplication1: Partial<Application> = newApplication(mockApplicantToken as UserIdentity);
 
 function appWithMockedAttestationDate(
   app: Application,
@@ -70,9 +29,9 @@ function appWithMockedAttestationDate(
 ): Application {
   const {
     durations: {
-      attestation: { unitOfTime, count, daysToAttestation },
+      attestation: { unitOfTime, count },
     },
-  } = mockConfig;
+  } = stateTestConfig;
   app.approvedAtUtc = moment
     .utc(new Date())
     .subtract(count, unitOfTime)
@@ -90,8 +49,7 @@ function appWithMockExpiryDate(
     durations: {
       expiry: { count, unitOfTime },
     },
-  } = mockConfig;
-
+  } = stateTestConfig;
   const mockExpiryDate = moment(app.expiresAtUtc)
     .subtract(count, unitOfTime)
     .add(countToAdd, units)
@@ -189,7 +147,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, mockApplicantIdentity);
+      const result = state.addCollaborator(collab, mockApplicantToken);
 
       expect(result.sections.collaborators.list[0]).to.deep.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
@@ -224,7 +182,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, mockApplicantIdentity);
+      const result = state.addCollaborator(collab, mockApplicantToken);
 
       expect(result.sections.collaborators.list[0]).to.deep.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
@@ -251,7 +209,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
       try {
-        state.addCollaborator(collab, mockApplicantIdentity);
+        state.addCollaborator(collab, mockApplicantToken);
       } catch (err) {
         if (err instanceof ConflictError) {
           return true;
@@ -290,7 +248,7 @@ describe('state manager', () => {
       };
 
       try {
-        state.addCollaborator(collab, mockApplicantIdentity);
+        state.addCollaborator(collab, mockApplicantToken);
       } catch (e) {
         expect((e as BadRequest).info.errors[0]).to.include({
           field: 'primaryAffiliation',
@@ -300,7 +258,7 @@ describe('state manager', () => {
 
       // add with correct PA
       collab.info.primaryAffiliation = 'ACME';
-      const app2 = state.addCollaborator(collab, mockApplicantIdentity);
+      const app2 = state.addCollaborator(collab, mockApplicantToken);
       app2.sections.collaborators.list[0].id = 'collab-1';
       expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
 
@@ -353,7 +311,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, mockApplicantIdentity);
+      const result = state.addCollaborator(collab, mockApplicantToken);
       result.sections.collaborators.list[0].id = 'collab-1';
       expect(result.state).to.eq('SIGN AND SUBMIT');
 
@@ -770,12 +728,7 @@ export function getReadyToSignApp() {
 export function getAppInReview() {
   const app = getReadyToSignApp();
   const state = new ApplicationStateManager(app);
-  const appAfterSign = state.addDocument(
-    '12345',
-    'signed.pdf',
-    'SIGNED_APP',
-    mockApplicantIdentity,
-  );
+  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', mockApplicantToken);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REVIEW',
   };
@@ -801,7 +754,10 @@ export function getPausedApplication() {
   const app = getApprovedApplication();
   app.approvedAtUtc = moment
     .utc(new Date())
-    .subtract(mockConfig.durations.attestation.count, mockConfig.durations.attestation.unitOfTime)
+    .subtract(
+      stateTestConfig.durations.attestation.count,
+      stateTestConfig.durations.attestation.unitOfTime,
+    )
     .toDate();
   const state = new ApplicationStateManager(app);
   const updatePart: Partial<UpdateApplication> = {

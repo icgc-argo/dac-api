@@ -1,11 +1,12 @@
 import JSZip from 'jszip';
 import { Readable } from 'stream';
 import fs from 'fs';
+
 describe('zip', () => {
-  it.only('should package string correctly', async () => {
+  it('should package string correctly', async () => {
     const encrypted = {
       content: 'ABC1234567890',
-      iv: '123'
+      iv: '123',
     };
 
     // build streams to zip later
@@ -21,16 +22,15 @@ describe('zip', () => {
     // build the zip package
     const zip = new JSZip();
     [
-      {name: 'iv.txt', stream: ivStream},
-      {name: 'approved_users.csv.enc', stream: contentStream }
+      { name: 'iv.txt', stream: ivStream },
+      { name: 'approved_users.csv.enc', stream: contentStream },
     ].forEach((a) => {
       zip.file(a.name, a.stream);
     });
     const zipFileOut = await zip.generateAsync({
-      type: 'nodebuffer'
+      type: 'nodebuffer',
     });
     console.log(zipFileOut);
     fs.writeFileSync('/tmp/test-zip.zip', zipFileOut);
   });
-
 });
