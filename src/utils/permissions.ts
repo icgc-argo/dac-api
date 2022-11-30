@@ -17,11 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import {
-  ApplicationIdentity,
-  Identity,
-  UserIdentity,
-} from '@overture-stack/ego-token-middleware/dist/types';
+import { Identity, UserIdentity, ApplicationIdentity } from '@overture-stack/ego-token-middleware';
 
 import { DacoRole, UpdateAuthor } from '../domain/interface';
 import { getAppConfig } from '../config';

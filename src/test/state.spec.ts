@@ -1,4 +1,4 @@
-import { UserIdentity } from '@overture-stack/ego-token-middleware/dist/types';
+import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
 import { isDate, pick, cloneDeep, omit, get, every } from 'lodash';
 import moment, { unitOfTime } from 'moment';

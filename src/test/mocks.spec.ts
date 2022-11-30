@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import * as config from '../config';
 import sinon from 'sinon';
-import { Identity } from '@overture-stack/ego-token-middleware/dist/types';
+import { Identity } from '@overture-stack/ego-token-middleware';
 
 import { isApplicationJwt, isUserJwt } from '../utils/permissions';
 

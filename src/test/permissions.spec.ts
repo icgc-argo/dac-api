@@ -1,4 +1,4 @@
-import { Identity } from '@overture-stack/ego-token-middleware/dist/types';
+import { Identity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
 import { cloneDeep } from 'lodash';
 
