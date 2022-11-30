@@ -16,6 +16,13 @@ export class ConflictError extends Error {
   }
 }
 
+export class Forbidden extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'Forbidden';
+  }
+}
+
 export function throwApplicationClosedError(): () => void {
   throw new Error('Cannot modify an application in CLOSED state.');
 }
