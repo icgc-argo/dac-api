@@ -17,7 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
 
 import { NotFound } from '../../../utils/errors';
@@ -203,7 +203,9 @@ export async function search(params: SearchParams, identity: Identity): Promise<
   };
 }
 
-export const searchCollaboratorApplications = async (identity: Identity) => {
+export const searchCollaboratorApplications = async (
+  identity: UserIdentity,
+): Promise<Partial<ApplicationSummary>[]> => {
   // find all applications on which the logged-in user has collaborator access
   // using ego token email matched against collaborator googleEmail
   const apps = await ApplicationModel.find({

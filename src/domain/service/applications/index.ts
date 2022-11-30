@@ -17,10 +17,10 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Identity } from '@overture-stack/ego-token-middleware';
 import { difference, isEmpty } from 'lodash';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 
 import { AppConfig, getAppConfig } from '../../../config';
 import { ApplicationModel } from '../../model';
@@ -42,13 +42,12 @@ import {
   sendApplicationPausedEmail,
 } from '../emails';
 import { findApplication } from './search';
-import { hasReviewScope, getUpdateAuthor, hasDacoSystemScope } from '../../../utils/permissions';
+import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
 import { throwApplicationClosedError } from '../../../utils/errors';
 
-export async function create(identity: Identity) {
+export async function create(identity: UserIdentity) {
   const isAdminOrReviewerResult = hasReviewScope(identity);
-  const isSystem = hasDacoSystemScope(identity);
-  if (isAdminOrReviewerResult || isSystem) {
+  if (isAdminOrReviewerResult) {
     throw new Error('not allowed');
   }
   const app = newApplication(identity);
