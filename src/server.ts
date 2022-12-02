@@ -29,7 +29,7 @@ import App, { setDBStatus, Status } from './app';
 import getAppSecrets from './secrets';
 
 let server: Server;
-console.log('in server.ts');
+logger.info('in server.ts');
 
 (async () => {
   const appConfig = getAppConfig();
@@ -49,7 +49,7 @@ console.log('in server.ts');
   try {
     connection = await database.connect();
     const migrated = await up(connection.db);
-    migrated.forEach((fileName: string) => console.log('Migrated:', fileName));
+    migrated.forEach((fileName: string) => logger.info('Migrated:', fileName));
   } catch (err) {
     logger.error('failed to do migration', err);
     process.exit(-10);

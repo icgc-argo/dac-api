@@ -1,4 +1,6 @@
 import * as dotenv from 'dotenv';
+
+import logger from './logger';
 import * as vault from './vault';
 
 export interface MongoSecrets {
@@ -31,20 +33,20 @@ let secrets: AppSecrets | undefined = undefined;
 const vaultEnabled = (process.env.VAULT_ENABLED || '').toLowerCase() === 'true';
 
 const loadVaultSecrets = async () => {
-  console.info('Loading Vault secrets...');
+  logger.info('Loading Vault secrets...');
   try {
     if (process.env.VAULT_SECRETS_PATH) {
       return await vault.loadSecret(process.env.VAULT_SECRETS_PATH);
     }
     throw new Error('Path to secrets not specified but vault is enabled');
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     throw new Error('Failed to load secrets from vault.');
   }
 };
 
 const buildSecrets = async (vaultSecrets: Record<string, any> = {}): Promise<AppSecrets> => {
-  console.info('Building app secrets...');
+  logger.info('Building app secrets...');
 
   secrets = {
     email: {

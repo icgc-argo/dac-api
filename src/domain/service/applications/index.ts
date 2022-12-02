@@ -191,6 +191,6 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const approvedDiff = difference(approvedArrayBefore, approvedArrayAfter);
   approvedDiff.forEach((o) => removedIds.push(o));
 
-  console.log('removing docs: ', removedIds);
+  logger.info('removing docs: ', removedIds);
   return removedIds;
 }

@@ -55,6 +55,7 @@ const uiLinksStub = {
 };
 
 describe('emails', () => {
+  // To view a rendered email, log the result of an email function and paste into https://mjml.io/try-it-live
   describe('email rendering', () => {
     it('should render submission email', async () => {
       const app = getAppInReview();
@@ -69,7 +70,6 @@ describe('emails', () => {
         attestationGuide: '',
         generalApplicationGuide: '',
       });
-      console.log(email.emailMjml);
     });
 
     it('should render reviewer email', async () => {
@@ -79,7 +79,6 @@ describe('emails', () => {
         { lastName: 'Dough', firstName: 'Pizza' },
         uiLinksStub,
       );
-      console.log(email.emailMjml);
     });
 
     it('should render revisions requested email', async () => {
@@ -94,13 +93,11 @@ describe('emails', () => {
         },
         ui: uiLinksStub,
       } as any);
-      console.log(email.emailMjml);
     });
 
     it('should render approved email', async () => {
       const app = getApprovedApplication();
       const email = await renderApprovedEmail(app, stub);
-      console.log(email.emailMjml);
     });
 
     it('should render collaborator notification email', async () => {
@@ -130,7 +127,6 @@ describe('emails', () => {
         ...stub,
         dataAccessGuide: 'https://www.google.com',
       });
-      console.log(email.emailMjml);
     });
 
     it('should render a collaborator removed notification email', async () => {
@@ -160,58 +156,49 @@ describe('emails', () => {
       const email = await renderCollaboratorRemovedEmail(app, collab, {
         ...stub,
       });
-      console.log(email.emailMjml);
     });
 
     it('should render approved application closed email', async () => {
       const app = getApprovedApplication();
       const email = await renderClosedEmail(app, stub);
-      console.log(email.emailMjml);
     });
 
     it('should render rejected email', async () => {
       const app = getRejectedApplication();
       const email = await rejected(app, stub);
-      console.log(email.emailMjml);
     });
 
     it('should render an access expiring in 45 days email', async () => {
       const app = getApprovedApplication();
       const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, durationsStub, 45);
-      console.log(email.emailMjml);
     });
 
     it('should render an access expiring in 90 days email', async () => {
       const app = getApprovedApplication();
       const email = await renderAccessExpiringEmail(app, stub, uiLinksStub, durationsStub, 90);
-      console.log(email.emailMjml);
     });
 
     it('should render an access has expired email', async () => {
       const app = getApprovedApplication();
       const email = await renderAccessHasExpiredEmail(app, stub, uiLinksStub, durationsStub);
-      console.log(email.emailMjml);
     });
 
     it('should render an attestation required email', async () => {
       const app = getApprovedApplication();
       const configStub = { durations: durationsStub, email: { links: stub } } as AppConfig;
       const email = await renderAttestationRequiredEmail(app, uiLinksStub, configStub);
-      console.log(email.emailMjml);
     });
 
     it('should render an application paused email', async () => {
       const configStub = { durations: durationsStub, email: { links: stub } } as AppConfig;
       const app = getPausedApplication();
       const email = await renderApplicationPausedEmail(app, uiLinksStub, configStub);
-      console.log(email.emailMjml);
     });
 
     it('should render an attestation received email', async () => {
       const app = getApprovedApplication();
       app.attestedAtUtc = new Date();
       const email = await renderAttestationReceivedEmail(app, stub);
-      console.log(email.emailMjml);
     });
   });
 });
