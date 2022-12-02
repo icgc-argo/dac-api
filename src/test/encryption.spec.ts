@@ -6,6 +6,7 @@ import {
   DACO_ENCRYPTION_ALGO,
   EMAIL_CONTENT_ENCODING,
 } from '../utils/constants';
+import logger from '../logger';
 
 describe('encryption', () => {
   it('should encrypt and decrypt text', async () => {
@@ -44,7 +45,7 @@ describe('encryption', () => {
       ]);
       expect(decrypted.toString()).to.eq(text);
     } catch (err) {
-      console.log(err);
+      logger.error(err);
     }
   });
 });

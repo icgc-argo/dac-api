@@ -18,6 +18,8 @@
  */
 import * as dotenv from 'dotenv';
 import moment from 'moment';
+
+import logger from './logger';
 import { c } from './utils/misc';
 
 let currentConfig: AppConfig;
@@ -100,7 +102,7 @@ export interface KafkaConfigurations {
 
 const buildAppContext = (): AppConfig => {
   dotenv.config();
-  console.log('building app context');
+  logger.info('building app context');
 
   const config: AppConfig = {
     serverPort: process.env.PORT || '3000',

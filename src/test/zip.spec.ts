@@ -30,7 +30,6 @@ describe('zip', () => {
     const zipFileOut = await zip.generateAsync({
       type: 'nodebuffer',
     });
-    console.log(zipFileOut);
     fs.writeFileSync('/tmp/test-zip.zip', zipFileOut);
   });
 });
