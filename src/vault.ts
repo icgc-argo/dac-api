@@ -59,7 +59,7 @@ async function login() {
   });
 
   const clientToken = response.auth.client_token as string;
-  console.log(`login successful, token length: ${clientToken.length}`);
+  logger.info(`login successful, token length: ${clientToken.length}`);
 }
 
 export async function loadSecret(key: string) {
@@ -68,6 +68,6 @@ export async function loadSecret(key: string) {
   }
 
   const result = await vaultClient.read(key);
-  console.log(`loaded Secret ${key}`);
+  logger.info(`loaded Secret ${key}`);
   return result.data;
 }

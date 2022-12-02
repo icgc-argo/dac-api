@@ -10,7 +10,7 @@ import { NOTIFICATION_UNIT_OF_TIME, REQUEST_CHUNK_SIZE } from '../utils/constant
 import { ApplicationDocument, ApplicationModel } from '../domain/model';
 import { Application } from '../domain/interface';
 import { buildReportDetails, getEmptyReportDetails } from './utils';
-import { sendAttestationRequiredEmail } from '../domain/service';
+import { sendAttestationRequiredEmail } from '../domain/service/emails';
 import { getDayRange } from '../utils/calculations';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 
@@ -21,11 +21,10 @@ async function attestationRequiredNotificationCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
 ): Promise<JobReport<BatchJobDetails>> {
-  const config = await getAppConfig();
   const startedAt = new Date();
   try {
     logger.info(`${JOB_NAME} - Initiating...`);
-    const details = await getAttestableNotificationReportDetails(currentDate, emailClient, config);
+    const details = await getAttestableNotificationReportDetails(currentDate, emailClient);
     details.errors.length
       ? logger.warn(`${JOB_NAME} - Completed with errors.`)
       : logger.info(`${JOB_NAME} - Completed.`);
@@ -57,8 +56,8 @@ async function attestationRequiredNotificationCheck(
 const getAttestableNotificationReportDetails = async (
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
-  config: AppConfig,
 ): Promise<BatchJobDetails> => {
+  const config = getAppConfig();
   const query = getAttestableQuery(config, currentDate);
   const attestableAppCount = await ApplicationModel.find(query).countDocuments();
   if (attestableAppCount === 0) {

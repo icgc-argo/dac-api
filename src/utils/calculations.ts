@@ -1,15 +1,13 @@
 import moment from 'moment';
-import { AppConfig } from '../config';
+import { AppConfig, getAppConfig } from '../config';
 import { Application } from '../domain/interface';
 
 export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();
 };
 
-export const getAttestationByDate: (approvalDate: Date, config: AppConfig) => Date = (
-  approvalDate,
-  config,
-) => {
+export const getAttestationByDate: (approvalDate: Date) => Date = (approvalDate) => {
+  const config = getAppConfig();
   const { unitOfTime, count } = config.durations?.attestation;
   return moment(approvalDate).add(count, unitOfTime).toDate();
 };
@@ -37,10 +35,7 @@ export const getDayRange: (targetDate: moment.Moment) => { $gte: Date; $lte: Dat
   };
 };
 
-export const isAttestable: (currentApp: Application, config: AppConfig) => boolean = (
-  currentApp,
-  config,
-) => {
+export const isAttestable: (currentApp: Application) => boolean = (currentApp) => {
   // isAttestable is false if attestation has already occurred
   // **NOTE** attestation fields will be reset when an app goes through the renewal process
   if (currentApp.attestedAtUtc) {
@@ -50,22 +45,21 @@ export const isAttestable: (currentApp: Application, config: AppConfig) => boole
   if (!(currentApp.state === 'APPROVED' || currentApp.state === 'PAUSED')) {
     return false;
   }
-  const attestationByDate = getAttestationByDate(currentApp.approvedAtUtc, config);
+  const config = getAppConfig();
+  const attestationByDate = getAttestationByDate(currentApp.approvedAtUtc);
   const now = moment.utc().toDate();
   const elapsed = getDaysElapsed(now, attestationByDate);
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
 
-export const isRenewable: (currentApp: Application, config: AppConfig) => boolean = (
-  currentApp,
-  config,
-) => {
+export const isRenewable: (currentApp: Application) => boolean = (currentApp) => {
   // if the user has already started the renewal process, app state will be in DRAFT, SIGN AND SUBMIT, REVIEW or REVISIONS REQUESTED,
   // so need to look for apps still in APPROVED or EXPIRED state, which means no action has been taken yet
   // TODO: verify whether PAUSED apps can be renewed
   if (!(currentApp.expiresAtUtc && ['APPROVED', 'EXPIRED'].includes(currentApp.state))) {
     return false;
   }
+  const config = getAppConfig();
   const now = moment.utc();
   // expiry - DAYS_TO_EXPIRY_1
   const expiryPeriodStart = moment

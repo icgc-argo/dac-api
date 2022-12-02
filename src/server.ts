@@ -16,26 +16,30 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-import { getAppConfig } from './config';
-import App, { setDBStatus, Status } from './app';
 import mongoose from 'mongoose';
-import logger from './logger';
 import { Server } from 'http';
 import AWS from 'aws-sdk';
 import { database, up } from 'migrate-mongo';
 import nodemailer from 'nodemailer';
-let server: Server;
-console.log('in server.ts');
-import { Storage } from './storage';
-(async () => {
-  const appConfig = await getAppConfig();
 
+import logger from './logger';
+import { Storage } from './storage';
+import { getAppConfig } from './config';
+import App, { setDBStatus, Status } from './app';
+import getAppSecrets from './secrets';
+
+let server: Server;
+logger.info('in server.ts');
+
+(async () => {
+  const appConfig = getAppConfig();
+  const appSecrets = await getAppSecrets();
   /**
    * This check is to avoid setting falsy value for user/pass if
    * there is no user pass provided because process.env will force string "undefined"
    * which will fail the auth (used by migrate mongo config file).
    */
-  const mongoProps = appConfig.mongoProperties;
+  const mongoProps = appSecrets.mongoProperties;
   if (mongoProps.dbUser && mongoProps.dbPassword) {
     process.env.DB_USERNAME = mongoProps.dbUser;
     process.env.DB_PASSWORD = mongoProps.dbPassword;
@@ -45,7 +49,7 @@ import { Storage } from './storage';
   try {
     connection = await database.connect();
     const migrated = await up(connection.db);
-    migrated.forEach((fileName: string) => console.log('Migrated:', fileName));
+    migrated.forEach((fileName: string) => logger.info('Migrated:', fileName));
   } catch (err) {
     logger.error('failed to do migration', err);
     process.exit(-10);
@@ -83,7 +87,7 @@ import { Storage } from './storage';
   });
 
   try {
-    await mongoose.connect(appConfig.mongoProperties.dbUrl, {
+    await mongoose.connect(appSecrets.mongoProperties.dbUrl, {
       autoReconnect: true,
       socketTimeoutMS: 10000,
       connectTimeoutMS: 30000,
@@ -91,8 +95,8 @@ import { Storage } from './storage';
       reconnectTries: 10,
       reconnectInterval: 3000,
       useNewUrlParser: true,
-      user: appConfig.mongoProperties.dbUser,
-      pass: appConfig.mongoProperties.dbPassword,
+      user: appSecrets.mongoProperties.dbUser,
+      pass: appSecrets.mongoProperties.dbPassword,
       w: appConfig.mongoProperties.writeConcern,
       wtimeout: appConfig.mongoProperties.writeAckTimeout,
       // To fix deprecation warning on findOneAndUpdate() https://mongoosejs.com/docs/5.x/docs/deprecations.html#findandmodify
@@ -110,16 +114,16 @@ import { Storage } from './storage';
     AWS.config.httpOptions.connectTimeout = appConfig.storage.timeout;
   }
 
-  const storageClient: Storage = new Storage(appConfig);
+  const storageClient: Storage = new Storage(appConfig, appSecrets);
   await storageClient.createBucket();
 
   const emailClient = nodemailer.createTransport({
     host: appConfig.email.host,
     port: appConfig.email.port,
-    auth: appConfig.email.auth.user
+    auth: appSecrets.email.auth.user
       ? {
-          user: appConfig.email.auth?.user, // generated ethereal user
-          pass: appConfig.email.auth?.password, // generated ethereal password
+          user: appSecrets.email.auth?.user, // generated ethereal user
+          pass: appSecrets.email.auth?.password, // generated ethereal password
         }
       : undefined,
   } as any);

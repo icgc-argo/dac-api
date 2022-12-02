@@ -12,7 +12,7 @@ import { Application, PauseReason } from '../domain/interface';
 import { ApplicationStateManager } from '../domain/state';
 import { getDacoRole } from '../utils/misc';
 import { REQUEST_CHUNK_SIZE } from '../utils/constants';
-import { onStateChange } from '../domain/service';
+import { onStateChange } from '../domain/service/applications';
 import { buildReportDetails, getEmptyReportDetails } from './utils';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 
@@ -72,9 +72,8 @@ const pauseApplication = async (
   identity: Identity,
   reason?: PauseReason,
 ): Promise<Application> => {
-  const config = await getAppConfig();
   // set app in state
-  const appObj = new ApplicationStateManager(currentApp, config);
+  const appObj = new ApplicationStateManager(currentApp);
   const role = await getDacoRole(identity);
   logger.info(
     `${JOB_NAME} - Role ${role} is trying to PAUSE appId ${currentApp.appId} with pause reason ${reason}`,
@@ -131,7 +130,7 @@ const getPausedAppsReportDetails = async (
   user: Identity,
   currentDate: Date,
 ): Promise<BatchJobDetails> => {
-  const config = await getAppConfig();
+  const config = getAppConfig();
   const query = getPauseableQuery(config, currentDate);
   const pauseableAppCount = await ApplicationModel.find(query).countDocuments();
   // if no applications fit the criteria, return empty report details
