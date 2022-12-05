@@ -20,7 +20,6 @@ import {
   getRejectedApplication,
 } from './state.spec';
 import { Collaborator } from '../domain/interface';
-import { AppConfig } from '../config';
 import { mockedConfig } from './mocks.spec';
 
 const emailTestConfig = mockedConfig();
@@ -170,7 +169,6 @@ describe('emails', () => {
     it('should render an attestation required email', async () => {
       const app = getApprovedApplication();
       const email = await renderAttestationRequiredEmail(app, uiLinksStub, emailTestConfig);
-      console.log(email.emailMjml);
     });
 
     it('should render an application paused email', async () => {

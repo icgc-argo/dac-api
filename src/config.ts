@@ -19,7 +19,6 @@
 import * as dotenv from 'dotenv';
 import moment from 'moment';
 
-import logger from './logger';
 import { c } from './utils/misc';
 
 let currentConfig: AppConfig;
@@ -102,7 +101,7 @@ export interface KafkaConfigurations {
 
 const buildAppContext = (): AppConfig => {
   dotenv.config();
-  logger.info('building app context');
+  console.info('building app context');
 
   const config: AppConfig = {
     serverPort: process.env.PORT || '3000',
@@ -117,7 +116,7 @@ const buildAppContext = (): AppConfig => {
       kafkaClientId: process.env.KAFKA_CLIENT_ID || '',
       kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED === 'true' ? true : false,
     },
-    logLevel: String(process.env.LOG_LEVEL).toLowerCase() || 'debug',
+    logLevel: process.env.LOG_LEVEL || 'debug',
     auth: {
       enabled: process.env.AUTH_ENABLED !== 'false',
       jwtKeyUrl: process.env.JWT_KEY_URL || '',

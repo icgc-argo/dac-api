@@ -9,6 +9,7 @@ const mockConfig = {
   serverPort: '3000',
   basePath: '/',
   openApiPath: '/api-docs',
+  logLevel: 'debug',
   mongoProperties: {
     writeConcern: 'majority',
     writeAckTimeout: 5000,
