@@ -149,7 +149,6 @@ const stateToLockedSectionsMap: Record<
 
 // SYSTEM role is not allowed to do any modifications to collaborators or documents no matter what state the app is in
 // ADMIN role can add or delete collaborators and documents under certain conditions
-// ADMIN scope is checked first as it would supersede the SYSTEM scope if both are present (but ideally this should never be the case)
 function checkAppIsApprovedAndUserCanAmend(current: Application, identity: Identity): void {
   const isReviewer = hasReviewScope(identity);
   const isSystem = hasDacoSystemScope(identity);
