@@ -23,15 +23,28 @@ import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import moment from 'moment';
 import 'moment-timezone';
+import { uniqBy } from 'lodash';
 
 import { getAppConfig } from '../../config';
 import { ApplicationDocument, ApplicationModel } from '../model';
 import { ApplicationStateManager } from '../state';
-import { Application, ApplicationUpdate, ColumnHeader, UploadDocumentType } from '../interface';
+import {
+  Application,
+  ApplicationUpdate,
+  ApprovedUserRowData,
+  ColumnHeader,
+  PersonalInfo,
+  UploadDocumentType,
+  UserDataFromApprovedApplicationsResult,
+} from '../interface';
 import { Storage } from '../../storage';
 import logger from '../../logger';
 import { hasReviewScope } from '../../utils/permissions';
-import { findApplication, getApplicationUpdates } from './applications/search';
+import {
+  findApplication,
+  getApplicationUpdates,
+  getUsersFromApprovedApps,
+} from './applications/search';
 import { sendEthicsLetterSubmitted } from './emails';
 import { c } from '../../utils/misc';
 import { sortByDate } from '../../utils/calculations';
@@ -221,4 +234,75 @@ export const createAppHistoryTSV = async () => {
   });
 
   return [headerRow, ...tsvRows].join('\n');
+};
+
+function getUserChangedDate(
+  appData: UserDataFromApprovedApplicationsResult,
+  section: 'applicant' | 'collaborators',
+): Date {
+  return appData[section].meta.lastUpdatedAtUtc || appData.lastUpdatedAtUtc || new Date();
+}
+
+const parseApprovedUser = (
+  userInfo: PersonalInfo,
+  lastUpdatedAtUtc: Date,
+): ApprovedUserRowData => ({
+  userName: userInfo.displayName,
+  openId: userInfo.googleEmail,
+  email: userInfo.institutionEmail,
+  affiliation: userInfo.primaryAffiliation,
+  changed: moment(lastUpdatedAtUtc).format('YYYY-MM-DDTHH:mm'), // simple formatting until value of this field is verified
+});
+
+export const createDacoCSVFile = async (): Promise<string> => {
+  logger.info('Fetching applicant and collaborator info from all approved applications.');
+  const results = await getUsersFromApprovedApps();
+  const approvedAppsCount = results.length;
+  // applicant + collaborators get daco access
+  logger.info(
+    `Found applicant and collaborator info from ${approvedAppsCount} approved applications.`,
+  );
+  logger.info(`Parsing user info`);
+  const parsedResults = results
+    .map((appResult) => {
+      const applicantInfo = appResult.applicant.info;
+      const applicant = parseApprovedUser(
+        applicantInfo,
+        getUserChangedDate(appResult, 'applicant'),
+      );
+      const collabs = (appResult.collaborators.list || []).map((collab) =>
+        parseApprovedUser(collab.info, getUserChangedDate(appResult, 'collaborators')),
+      );
+      // maybe here can add the appId to a report item
+      // logger.debug(`Returning applicant and collaborators for ${appResult.appId}.`);
+      return [applicant, ...collabs];
+    })
+    .flat();
+
+  logger.info(
+    `Parsed info for ${parsedResults.length} users from ${approvedAppsCount} applications.`,
+  );
+  const fileHeaders: ColumnHeader[] = [
+    { accessor: 'userName', name: 'USER NAME' },
+    { accessor: 'openId', name: 'OPENID' },
+    { accessor: 'email', name: 'EMAIL' },
+    { accessor: 'changed', name: 'CHANGED' },
+    { accessor: 'affiliation', name: 'AFFILIATION' },
+  ];
+  const headerRow: string[] = fileHeaders.map((header) => header.name);
+
+  logger.info(`De-duplicating approved users list.`);
+  const uniqueApprovedUsers = uniqBy(parsedResults, 'openId');
+  logger.info(
+    `Retrieved ${uniqueApprovedUsers.length} unique approved users from ${approvedAppsCount} applications.`,
+  );
+  const approvedUsersRows = uniqueApprovedUsers.map((row: any) => {
+    const dataRow: string[] = fileHeaders.map((header) => {
+      // if value is missing, add empty string so the column has content
+      return row[header.accessor as string] || '';
+    });
+    return dataRow.join(',');
+  });
+
+  return [headerRow, ...approvedUsersRows].join('\n');
 };
