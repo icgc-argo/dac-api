@@ -2,10 +2,8 @@ import { Router, Request, Response, RequestHandler } from 'express';
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import moment from 'moment';
-import { Identity } from '@overture-stack/ego-token-middleware';
 import JSZip from 'jszip';
 import { isArray } from 'lodash';
-import { Readable } from 'stream';
 
 import wrapAsync from '../utils/wrapAsync';
 import { create, updatePartial } from '../domain/service/applications';
@@ -19,31 +17,28 @@ import {
   getApplicationAssetsAsStream,
   uploadDocument,
   createAppHistoryTSV,
+  createDacoCSVFile,
 } from '../domain/service/files';
-import { sendEmail } from '../domain/service/emails';
 import {
   deleteApp,
   getById,
   search,
   searchCollaboratorApplications,
+  getSearchParams,
 } from '../domain/service/applications/search';
 import { BadRequest } from '../utils/errors';
 import logger from '../logger';
 import {
   FileFormat,
+  IRequest,
   PauseReason,
   UpdateApplication,
   UploadDocumentType,
 } from '../domain/interface';
 import { AppConfig } from '../config';
 import { Storage } from '../storage';
-import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
 import runAllJobs from '../jobs/runAllJobs';
-import getAppSecrets from '../secrets';
-
-export interface IRequest extends Request {
-  identity: Identity;
-}
+import { sendEncryptedApprovedUsersEmail } from '../jobs/egaEmail';
 
 const createApplicationsRouter = (
   config: AppConfig,
@@ -251,7 +246,7 @@ const createApplicationsRouter = (
       // other formats may be added in future but for now only handling DACO_FILE_FORMAT type, all else will return 400
       if (fileFormat === FileFormat.DACO_FILE_FORMAT) {
         // createCSV
-        const csv = await createDacoCSVFile(req);
+        const csv = await createDacoCSVFile();
         const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DDTHH:mm');
         res.set('Content-Type', 'text/csv');
         res.status(200).attachment(`daco-users-${currentDate}.csv`).send(csv);
@@ -265,57 +260,12 @@ const createApplicationsRouter = (
     '/jobs/export-and-email/',
     authFilter([config.auth.reviewScope]),
     wrapAsync(async (req: Request, res: Response) => {
-      // generate CSV file from approved users
-      const csv = await createDacoCSVFile(req);
-      // encrypt csv content, return {content, iv}
-      const secrets = await getAppSecrets();
       try {
-        // encrypt the contents
-        const encrypted = await encrypt(csv, secrets.auth.dacoEncryptionKey);
-
-        // build streams to zip later
-        const ivStream = new Readable();
-        ivStream.push(encrypted.iv);
-        // tslint:disable-next-line:no-null-keyword
-        ivStream.push(null);
-        const contentStream = new Readable();
-        contentStream.push(encrypted.content);
-        // tslint:disable-next-line:no-null-keyword
-        contentStream.push(null);
-
-        // build the zip package
-        const zip = new JSZip();
-        [
-          { name: 'iv.txt', stream: ivStream },
-          { name: 'approved_users.csv.enc', stream: contentStream },
-        ].forEach((a) => {
-          zip.file(a.name, a.stream);
-        });
-        const zipFileOut = await zip.generateAsync({
-          type: 'nodebuffer',
-        });
-        const zipName = `icgc_daco_users.zip`;
-
-        // send the email
-        sendEmail(
-          emailClient,
-          config.email.fromAddress,
-          config.email.fromName,
-          new Set([config.email.dccMailingList]),
-          'Approved DACO Users',
-          `find the attached zip package`,
-          undefined,
-          [
-            {
-              filename: zipName,
-              content: zipFileOut,
-              contentType: 'application/zip',
-            },
-          ],
-        );
+        logger.info('Retrieving approved users list');
+        sendEncryptedApprovedUsersEmail(emailClient);
         return res.status(200).send('OK');
       } catch (err) {
-        logger.error('failed to export users and email them');
+        logger.error('Failed to export approved users and email them');
         logger.error(err);
         if (err instanceof Error) {
           return res.status(500).send(err.message);
@@ -429,6 +379,7 @@ const createApplicationsRouter = (
     '/jobs/batch-transitions/',
     authFilter([config.auth.dacoSystemScope]),
     wrapAsync(async (req: Request, res: Response) => {
+      // TODO: add new system role check here to reject user jwts with system permission
       // respond immediately so cron job doesn't time out
       res.status(200).send('Starting all batch jobs...');
 

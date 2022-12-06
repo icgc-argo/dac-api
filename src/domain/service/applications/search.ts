@@ -19,14 +19,24 @@
 
 import { Identity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
+import { Request } from 'express';
+import moment from 'moment';
 
 import { NotFound } from '../../../utils/errors';
 import { ApplicationDocument, ApplicationModel } from '../../model';
 import { ApplicationStateManager, wasInRevisionRequestState } from '../../state';
-import { ApplicationSummary, Collaborator, SearchResult, State } from '../../interface';
+import {
+  ApplicationSummary,
+  Collaborator,
+  PersonalInfo,
+  SearchResult,
+  State,
+  Sections,
+  UserDataFromApprovedApplicationsResult,
+} from '../../interface';
 
 import { getAttestationByDate, isAttestable, isRenewable } from '../../../utils/calculations';
-import { c, getLastPausedAtDate } from '../../../utils/misc';
+import { getLastPausedAtDate } from '../../../utils/misc';
 import { hasReviewScope } from '../../../utils/permissions';
 
 export type SearchParams = {
@@ -274,3 +284,52 @@ export async function findApplication(appId: string, identity: Identity) {
   }
   return appDoc;
 }
+
+export const getSearchParams = (req: Request, defaultSort?: string): SearchParams => {
+  const query = (req.query.query as string | undefined) || '';
+  const states = req.query.states ? ((req.query.states as string).split(',') as State[]) : [];
+  const page = Number(req.query.page) || 0;
+  const pageSize = Number(req.query.pageSize) || 25;
+  const sort = (req.query.sort as string | undefined) || defaultSort;
+  const includeStats = Boolean(req.query.includeStats === 'true') || false;
+  const sortBy = sort
+    ? sort.split(',').map((s) => {
+        const sortField = s.trim().split(':');
+        return { field: sortField[0].trim(), direction: sortField[1].trim() };
+      })
+    : [];
+
+  return {
+    query,
+    states,
+    page,
+    pageSize,
+    sortBy,
+    includeStats,
+  };
+};
+
+export const getUsersFromApprovedApps = async (): Promise<
+  UserDataFromApprovedApplicationsResult[]
+> => {
+  const query: FilterQuery<ApplicationDocument> = {
+    state: 'APPROVED',
+  };
+  // retrieve applicant + collaborators, only they get daco access
+  const results = await ApplicationModel.find(query, {
+    appId: 1,
+    'sections.applicant': 1,
+    'sections.collaborators': 1,
+    lastUpdatedAtUtc: 1,
+  }).exec();
+
+  return results.map((result) => {
+    const approvedUsersInfo: UserDataFromApprovedApplicationsResult = {
+      applicant: result.sections.applicant,
+      collaborators: result.sections.collaborators,
+      appId: result.appId,
+      lastUpdatedAtUtc: result.lastUpdatedAtUtc,
+    };
+    return approvedUsersInfo;
+  });
+};
