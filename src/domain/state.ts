@@ -233,7 +233,7 @@ export class ApplicationStateManager {
 
   addDocument(id: string, name: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
-    checkAppIsApprovedAndUserCanAmend;
+    checkAppIsApprovedAndUserCanAmend(current, identity);
 
     if (type == 'ETHICS') {
       uploadEthicsLetter(current, id, name, getUpdateAuthor(identity));
