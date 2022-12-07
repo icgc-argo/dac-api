@@ -38,7 +38,7 @@ import {
 import { AppConfig } from '../config';
 import { Storage } from '../storage';
 import runAllJobs from '../jobs/runAllJobs';
-import { sendEncryptedApprovedUsersEmail } from '../jobs/egaEmail';
+import { sendEncryptedApprovedUsersEmail } from '../jobs/approvedUsersEmail';
 
 const createApplicationsRouter = (
   config: AppConfig,

@@ -38,7 +38,7 @@ import {
   UserDataFromApprovedApplicationsResult,
 } from '../interface';
 import { Storage } from '../../storage';
-import logger from '../../logger';
+import logger, { buildNamedLog } from '../../logger';
 import { hasReviewScope } from '../../utils/permissions';
 import {
   findApplication,
@@ -254,15 +254,23 @@ const parseApprovedUser = (
   changed: moment(lastUpdatedAtUtc).format('YYYY-MM-DDTHH:mm'), // simple formatting until value of this field is verified
 });
 
-export const createDacoCSVFile = async (): Promise<string> => {
-  logger.info('Fetching applicant and collaborator info from all approved applications.');
+export const createDacoCSVFile = async (jobName?: string): Promise<string> => {
+  logger.info(
+    buildNamedLog(
+      `Fetching applicant and collaborator info from all approved applications.`,
+      jobName,
+    ),
+  );
   const results = await getUsersFromApprovedApps();
   const approvedAppsCount = results.length;
   // applicant + collaborators get daco access
   logger.info(
-    `Found applicant and collaborator info from ${approvedAppsCount} approved applications.`,
+    buildNamedLog(
+      `Found applicant and collaborator info from ${approvedAppsCount} approved applications.`,
+      jobName,
+    ),
   );
-  logger.info(`Parsing user info`);
+  logger.info(buildNamedLog(`Parsing user info results.`, jobName));
   const parsedResults = results
     .map((appResult) => {
       const applicantInfo = appResult.applicant.info;
@@ -273,14 +281,15 @@ export const createDacoCSVFile = async (): Promise<string> => {
       const collabs = (appResult.collaborators.list || []).map((collab) =>
         parseApprovedUser(collab.info, getUserChangedDate(appResult, 'collaborators')),
       );
-      // maybe here can add the appId to a report item
-      // logger.debug(`Returning applicant and collaborators for ${appResult.appId}.`);
       return [applicant, ...collabs];
     })
     .flat();
 
   logger.info(
-    `Parsed info for ${parsedResults.length} users from ${approvedAppsCount} applications.`,
+    buildNamedLog(
+      `Parsed info for ${parsedResults.length} users from ${approvedAppsCount} applications.`,
+      jobName,
+    ),
   );
   const fileHeaders: ColumnHeader[] = [
     { accessor: 'userName', name: 'USER NAME' },
@@ -291,10 +300,13 @@ export const createDacoCSVFile = async (): Promise<string> => {
   ];
   const headerRow: string[] = fileHeaders.map((header) => header.name);
 
-  logger.info(`De-duplicating approved users list.`);
+  logger.info(buildNamedLog(`De-duplicating approved users list.`, jobName));
   const uniqueApprovedUsers = uniqBy(parsedResults, 'openId');
   logger.info(
-    `Retrieved ${uniqueApprovedUsers.length} unique approved users from ${approvedAppsCount} applications.`,
+    buildNamedLog(
+      `Retrieved ${uniqueApprovedUsers.length} unique approved users from ${approvedAppsCount} applications.`,
+      jobName,
+    ),
   );
   const approvedUsersRows = uniqueApprovedUsers.map((row: any) => {
     const dataRow: string[] = fileHeaders.map((header) => {

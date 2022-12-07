@@ -6,6 +6,7 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import logger from '../logger';
 import attestationRequiredNotification from './attestationRequiredNotification';
 import runPauseAppsCheck from './pauseAppCheck';
+import approvedUsersEmail from './approvedUsersEmail';
 import { Report, JobReport } from './types';
 
 const JOB_NAME = 'ALL BATCH JOBS';
@@ -24,7 +25,11 @@ export default async function (
       emailClient,
     );
     const pausedAppReport = await runPauseAppsCheck(currentDate, emailClient, user);
-
+    // TODO: const expiryNotification1Report
+    // TODO: const expiryNotification2Report
+    // TODO: const expiredAppsReport
+    // TODO: const closedAppsReport
+    const approvedUsersEmailReport = await approvedUsersEmail(emailClient);
     // define report to collect all affected appIds
     // each job will return its own report
     // this function will build a complete summary
@@ -44,6 +49,8 @@ export default async function (
       expiryNotifications1: getReportToBeImplemented('FIRST EXPIRY NOTIFICATIONS'),
       expiryNotifications2: getReportToBeImplemented('SECOND EXPIRY NOTIFICATIONS'),
       expiredApps: getReportToBeImplemented('EXPIRING APPLICATIONS'),
+      closedApps: getReportToBeImplemented('CLOSING EXPIRED APPLICATIONS'),
+      approvedUsers: approvedUsersEmailReport,
     };
     logger.info(`${JOB_NAME} - Logging report`);
     logger.info(`${JOB_NAME} - ${JSON.stringify(completeReport)}`);
@@ -52,6 +59,4 @@ export default async function (
     logger.error(`${JOB_NAME} - failed with error: ${err}`);
     logger.error(`${JOB_NAME} - ${err as Error}`);
   }
-
-  // TODO: add DACO report step to finish (existing cron job will reach out to this endpoint only)
 }

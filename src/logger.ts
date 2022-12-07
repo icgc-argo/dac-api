@@ -24,7 +24,7 @@ const options: LoggerOptions = {
   format: combine(
     colorize(),
     timestamp(),
-    printf(info => `${info.timestamp} ${info.level}: ${info.message}`),
+    printf((info) => `${info.timestamp} ${info.level}: ${info.message}`),
   ),
   transports: [
     new transports.Console({
@@ -38,6 +38,10 @@ const logger = createLogger(options);
 
 if (process.env.NODE_ENV !== 'production') {
   logger.debug('Logging initialized at debug level');
+}
+
+export function buildNamedLog(message: string, name?: string): string {
+  return `${name ? `${name} - ` : ''}${message}`;
 }
 
 export default logger;

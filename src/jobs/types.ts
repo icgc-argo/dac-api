@@ -35,4 +35,6 @@ export interface Report {
   attestationNotifications: JobReport<BatchJobDetails>;
   expiryNotifications1: JobReport<BatchJobDetails>;
   expiryNotifications2: JobReport<BatchJobDetails>;
+  closedApps: JobReport<BatchJobDetails>;
+  approvedUsers: JobReport<void>;
 }
