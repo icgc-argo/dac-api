@@ -296,6 +296,15 @@ export type RevisionSections =
   | 'general';
 export type RevisionRequestUpdate = Partial<Record<RevisionSections, RevisionRequest>>;
 
+export interface NotificationSentFlags {
+  attestationRequiredNotificationSent?: boolean;
+  applicationPausedNotificationSent?: boolean;
+  firstExpiryNotificationSent?: boolean;
+  secondExpiryNotificationSent?: boolean;
+  applicationExpiredNotificationSent?: boolean;
+  applicationClosedNotificationSent?: boolean;
+}
+
 export interface UpdateApplication {
   state?: State;
   expiresAtUtc?: Date;
@@ -344,6 +353,7 @@ export interface UpdateApplication {
       signedAppDocObjId: string;
     };
   };
+  emailNotifications?: NotificationSentFlags;
 }
 
 export enum FileFormat {
@@ -356,7 +366,7 @@ export type ColumnHeader = {
   format?: (value: any) => any;
 };
 
-export const TERMS_AGREEMENT_NAME = 'introduction_agree_to_terms';
+// agreements constants
 export const IT_AGREEMENT_SOFTWARE_UPDATES = 'it_agreement_software_updates';
 export const IT_AGREEMENT_PROTECT_DATA = 'it_agreement_protect_data';
 export const IT_AGREEMENT_MONITOR_ACCESS = 'it_agreement_monitor_access';

@@ -40,6 +40,8 @@ import { Storage } from '../storage';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
 import runAllJobs from '../jobs/runAllJobs';
 import getAppSecrets from '../secrets';
+import { getAttestableQuery } from '../jobs/attestationRequiredNotification';
+import { ApplicationModel } from '../domain/model';
 
 export interface IRequest extends Request {
   identity: Identity;
@@ -345,6 +347,11 @@ const createApplicationsRouter = (
       logger.info(
         `fetching application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
       );
+      const now = new Date();
+      const query = getAttestableQuery(config, now);
+      console.log(query);
+      const stuff = await ApplicationModel.find(query).exec();
+      console.log(stuff);
       const result = await getById(validatedId, (req as IRequest).identity);
       if (!result) {
         return res.status(404).send();

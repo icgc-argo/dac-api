@@ -10,6 +10,13 @@ import { Report, JobReport } from './types';
 
 const JOB_NAME = 'ALL BATCH JOBS';
 
+// today lands between (approval + 1 year) to (approval + 1 year) - 45 days --> attestation required. state APPROVED
+// today lands between (approval + 1 year) to (expiry) --> app pausing
+// today lands between expiry - 90 days to expiry - 45 days --> first renewal notice. state APPROVED or PAUSED
+// todays lands between expiry - 45 days to expiry --> second renewal notice. state APPROVED or PAUSED
+// today lands between expiry and expiry + 90 days --> app expiring. state EXPIRED
+// today lands on expiry or after --> app closing. state EXPIRED
+
 export default async function (
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
   user: Identity,
@@ -22,6 +29,7 @@ export default async function (
     const attestationNotificationReport = await attestationRequiredNotification(
       currentDate,
       emailClient,
+      user,
     );
     const pausedAppReport = await runPauseAppsCheck(currentDate, emailClient, user);
 

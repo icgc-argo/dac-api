@@ -1,3 +1,9 @@
+import { Identity } from '@overture-stack/ego-token-middleware';
+
+import { NotificationSentFlags, Application } from '../domain/interface';
+import { ApplicationModel } from '../domain/model';
+import { ApplicationStateManager } from '../domain/state';
+import { getUpdateAuthor } from '../utils/misc';
 import logger from '../logger';
 import {
   Report,
@@ -45,3 +51,29 @@ export const buildReportDetails = (
   };
   return details;
 };
+
+export async function setEmailSentFlag(
+  app: Application,
+  flag: keyof NotificationSentFlags,
+  identity: Identity,
+  jobName: string,
+): Promise<Application> {
+  const appObj = new ApplicationStateManager(app);
+  const notificationFieldName = `emailNotifications.${flag}`;
+  logger.info(`${jobName} - Email sent, setting ${notificationFieldName} flag.`);
+  const result = appObj.updateApp(
+    { [notificationFieldName]: true },
+    false,
+    getUpdateAuthor(identity.userId, false),
+  );
+  // save new app state in db
+  const updatedApp = await ApplicationModel.findOneAndUpdate({ appId: result.appId }, result, {
+    new: true,
+  }).exec();
+  if (updatedApp) {
+    logger.info(`${jobName} - ${notificationFieldName} flag set to TRUE`);
+    return updatedApp;
+  } else {
+    throw new Error(`${jobName} - Find and update operation failed for ${app.appId}.`);
+  }
+}

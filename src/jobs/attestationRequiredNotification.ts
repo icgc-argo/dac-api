@@ -8,11 +8,14 @@ import logger from '../logger';
 import { AppConfig, getAppConfig } from '../config';
 import { NOTIFICATION_UNIT_OF_TIME, REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { ApplicationDocument, ApplicationModel } from '../domain/model';
-import { Application } from '../domain/interface';
-import { buildReportDetails, getEmptyReportDetails } from './utils';
+import { Application, NotificationSentFlags } from '../domain/interface';
+import { buildReportDetails, getEmptyReportDetails, setEmailSentFlag } from './utils';
 import { sendAttestationRequiredEmail } from '../domain/service/emails';
 import { getDayRange } from '../utils/calculations';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
+import { Identity } from '@overture-stack/ego-token-middleware';
+import { ApplicationStateManager } from '../domain/state';
+import { getUpdateAuthor } from '../utils/misc';
 
 export const JOB_NAME = 'ATTESTATION REQUIRED NOTIFICATIONS';
 
@@ -20,11 +23,12 @@ export const JOB_NAME = 'ATTESTATION REQUIRED NOTIFICATIONS';
 async function attestationRequiredNotificationCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
+  user: Identity,
 ): Promise<JobReport<BatchJobDetails>> {
   const startedAt = new Date();
   try {
     logger.info(`${JOB_NAME} - Initiating...`);
-    const details = await getAttestableNotificationReportDetails(currentDate, emailClient);
+    const details = await getAttestableNotificationReportDetails(currentDate, emailClient, user);
     details.errors.length
       ? logger.warn(`${JOB_NAME} - Completed with errors.`)
       : logger.info(`${JOB_NAME} - Completed.`);
@@ -56,6 +60,7 @@ async function attestationRequiredNotificationCheck(
 const getAttestableNotificationReportDetails = async (
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
+  user: Identity,
 ): Promise<BatchJobDetails> => {
   const config = getAppConfig();
   const query = getAttestableQuery(config, currentDate);
@@ -77,7 +82,13 @@ const getAttestableNotificationReportDetails = async (
   const sendNotification = async (app: Application): Promise<JobResultForApplication> => {
     try {
       await sendAttestationRequiredEmail(app, config, emailClient);
-      return { success: true, app };
+      const updatedApp = await setEmailSentFlag(
+        app,
+        'attestationRequiredNotificationSent',
+        user,
+        JOB_NAME,
+      );
+      return { success: true, app: updatedApp };
     } catch (err: unknown) {
       // Error thrown in one of our async operations
       logger.error(
@@ -102,7 +113,7 @@ const getAttestableNotificationReportDetails = async (
   return attestationNotificationReport;
 };
 
-const getAttestableQuery = (
+export const getAttestableQuery = (
   config: AppConfig,
   currentDate: Date,
 ): FilterQuery<ApplicationDocument> => {
@@ -113,18 +124,22 @@ const getAttestableQuery = (
   } = config;
   // find all apps that are APPROVED with an approval date matching the configured time period minus configured daysToAttestation
   // default is 1 year less 45 days to match DACO
-  const attestationStartDate = moment(currentDate)
-    .subtract(count, unitOfTime)
-    .add(daysToAttestation, NOTIFICATION_UNIT_OF_TIME);
-  const approvalDayRange = getDayRange(attestationStartDate);
-  logger.info(
-    `${JOB_NAME} - Approval day period is ${approvalDayRange.$gte} to ${approvalDayRange.$lte}`,
-  );
+  const startDate = moment(currentDate).utc().subtract(count, unitOfTime);
+  const startOfRange = startDate.startOf('day').toDate();
+  const endOfRange = startDate
+    .add(daysToAttestation, NOTIFICATION_UNIT_OF_TIME)
+    .endOf('day')
+    .toDate();
+  logger.info(`${JOB_NAME} - Approval day period is ${startOfRange} to ${endOfRange}`);
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',
-    approvedAtUtc: approvalDayRange,
-    // tslint:disable-next-line:no-null-keyword
-    $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
+    approvedAtUtc: {
+      $gte: startOfRange,
+      $lte: endOfRange,
+    },
+    attestedAtUtc: { $exists: false }, // check the applicant has not already attested. Will only be undefined or a datestring
+    // check email has not already been sent. Should only be undefined or true. We do not set the value at all if the email op has failed on a previous run
+    'emailNotifications.attestationRequiredNotificationSent': { $exists: false },
   };
 
   return query;
