@@ -39,7 +39,6 @@ import {
 } from '../interface';
 import { Storage } from '../../storage';
 import logger, { buildNamedLog } from '../../logger';
-import { hasReviewScope } from '../../utils/permissions';
 import {
   findApplication,
   getApplicationUpdates,

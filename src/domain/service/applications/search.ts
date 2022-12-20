@@ -20,7 +20,6 @@
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
 import { Request } from 'express';
-import moment from 'moment';
 
 import { NotFound } from '../../../utils/errors';
 import { ApplicationDocument, ApplicationModel } from '../../model';
@@ -28,10 +27,8 @@ import { ApplicationStateManager, wasInRevisionRequestState } from '../../state'
 import {
   ApplicationSummary,
   Collaborator,
-  PersonalInfo,
   SearchResult,
   State,
-  Sections,
   UserDataFromApprovedApplicationsResult,
 } from '../../interface';
 

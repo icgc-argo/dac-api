@@ -2,7 +2,7 @@ import { Router, Request, Response, RequestHandler, NextFunction } from 'express
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import moment from 'moment';
-import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
+import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import JSZip from 'jszip';
 import { isArray } from 'lodash';
 
@@ -40,7 +40,6 @@ import { AppConfig } from '../config';
 import { Storage } from '../storage';
 import runAllJobs from '../jobs/runAllJobs';
 import { sendEncryptedApprovedUsersEmail } from '../jobs/approvedUsersEmail';
-import getAppSecrets from '../secrets';
 import { isUserJwt } from '../utils/permissions';
 
 const createApplicationsRouter = (
