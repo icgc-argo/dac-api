@@ -101,7 +101,6 @@ export interface KafkaConfigurations {
 
 const buildAppContext = (): AppConfig => {
   dotenv.config();
-  console.info('building app context');
 
   const config: AppConfig = {
     serverPort: process.env.PORT || '3000',
@@ -125,7 +124,7 @@ const buildAppContext = (): AppConfig => {
       dacoSystemScope: process.env.DACO_SYSTEM_SCOPE || 'DACO-SYSTEM.WRITE',
     },
     ui: {
-      baseUrl: process.env.DACO_UI_BASE_URL || 'https://daco.icgc-argo.org', // used for email links only
+      baseUrl: c(process.env.DACO_UI_BASE_URL), // used for email links only
       sectionPath:
         process.env.DACO_UI_APPLICATION_SECTION_PATH || '/applications/{id}?section={section}',
     },

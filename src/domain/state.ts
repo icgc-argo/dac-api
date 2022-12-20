@@ -63,7 +63,7 @@ import {
   validateProjectInfo,
   validateRepresentativeSection,
 } from './validations';
-import { BadRequest, ConflictError, NotFound } from '../utils/errors';
+import { BadRequest, ConflictError, Forbidden, NotFound } from '../utils/errors';
 import { getAppConfig } from '../config';
 import {
   getAttestationByDate,
@@ -153,7 +153,7 @@ function checkAppIsApprovedAndUserCanAmend(current: Application, identity: Ident
   const isReviewer = hasReviewScope(identity);
   const isSystem = hasDacoSystemScope(identity);
   if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
-    throw new Error('not allowed');
+    throw new Forbidden('User cannot perform action in this application state.');
   }
 }
 
