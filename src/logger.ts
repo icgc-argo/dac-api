@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2022 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -19,25 +19,28 @@
 
 import { createLogger, LoggerOptions, transports, format } from 'winston';
 
+import { getAppConfig } from './config';
+
 const { combine, timestamp, colorize, printf } = format;
+
+const config = getAppConfig();
+const logLevel = config.logLevel;
+const isProduction = String(process.env.NODE_ENV).toLowerCase() === 'production';
+
+const fileTransport = new transports.File({ filename: 'debug.log', level: 'debug' });
+const consoleTransport = new transports.Console({
+  level: logLevel,
+});
 const options: LoggerOptions = {
   format: combine(
     colorize(),
     timestamp(),
-    printf(info => `${info.timestamp} ${info.level}: ${info.message}`),
+    printf((info) => `${info.timestamp} ${info.level}: ${info.message}`),
   ),
-  transports: [
-    new transports.Console({
-      level: process.env.NODE_ENV === 'production' ? 'error' : 'debug',
-    }),
-    new transports.File({ filename: 'debug.log', level: 'debug' }),
-  ],
+  transports: isProduction ? [consoleTransport] : [consoleTransport, fileTransport],
 };
 
 const logger = createLogger(options);
-
-if (process.env.NODE_ENV !== 'production') {
-  logger.debug('Logging initialized at debug level');
-}
+logger.info(`Logging initialized at ${logLevel} level`);
 
 export default logger;

@@ -1,6 +1,5 @@
 import { findLast, sortBy, uniqBy, cloneDeep, isArray } from 'lodash';
 import { Request } from 'express';
-import { Identity } from '@overture-stack/ego-token-middleware';
 import { createCipheriv, randomBytes } from 'crypto';
 import moment from 'moment';
 
@@ -9,8 +8,6 @@ import {
   PersonalInfo,
   ApplicationSummary,
   ColumnHeader,
-  DacoRole,
-  UpdateAuthor,
   Application,
   UpdateEvent,
 } from '../domain/interface';
@@ -22,7 +19,6 @@ import {
   EMAIL_CONTENT_ENCODING,
   IV_LENGTH,
 } from './constants';
-import { hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -162,21 +158,6 @@ export const encrypt: (
     console.error('Encryption failure: ', err);
     throw new Error('Encryption failure');
   }
-};
-
-// TODO: update to handle SYSTEM role
-export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor = (
-  id,
-  isReviewer,
-) => ({
-  id,
-  role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
-});
-
-export const getDacoRole: (identity: Identity) => Promise<DacoRole> = async (identity) => {
-  const isSystem = await hasDacoSystemScope(identity);
-  const isAdmin = await hasReviewScope(identity);
-  return isSystem ? DacoRole.SYSTEM : isAdmin ? DacoRole.ADMIN : DacoRole.SUBMITTER;
 };
 
 export const getLastPausedAtDate = (app: Application): Date | undefined => {

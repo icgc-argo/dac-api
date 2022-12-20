@@ -30,7 +30,6 @@ import { ApplicationStateManager } from '../state';
 import { Application, ApplicationUpdate, ColumnHeader, UploadDocumentType } from '../interface';
 import { Storage } from '../../storage';
 import logger from '../../logger';
-import { hasReviewScope } from '../../utils/permissions';
 import { findApplication, getApplicationUpdates } from './applications/search';
 import { sendEthicsLetterSubmitted } from './emails';
 import { c } from '../../utils/misc';
@@ -43,23 +42,17 @@ export async function deleteDocument(
   identity: Identity,
   storageClient: Storage,
 ) {
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.deleteDocument(
-    objectId,
-    type,
-    identity.userId,
-    isAdminOrReviewerResult,
-  );
+  const result = stateManager.deleteDocument(objectId, type, identity);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
   const updated = await findApplication(c(result.appId), identity);
-  const viewAbleApplication = new ApplicationStateManager(
+  const viewableApplication = new ApplicationStateManager(
     updated.toObject(),
   ).prepareApplicationForUser(false);
-  return viewAbleApplication;
+  return viewableApplication;
 }
 
 export async function uploadDocument(
@@ -71,7 +64,6 @@ export async function uploadDocument(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const config = getAppConfig();
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
 
@@ -92,13 +84,7 @@ export async function uploadDocument(
 
   const id = await storageClient.upload(file, existingId);
   const stateManager = new ApplicationStateManager(appDocObj);
-  const result = stateManager.addDocument(
-    id,
-    file.name,
-    type,
-    identity.userId,
-    isAdminOrReviewerResult,
-  );
+  const result = stateManager.addDocument(id, file.name, type, identity);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   const updated = await findApplication(c(result.appId), identity);
 
@@ -108,10 +94,10 @@ export async function uploadDocument(
     }
   }
 
-  const viewAbleApplication = new ApplicationStateManager(
+  const viewableApplication = new ApplicationStateManager(
     updated.toObject(),
   ).prepareApplicationForUser(false);
-  return viewAbleApplication;
+  return viewableApplication;
 }
 
 export async function getApplicationAssetsAsStream(
