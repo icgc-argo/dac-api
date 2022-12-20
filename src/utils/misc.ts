@@ -1,8 +1,6 @@
 import { findLast, sortBy, cloneDeep, isArray } from 'lodash';
-import { Identity } from '@overture-stack/ego-token-middleware';
 
-import { DacoRole, UpdateAuthor, Application, UpdateEvent } from '../domain/interface';
-import { hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
+import { Application, UpdateEvent } from '../domain/interface';
 
 export function c<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
@@ -39,21 +37,6 @@ const _mergeKnown = (a: any, b: any) => {
       _mergeKnown(a[k], b[k]);
     }
   });
-};
-
-// TODO: update to handle SYSTEM role
-export const getUpdateAuthor: (id: string, isReviewer: boolean) => UpdateAuthor = (
-  id,
-  isReviewer,
-) => ({
-  id,
-  role: isReviewer ? DacoRole.ADMIN : DacoRole.SUBMITTER,
-});
-
-export const getDacoRole: (identity: Identity) => Promise<DacoRole> = async (identity) => {
-  const isSystem = await hasDacoSystemScope(identity);
-  const isAdmin = await hasReviewScope(identity);
-  return isSystem ? DacoRole.SYSTEM : isAdmin ? DacoRole.ADMIN : DacoRole.SUBMITTER;
 };
 
 export const getLastPausedAtDate = (app: Application): Date | undefined => {

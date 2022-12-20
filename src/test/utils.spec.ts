@@ -1,10 +1,9 @@
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
 import moment from 'moment';
 
 import { cloneDeep } from 'lodash';
 import { newApplication } from '../domain/state';
-import { AppConfig } from '../config';
 import { getDaysElapsed, isAttestable, isRenewable } from '../utils/calculations';
 import {
   getAppInReview,
@@ -17,17 +16,9 @@ import {
   getRejectedApplication,
 } from './state.spec';
 import { Application } from '../domain/interface';
+import { mockApplicantToken } from './mocks.spec';
 
-const newApplication1: Partial<Application> = newApplication({
-  userId: 'abc123',
-  tokenInfo: {
-    context: {
-      user: {
-        email: 'test@example.com',
-      },
-    },
-  },
-} as Identity);
+const newApplication1: Partial<Application> = newApplication(mockApplicantToken as UserIdentity);
 
 describe('utils', () => {
   describe('daysElapsed', () => {
@@ -103,18 +94,6 @@ describe('utils', () => {
   });
 
   describe('isRenewable', () => {
-    const mockRenewalConfig = {
-      durations: {
-        expiry: {
-          daysToExpiry1: 90,
-          daysToExpiry2: 45,
-          daysPostExpiry: 90,
-          count: 150,
-          unitOfTime: 'days',
-        },
-      },
-    } as AppConfig;
-
     it('should not be renewable in CLOSED after approval state', () => {
       const closedApp = getClosedAfterApprovalApplication();
       const canRenew = isRenewable(closedApp);

@@ -10,7 +10,7 @@ import { AppConfig, getAppConfig } from '../config';
 import { ApplicationModel, ApplicationDocument } from '../domain/model';
 import { Application, PauseReason } from '../domain/interface';
 import { ApplicationStateManager } from '../domain/state';
-import { getDacoRole } from '../utils/misc';
+import { getDacoRole } from '../utils/permissions';
 import { REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { onStateChange } from '../domain/service/applications';
 import { buildReportDetails, getEmptyReportDetails } from './utils';
@@ -74,7 +74,7 @@ const pauseApplication = async (
 ): Promise<Application> => {
   // set app in state
   const appObj = new ApplicationStateManager(currentApp);
-  const role = await getDacoRole(identity);
+  const role = getDacoRole(identity);
   logger.info(
     `${JOB_NAME} - Role ${role} is trying to PAUSE appId ${currentApp.appId} with pause reason ${reason}`,
   );

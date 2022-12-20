@@ -17,17 +17,47 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { Identity, UserIdentity, ApplicationIdentity } from '@overture-stack/ego-token-middleware';
+
+import { DacoRole, UpdateAuthor } from '../domain/interface';
 import { getAppConfig } from '../config';
 
-export async function hasReviewScope(identity: Identity) {
+export const isUserJwt = (identity: Identity): identity is UserIdentity =>
+  identity.tokenInfo.context.hasOwnProperty('user');
+export const isApplicationJwt = (identity: Identity): identity is ApplicationIdentity =>
+  identity.tokenInfo.context.hasOwnProperty('application');
+
+export function hasReviewScope(identity: Identity) {
+  // only user JWTs are allowed as Admins
+  if (isApplicationJwt(identity)) {
+    return false;
+  }
   const REVIEW_SCOPE = getAppConfig().auth.reviewScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((v) => v == REVIEW_SCOPE);
 }
 
-export async function hasDacoSystemScope(identity: Identity) {
+export function hasDacoSystemScope(identity: Identity) {
+  // only application JWTs are allowed as System actors
+  if (isUserJwt(identity)) {
+    return false;
+  }
+
   const DACO_SYSTEM_SCOPE = getAppConfig().auth.dacoSystemScope;
   const scopes = identity.tokenInfo.context.scope;
   return scopes.some((scope) => scope === DACO_SYSTEM_SCOPE);
 }
+
+export const getUpdateAuthor = (identity: Identity): UpdateAuthor => ({
+  id: identity.userId,
+  role: getDacoRole(identity),
+});
+
+// A user can have only one role.
+// admin and system scope checks verify a jwt type (user or application) matches the provided scopes
+// a regular user has neither system nor admin scope
+export const getDacoRole: (identity: Identity) => DacoRole = (identity) => {
+  const isSystem = hasDacoSystemScope(identity);
+  const isAdmin = hasReviewScope(identity);
+  return isSystem ? DacoRole.SYSTEM : isAdmin ? DacoRole.ADMIN : DacoRole.SUBMITTER;
+};

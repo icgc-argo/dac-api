@@ -1,6 +1,27 @@
+/*
+ * Copyright (c) 2022 The Ontario Institute for Cancer Research. All rights reserved
+ *
+ * This program and the accompanying materials are made available under the terms of
+ * the GNU Affero General Public License v3.0. You should have received a copy of the
+ * GNU Affero General Public License along with this program.
+ *  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+ * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 import moment from 'moment';
 import 'moment-timezone';
 import { cloneDeep, last } from 'lodash';
+import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
+
 import {
   Application,
   IT_AGREEMENT_PROTECT_DATA,
@@ -33,7 +54,6 @@ import {
   DacoRole,
   PauseReason,
 } from './interface';
-import { Identity } from '@overture-stack/ego-token-middleware';
 import {
   validateAppendices,
   validateApplicantSection,
@@ -43,15 +63,16 @@ import {
   validateProjectInfo,
   validateRepresentativeSection,
 } from './validations';
-import { BadRequest, ConflictError, NotFound } from '../utils/errors';
-import { AppConfig, getAppConfig } from '../config';
+import { BadRequest, ConflictError, Forbidden, NotFound } from '../utils/errors';
+import { getAppConfig } from '../config';
 import {
   getAttestationByDate,
   getDaysElapsed,
   isAttestable,
   isRenewable,
 } from '../utils/calculations';
-import { getLastPausedAtDate, getUpdateAuthor, mergeKnown } from '../utils/misc';
+import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
+import { getUpdateAuthor, hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -126,6 +147,16 @@ const stateToLockedSectionsMap: Record<
   },
 };
 
+// SYSTEM role is not allowed to do any modifications to collaborators or documents no matter what state the app is in
+// ADMIN role can add or delete collaborators and documents under certain conditions
+function checkAppIsApprovedAndUserCanAmend(current: Application, identity: Identity): void {
+  const isReviewer = hasReviewScope(identity);
+  const isSystem = hasDacoSystemScope(identity);
+  if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
+    throw new Forbidden('User cannot perform action in this application state.');
+  }
+}
+
 export class ApplicationStateManager {
   public readonly currentApplication: Application;
 
@@ -178,18 +209,13 @@ export class ApplicationStateManager {
     return this.currentApplication;
   }
 
-  deleteDocument(
-    objectId: string,
-    type: UploadDocumentType,
-    updatedBy: string,
-    isReviewer: boolean,
-  ) {
+  deleteDocument(objectId: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
-    if (isReviewer && current.state !== 'APPROVED') {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend(current, identity);
+    const isReviewer = hasReviewScope(identity);
+
     if (type == 'ETHICS') {
-      return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(updatedBy, isReviewer));
+      return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(identity));
     }
 
     if (type == 'SIGNED_APP' && current.state == 'SIGN AND SUBMIT') {
@@ -205,20 +231,12 @@ export class ApplicationStateManager {
     throw new BadRequest('Operation not allowed');
   }
 
-  addDocument(
-    id: string,
-    name: string,
-    type: UploadDocumentType,
-    updatedBy: string,
-    isReviewer: boolean,
-  ) {
+  addDocument(id: string, name: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
-    if (isReviewer && current.state !== 'APPROVED') {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend(current, identity);
 
     if (type == 'ETHICS') {
-      uploadEthicsLetter(current, id, name, getUpdateAuthor(updatedBy, isReviewer));
+      uploadEthicsLetter(current, id, name, getUpdateAuthor(identity));
       return current;
     }
 
@@ -235,6 +253,7 @@ export class ApplicationStateManager {
     }
 
     if (type === 'APPROVED_PDF') {
+      const isReviewer = hasReviewScope(identity);
       if (current.state === 'APPROVED' && isReviewer) {
         const currentApprovedDoc = current.approvedAppDocs.find((doc) => doc.isCurrent);
         if (currentApprovedDoc) {
@@ -270,11 +289,10 @@ export class ApplicationStateManager {
     throw new BadRequest('Unknown file type');
   }
 
-  deleteCollaborator(collaboratorId: string, updatedBy: string, isReviewer: boolean) {
+  deleteCollaborator(collaboratorId: string, identity: Identity) {
     const current = this.currentApplication;
-    if (isReviewer && current.state !== 'APPROVED') {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend(current, identity);
+
     current.sections.collaborators.list = current.sections.collaborators.list.filter(
       (c) => c.id?.toString() !== collaboratorId,
     );
@@ -287,7 +305,7 @@ export class ApplicationStateManager {
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
-      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(identity));
     } else if (current.state == 'DRAFT') {
       // This is to handle the scenario where changing the primary affiliation in applicant section in an application that is in the state 'SIGN & SUBMIT'
       // will invalidate the collaborators section
@@ -370,11 +388,10 @@ export class ApplicationStateManager {
     return current;
   }
 
-  addCollaborator(collaborator: CollaboratorDto, updatedBy: string, isReviewer: boolean) {
+  addCollaborator(collaborator: CollaboratorDto, identity: Identity) {
     const current = this.currentApplication;
-    if (isReviewer && current.state !== 'APPROVED') {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend(current, identity);
+
     const defaultCollaboratorInfo = {
       title: '',
       firstName: '',
@@ -460,7 +477,7 @@ export class ApplicationStateManager {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
       // trigger transition in application state and sign and submit check
-      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(identity));
     }
 
     onAppUpdate(current);
@@ -471,7 +488,7 @@ export class ApplicationStateManager {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
-        updateAppStateForApprovedApplication(current, updatePart, isReviewer, updatedBy, false);
+        updateAppStateForApprovedApplication(current, updatePart, updatedBy, false);
         break;
 
       case 'REVISIONS REQUESTED':
@@ -573,7 +590,8 @@ export function getSearchFieldValues(appDoc: Application) {
   ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
 }
 
-export function newApplication(identity: Identity): Partial<Application> {
+// new applications can only be created by user jwt identities
+export function newApplication(identity: UserIdentity): Partial<Application> {
   const pristineMeta = {
     status: 'PRISTINE' as SectionStatus,
     errorsList: [],
@@ -674,7 +692,7 @@ export function newApplication(identity: Identity): Partial<Application> {
     ableToRenew: false,
   };
 
-  const author = getUpdateAuthor(identity.userId, false); // set to false as we already know user scopes have been checked
+  const author = getUpdateAuthor(identity);
   const createdEvent = createUpdateEvent(app as Application, author, UpdateEvent.CREATED);
   app.updates?.push(createdEvent);
 
@@ -747,7 +765,7 @@ function uploadEthicsLetter(
   } else if (current.state == 'REVISIONS REQUESTED') {
     updateAppStateForReturnedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'APPROVED') {
-    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, true);
+    updateAppStateForApprovedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'SIGN AND SUBMIT') {
     updateAppStateForSignAndSubmit(current, updatePart, updatedBy, true);
   } else {
@@ -1076,7 +1094,6 @@ function isReadyForReview(application: Application) {
 function updateAppStateForApprovedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
-  isReviewer: boolean,
   updatedBy: UpdateAuthor,
   updateDocs?: boolean,
 ) {
