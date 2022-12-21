@@ -346,6 +346,11 @@ export interface UpdateApplication {
   };
 }
 
+export interface SubmitterInfo {
+  userId: string;
+  email: string;
+}
+
 export enum FileFormat {
   DACO_FILE_FORMAT = 'daco-file-format',
 }
