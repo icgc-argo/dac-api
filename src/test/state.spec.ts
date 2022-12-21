@@ -1,6 +1,6 @@
 import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
-import { isDate, pick, cloneDeep, omit, get, every } from 'lodash';
+import { isDate, pick, cloneDeep, omit, get, every, set } from 'lodash';
 import moment, { unitOfTime } from 'moment';
 
 import {
@@ -13,7 +13,7 @@ import {
   UpdateApplication,
 } from '../domain/interface';
 import { ApplicationStateManager, newApplication } from '../domain/state';
-import { BadRequest, ConflictError } from '../utils/errors';
+import { BadRequest, ConflictError, Forbidden } from '../utils/errors';
 import { c } from '../utils/misc';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 import { mockApplicantToken, mockedConfig } from './mocks.spec';
@@ -59,6 +59,16 @@ function appWithMockExpiryDate(
 }
 
 describe('state manager', () => {
+  it('should fail to create an application without submitter email', () => {
+    const userWithNoEmail = cloneDeep(mockApplicantToken);
+    set(userWithNoEmail, 'tokenInfo.context.user.email', undefined);
+    expect(get(userWithNoEmail, 'tokenInfo.context.user.email')).to.be.undefined;
+    expect(() => newApplication(userWithNoEmail as UserIdentity)).to.throw(
+      Forbidden,
+      'A submitter email is required to create a new application.',
+    );
+  });
+
   it('should update applicant info', () => {
     const emptyApp: Application = cloneDeep({
       ...newApplication1,
