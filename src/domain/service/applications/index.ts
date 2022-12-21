@@ -43,12 +43,12 @@ import {
 } from '../emails';
 import { findApplication } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
-import { throwApplicationClosedError } from '../../../utils/errors';
+import { Forbidden, throwApplicationClosedError } from '../../../utils/errors';
 
 export async function create(identity: UserIdentity) {
   const isAdminOrReviewerResult = hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
+    throw new Forbidden('User is not allowed to perform this action');
   }
   const app = newApplication(identity);
   const appDoc = await ApplicationModel.create(app);
