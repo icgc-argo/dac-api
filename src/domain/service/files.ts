@@ -32,7 +32,7 @@ import { Storage } from '../../storage';
 import logger from '../../logger';
 import { findApplication, getApplicationUpdates } from './applications/search';
 import { sendEthicsLetterSubmitted } from './emails';
-import { c } from '../../utils/misc';
+import { checkIsDefined } from '../../utils/misc';
 import { sortByDate } from '../../utils/calculations';
 
 export async function deleteDocument(
@@ -48,7 +48,7 @@ export async function deleteDocument(
   const result = stateManager.deleteDocument(objectId, type, identity);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
   await storageClient.delete(objectId);
-  const updated = await findApplication(c(result.appId), identity);
+  const updated = await findApplication(checkIsDefined(result.appId), identity);
   const viewableApplication = new ApplicationStateManager(
     updated.toObject(),
   ).prepareApplicationForUser(false);
@@ -86,7 +86,7 @@ export async function uploadDocument(
   const stateManager = new ApplicationStateManager(appDocObj);
   const result = stateManager.addDocument(id, file.name, type, identity);
   await ApplicationModel.updateOne({ appId: result.appId }, result);
-  const updated = await findApplication(c(result.appId), identity);
+  const updated = await findApplication(checkIsDefined(result.appId), identity);
 
   if (updated.state == 'APPROVED') {
     if (type == 'ETHICS') {

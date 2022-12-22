@@ -14,7 +14,7 @@ import {
 } from '../domain/interface';
 import { ApplicationStateManager, newApplication } from '../domain/state';
 import { BadRequest, ConflictError, Forbidden } from '../utils/errors';
-import { c } from '../utils/misc';
+import { checkIsDefined } from '../utils/misc';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 import { mockApplicantToken, mockedConfig } from './mocks.spec';
 
@@ -705,13 +705,13 @@ export function getReadyToSignApp() {
     appNumber: 1,
   }) as Application;
   const updatePart: UpdateApplication['sections'] = pick(cloneDeep(app), 'sections').sections;
-  c(updatePart.applicant).info = getRandomInfo();
-  c(updatePart.applicant).address = getAddress();
-  c(updatePart.representative).address = getAddress();
-  c(updatePart.representative).info = omit(getRandomInfo(), 'googleEmail');
-  c(updatePart.dataAccessAgreement).agreements.forEach((ag) => (ag.accepted = true));
-  c(updatePart.appendices).agreements.forEach((ag) => (ag.accepted = true));
-  c(updatePart.ethicsLetter).declaredAsRequired = false;
+  checkIsDefined(updatePart.applicant).info = getRandomInfo();
+  checkIsDefined(updatePart.applicant).address = getAddress();
+  checkIsDefined(updatePart.representative).address = getAddress();
+  checkIsDefined(updatePart.representative).info = omit(getRandomInfo(), 'googleEmail');
+  checkIsDefined(updatePart.dataAccessAgreement).agreements.forEach((ag) => (ag.accepted = true));
+  checkIsDefined(updatePart.appendices).agreements.forEach((ag) => (ag.accepted = true));
+  checkIsDefined(updatePart.ethicsLetter).declaredAsRequired = false;
   const exactly100words =
     'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum in ex tellus. Vestibulum blandit egestas pharetra. Proin porttitor hendrerit ligula. Aliquam mattis in elit nec dictum. Nam ante neque, cursus ac tortor sit amet, faucibus lacinia metus. Integer vestibulum nulla mauris, a iaculis nisl auctor et. Suspendisse potenti. Nulla porttitor orci ac sapien feugiat, eu rhoncus ante iaculis. Vestibulum id neque sit amet mauris molestie dictum in sit amet odio. Integer mattis enim non ultrices aliquet. Aenean maximus leo lacus, in fringilla ex suscipit eget. Nam felis dolor, bibendum et lobortis sit amet, sodales eu orci. Nunc at elementum ex.';
   updatePart.projectInfo = {

@@ -19,7 +19,7 @@
 import * as dotenv from 'dotenv';
 import moment from 'moment';
 
-import { c } from './utils/misc';
+import { checkIsDefined } from './utils/misc';
 
 let currentConfig: AppConfig;
 
@@ -124,7 +124,7 @@ const buildAppContext = (): AppConfig => {
       dacoSystemScope: process.env.DACO_SYSTEM_SCOPE || 'DACO-SYSTEM.WRITE',
     },
     ui: {
-      baseUrl: c(process.env.DACO_UI_BASE_URL), // used for email links only
+      baseUrl: checkIsDefined(process.env.DACO_UI_BASE_URL), // used for email links only
       sectionPath:
         process.env.DACO_UI_APPLICATION_SECTION_PATH || '/applications/{id}?section={section}',
     },
@@ -135,8 +135,8 @@ const buildAppContext = (): AppConfig => {
       timeout: Number(process.env.OBJECT_STORAGE_TIMEOUT_MILLIS) || 5000,
     },
     email: {
-      host: c(process.env.EMAIL_HOST),
-      port: Number(c(process.env.EMAIL_PORT)),
+      host: checkIsDefined(process.env.EMAIL_HOST),
+      port: Number(checkIsDefined(process.env.EMAIL_PORT)),
       dacoAddress: process.env.EMAIL_DACO_ADDRESS || 'daco@icgc-argo.org',
       fromName: process.env.EMAIL_FROM_NAME || 'ICGC DACO',
       fromAddress: process.env.EMAIL_FROM_ADDRESS || 'no-reply-daco@icgc-argo.org',
