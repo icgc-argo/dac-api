@@ -1,8 +1,8 @@
-import { Router, Request, Response, RequestHandler } from 'express';
+import { Router, Request, Response, RequestHandler, NextFunction } from 'express';
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import moment from 'moment';
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 import JSZip from 'jszip';
 import { isArray } from 'lodash';
 import { Readable } from 'stream';
@@ -27,7 +27,7 @@ import {
   search,
   searchCollaboratorApplications,
 } from '../domain/service/applications/search';
-import { BadRequest } from '../utils/errors';
+import { BadRequest, Forbidden } from '../utils/errors';
 import logger from '../logger';
 import {
   FileFormat,
@@ -40,6 +40,7 @@ import { Storage } from '../storage';
 import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
 import runAllJobs from '../jobs/runAllJobs';
 import getAppSecrets from '../secrets';
+import { isUserJwt } from '../utils/permissions';
 
 export interface IRequest extends Request {
   identity: Identity;
@@ -157,10 +158,20 @@ const createApplicationsRouter = (
   router.post(
     '/applications/',
     authFilter([]),
-    wrapAsync(async (req: Request, res: Response) => {
-      logger.info(`creating new application [user id: ${(req as IRequest).identity.userId}]`);
-      const app = await create((req as IRequest).identity);
-      return res.status(201).send(app);
+    wrapAsync(async (req: Request, res: Response, next: NextFunction) => {
+      const identity = (req as IRequest).identity;
+      try {
+        const isValidUser = isUserJwt(identity);
+        if (isValidUser) {
+          logger.info(`creating new application [user id: ${identity.userId}]`);
+          const app = await create(identity as UserIdentity);
+          return res.status(201).send(app);
+        } else {
+          throw new Forbidden('Invalid user!');
+        }
+      } catch (err) {
+        next(err);
+      }
     }),
   );
 
@@ -418,10 +429,19 @@ const createApplicationsRouter = (
   router.get(
     '/collaborators/applications',
     authFilter([]),
-    wrapAsync(async (req: Request, res: Response) => {
+    wrapAsync(async (req: Request, res: Response, next: NextFunction) => {
       const user = (req as IRequest).identity;
-      const applications = await searchCollaboratorApplications(user);
-      return res.status(200).send(applications);
+      try {
+        const isValidUser = isUserJwt(user);
+        if (isValidUser) {
+          const applications = await searchCollaboratorApplications(user as UserIdentity);
+          return res.status(200).send(applications);
+        } else {
+          throw new Forbidden('Invalid user!');
+        }
+      } catch (err) {
+        next(err);
+      }
     }),
   );
 

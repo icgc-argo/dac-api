@@ -1,6 +1,7 @@
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
-import { isDate, pick, cloneDeep, omit, get, every } from 'lodash';
+import { isDate, pick, cloneDeep, omit, get, every, set } from 'lodash';
+import moment, { unitOfTime } from 'moment';
 
 import {
   Address,
@@ -12,40 +13,14 @@ import {
   UpdateApplication,
 } from '../domain/interface';
 import { ApplicationStateManager, newApplication } from '../domain/state';
-import { BadRequest, ConflictError } from '../utils/errors';
-import { c } from '../utils/misc';
-import { AppConfig } from '../config';
-import moment, { unitOfTime } from 'moment';
-import { isRenewable } from '../utils/calculations';
+import { BadRequest, ConflictError, Forbidden } from '../utils/errors';
+import { checkIsDefined } from '../utils/misc';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
+import { mockApplicantToken, mockedConfig } from './mocks.spec';
 
-const mockConfig = {
-  durations: {
-    attestation: {
-      count: 1,
-      unitOfTime: 'year',
-      daysToAttestation: 45,
-    },
-    expiry: {
-      daysToExpiry1: 90,
-      daysToExpiry2: 45,
-      daysPostExpiry: 90,
-      count: 1,
-      unitOfTime: 'year',
-    },
-  },
-} as AppConfig;
+const stateTestConfig = mockedConfig();
 
-const newApplication1: Partial<Application> = newApplication({
-  userId: 'abc123',
-  tokenInfo: {
-    context: {
-      user: {
-        email: 'test@example.com',
-      },
-    },
-  },
-} as Identity);
+const newApplication1: Partial<Application> = newApplication(mockApplicantToken as UserIdentity);
 
 function appWithMockedAttestationDate(
   app: Application,
@@ -54,9 +29,9 @@ function appWithMockedAttestationDate(
 ): Application {
   const {
     durations: {
-      attestation: { unitOfTime, count, daysToAttestation },
+      attestation: { unitOfTime, count },
     },
-  } = mockConfig;
+  } = stateTestConfig;
   app.approvedAtUtc = moment
     .utc(new Date())
     .subtract(count, unitOfTime)
@@ -74,8 +49,7 @@ function appWithMockExpiryDate(
     durations: {
       expiry: { count, unitOfTime },
     },
-  } = mockConfig;
-
+  } = stateTestConfig;
   const mockExpiryDate = moment(app.expiresAtUtc)
     .subtract(count, unitOfTime)
     .add(countToAdd, units)
@@ -85,6 +59,16 @@ function appWithMockExpiryDate(
 }
 
 describe('state manager', () => {
+  it('should fail to create an application without submitter email', () => {
+    const userWithNoEmail = cloneDeep(mockApplicantToken);
+    set(userWithNoEmail, 'tokenInfo.context.user.email', undefined);
+    expect(get(userWithNoEmail, 'tokenInfo.context.user.email')).to.be.undefined;
+    expect(() => newApplication(userWithNoEmail as UserIdentity)).to.throw(
+      Forbidden,
+      'A submitter email is required to create a new application.',
+    );
+  });
+
   it('should update applicant info', () => {
     const emptyApp: Application = cloneDeep({
       ...newApplication1,
@@ -173,7 +157,8 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, 'user123', false);
+      const result = state.addCollaborator(collab, mockApplicantToken);
+
       expect(result.sections.collaborators.list[0]).to.deep.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
@@ -207,7 +192,8 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, 'user123', false);
+      const result = state.addCollaborator(collab, mockApplicantToken);
+
       expect(result.sections.collaborators.list[0]).to.deep.include(collab);
       expect(result.sections.collaborators.list[0].id).to.not.be.empty;
       expect(result.sections.collaborators.meta.status).to.eq('COMPLETE');
@@ -233,7 +219,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
       try {
-        state.addCollaborator(collab, 'user123', false);
+        state.addCollaborator(collab, mockApplicantToken);
       } catch (err) {
         if (err instanceof ConflictError) {
           return true;
@@ -272,7 +258,7 @@ describe('state manager', () => {
       };
 
       try {
-        state.addCollaborator(collab, 'user123', false);
+        state.addCollaborator(collab, mockApplicantToken);
       } catch (e) {
         expect((e as BadRequest).info.errors[0]).to.include({
           field: 'primaryAffiliation',
@@ -282,7 +268,7 @@ describe('state manager', () => {
 
       // add with correct PA
       collab.info.primaryAffiliation = 'ACME';
-      const app2 = state.addCollaborator(collab, 'user123', false);
+      const app2 = state.addCollaborator(collab, mockApplicantToken);
       app2.sections.collaborators.list[0].id = 'collab-1';
       expect(app2.sections.collaborators.list[0].meta.status).to.eq('COMPLETE');
 
@@ -335,7 +321,7 @@ describe('state manager', () => {
         type: 'personnel',
       };
 
-      const result = state.addCollaborator(collab, 'user123', false);
+      const result = state.addCollaborator(collab, mockApplicantToken);
       result.sections.collaborators.list[0].id = 'collab-1';
       expect(result.state).to.eq('SIGN AND SUBMIT');
 
@@ -719,13 +705,13 @@ export function getReadyToSignApp() {
     appNumber: 1,
   }) as Application;
   const updatePart: UpdateApplication['sections'] = pick(cloneDeep(app), 'sections').sections;
-  c(updatePart.applicant).info = getRandomInfo();
-  c(updatePart.applicant).address = getAddress();
-  c(updatePart.representative).address = getAddress();
-  c(updatePart.representative).info = omit(getRandomInfo(), 'googleEmail');
-  c(updatePart.dataAccessAgreement).agreements.forEach((ag) => (ag.accepted = true));
-  c(updatePart.appendices).agreements.forEach((ag) => (ag.accepted = true));
-  c(updatePart.ethicsLetter).declaredAsRequired = false;
+  checkIsDefined(updatePart.applicant).info = getRandomInfo();
+  checkIsDefined(updatePart.applicant).address = getAddress();
+  checkIsDefined(updatePart.representative).address = getAddress();
+  checkIsDefined(updatePart.representative).info = omit(getRandomInfo(), 'googleEmail');
+  checkIsDefined(updatePart.dataAccessAgreement).agreements.forEach((ag) => (ag.accepted = true));
+  checkIsDefined(updatePart.appendices).agreements.forEach((ag) => (ag.accepted = true));
+  checkIsDefined(updatePart.ethicsLetter).declaredAsRequired = false;
   const exactly100words =
     'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum in ex tellus. Vestibulum blandit egestas pharetra. Proin porttitor hendrerit ligula. Aliquam mattis in elit nec dictum. Nam ante neque, cursus ac tortor sit amet, faucibus lacinia metus. Integer vestibulum nulla mauris, a iaculis nisl auctor et. Suspendisse potenti. Nulla porttitor orci ac sapien feugiat, eu rhoncus ante iaculis. Vestibulum id neque sit amet mauris molestie dictum in sit amet odio. Integer mattis enim non ultrices aliquet. Aenean maximus leo lacus, in fringilla ex suscipit eget. Nam felis dolor, bibendum et lobortis sit amet, sodales eu orci. Nunc at elementum ex.';
   updatePart.projectInfo = {
@@ -752,7 +738,7 @@ export function getReadyToSignApp() {
 export function getAppInReview() {
   const app = getReadyToSignApp();
   const state = new ApplicationStateManager(app);
-  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', 'user123', false);
+  const appAfterSign = state.addDocument('12345', 'signed.pdf', 'SIGNED_APP', mockApplicantToken);
   const updatePart: Partial<UpdateApplication> = {
     state: 'REVIEW',
   };
@@ -778,7 +764,10 @@ export function getPausedApplication() {
   const app = getApprovedApplication();
   app.approvedAtUtc = moment
     .utc(new Date())
-    .subtract(mockConfig.durations.attestation.count, mockConfig.durations.attestation.unitOfTime)
+    .subtract(
+      stateTestConfig.durations.attestation.count,
+      stateTestConfig.durations.attestation.unitOfTime,
+    )
     .toDate();
   const state = new ApplicationStateManager(app);
   const updatePart: Partial<UpdateApplication> = {

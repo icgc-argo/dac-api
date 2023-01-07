@@ -17,7 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
 
 import { NotFound } from '../../../utils/errors';
@@ -26,7 +26,7 @@ import { ApplicationStateManager, wasInRevisionRequestState } from '../../state'
 import { ApplicationSummary, Collaborator, SearchResult, State } from '../../interface';
 
 import { getAttestationByDate, isAttestable, isRenewable } from '../../../utils/calculations';
-import { c, getLastPausedAtDate } from '../../../utils/misc';
+import { checkIsDefined, getLastPausedAtDate } from '../../../utils/misc';
 import { hasReviewScope } from '../../../utils/permissions';
 
 export type SearchParams = {
@@ -59,7 +59,7 @@ function mapField(field: string) {
 }
 
 export async function search(params: SearchParams, identity: Identity): Promise<SearchResult> {
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  const isAdminOrReviewerResult = hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {};
   if (!isAdminOrReviewerResult) {
     query.submitterId = identity.userId;
@@ -203,7 +203,9 @@ export async function search(params: SearchParams, identity: Identity): Promise<
   };
 }
 
-export const searchCollaboratorApplications = async (identity: Identity) => {
+export const searchCollaboratorApplications = async (
+  identity: UserIdentity,
+): Promise<Partial<ApplicationSummary>[]> => {
   // find all applications on which the logged-in user has collaborator access
   // using ego token email matched against collaborator googleEmail
   const apps = await ApplicationModel.find({
@@ -239,7 +241,7 @@ export async function deleteApp(id: string, identity: Identity) {
 }
 
 export async function getById(id: string, identity: Identity) {
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
+  const isAdminOrReviewerResult = hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId: id,
   };
@@ -259,7 +261,7 @@ export async function getById(id: string, identity: Identity) {
 }
 
 export async function findApplication(appId: string, identity: Identity) {
-  const isReviewer = await hasReviewScope(identity);
+  const isReviewer = hasReviewScope(identity);
   const query: FilterQuery<ApplicationDocument> = {
     appId,
   };

@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import fs from 'fs';
 
 describe('zip', () => {
-  it.only('should package string correctly', async () => {
+  it('should package string correctly', async () => {
     const encrypted = {
       content: 'ABC1234567890',
       iv: '123',

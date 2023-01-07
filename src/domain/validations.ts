@@ -9,7 +9,7 @@ import {
 } from './interface';
 import validator from 'validate.js';
 import { countriesList } from '../utils/constants';
-import { c } from '../utils/misc';
+import { checkIsDefined } from '../utils/misc';
 
 export function validateId(id: string) {
   if (!id) {
@@ -28,7 +28,7 @@ export function validateRepresentativeSection(app: Application) {
   const errors: SectionError[] = [];
   let addressResult = true;
   if (!app.sections.representative.addressSameAsApplicant) {
-    addressResult = validateAddress(c(app.sections.representative.address), errors);
+    addressResult = validateAddress(checkIsDefined(app.sections.representative.address), errors);
   }
   const validations = [
     validatePersonalInfo(app.sections.representative.info, errors, false),

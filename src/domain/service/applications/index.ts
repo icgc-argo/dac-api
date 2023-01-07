@@ -17,10 +17,10 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Identity } from '@overture-stack/ego-token-middleware';
 import { difference, isEmpty } from 'lodash';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 
 import { AppConfig, getAppConfig } from '../../../config';
 import { ApplicationModel } from '../../model';
@@ -28,7 +28,7 @@ import { ApplicationStateManager, getSearchFieldValues, newApplication } from '.
 import { Application, UpdateApplication } from '../../interface';
 import { Storage } from '../../../storage';
 import logger from '../../../logger';
-import { c, getUpdateAuthor } from '../../../utils/misc';
+import { checkIsDefined } from '../../../utils/misc';
 import {
   sendAttestationReceivedEmail,
   sendReviewEmail,
@@ -42,14 +42,13 @@ import {
   sendApplicationPausedEmail,
 } from '../emails';
 import { findApplication } from './search';
-import { hasReviewScope } from '../../../utils/permissions';
-import { throwApplicationClosedError } from '../../../utils/errors';
+import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
+import { Forbidden, throwApplicationClosedError } from '../../../utils/errors';
 
-export async function create(identity: Identity) {
-  const config = getAppConfig();
-  const isAdminOrReviewerResult = await hasReviewScope(identity);
+export async function create(identity: UserIdentity) {
+  const isAdminOrReviewerResult = hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
+    throw new Forbidden('User is not allowed to perform this action');
   }
   const app = newApplication(identity);
   const appDoc = await ApplicationModel.create(app);
@@ -71,8 +70,8 @@ export async function updatePartial(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const config = getAppConfig();
-  const isReviewer = await hasReviewScope(identity);
-  const appDoc = await findApplication(c(appId), identity);
+  const isReviewer = hasReviewScope(identity);
+  const appDoc = await findApplication(checkIsDefined(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
 
   // if current state is CLOSED, modifications are not allowed
@@ -80,11 +79,7 @@ export async function updatePartial(
     throwApplicationClosedError();
   }
   const stateManager = new ApplicationStateManager(appDocObj);
-  const updatedApp = stateManager.updateApp(
-    appPart,
-    isReviewer,
-    getUpdateAuthor(identity.userId, isReviewer),
-  );
+  const updatedApp = stateManager.updateApp(appPart, isReviewer, getUpdateAuthor(identity));
   await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
   const stateChanged = appDocObj.state != updatedApp.state;
   if (stateChanged) {
@@ -107,12 +102,12 @@ export async function updatePartial(
   deleted.map((d) =>
     storageClient.delete(d).catch((e) => logger.error(`failed to delete document ${d}`, e)),
   );
-  const updated = await findApplication(c(updatedApp.appId), identity);
+  const updated = await findApplication(checkIsDefined(updatedApp.appId), identity);
   const updatedObj = updated.toObject();
-  const viewAbleApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
+  const viewableApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
     isReviewer,
   );
-  return viewAbleApplication;
+  return viewableApplication;
 }
 
 export async function onStateChange(
