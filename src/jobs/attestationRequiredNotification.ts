@@ -113,7 +113,7 @@ const getAttestableNotificationReportDetails = async (
   return attestationNotificationReport;
 };
 
-export const getAttestableQuery = (
+const getAttestableQuery = (
   config: AppConfig,
   currentDate: Date,
 ): FilterQuery<ApplicationDocument> => {
@@ -124,18 +124,25 @@ export const getAttestableQuery = (
   } = config;
   // find all apps that are APPROVED with an approval date matching the configured time period minus configured daysToAttestation
   // default is 1 year less 45 days to match DACO
-  const startDate = moment(currentDate).utc().subtract(count, unitOfTime);
+  // we use a range here from (1 year) to (1 year - 45 days) to account for missed job runs or email send failures
+  const referenceDate = moment(currentDate).utc();
+  const startDate = moment(referenceDate).subtract(count, unitOfTime);
   const startOfRange = startDate.startOf('day').toDate();
   const endOfRange = startDate
     .add(daysToAttestation, NOTIFICATION_UNIT_OF_TIME)
     .endOf('day')
     .toDate();
+  // add expiry to query to account for possible custom expiry dates
+  const expiryThreshold = moment(referenceDate).endOf('day').toDate();
   logger.info(`${JOB_NAME} - Approval day period is ${startOfRange} to ${endOfRange}`);
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',
     approvedAtUtc: {
       $gte: startOfRange,
       $lte: endOfRange,
+    },
+    expiresAtUtc: {
+      $gt: expiryThreshold,
     },
     attestedAtUtc: { $exists: false }, // check the applicant has not already attested. Will only be undefined or a datestring
     // check email has not already been sent. Should only be undefined or true. We do not set the value at all if the email op has failed on a previous run
