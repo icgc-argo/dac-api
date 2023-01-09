@@ -1,9 +1,6 @@
-import { Identity } from '@overture-stack/ego-token-middleware';
-
 import { NotificationSentFlags, Application } from '../domain/interface';
 import { ApplicationModel } from '../domain/model';
 import { ApplicationStateManager } from '../domain/state';
-import { getUpdateAuthor } from '../utils/misc';
 import logger from '../logger';
 import {
   Report,
@@ -55,17 +52,12 @@ export const buildReportDetails = (
 export async function setEmailSentFlag(
   app: Application,
   flag: keyof NotificationSentFlags,
-  identity: Identity,
   jobName: string,
 ): Promise<Application> {
   const appObj = new ApplicationStateManager(app);
   const notificationFieldName = `emailNotifications.${flag}`;
   logger.info(`${jobName} - Email sent, setting ${notificationFieldName} flag.`);
-  const result = appObj.updateApp(
-    { [notificationFieldName]: true },
-    false,
-    getUpdateAuthor(identity.userId, false),
-  );
+  const result = appObj.updateEmailNotifications(flag);
   // save new app state in db
   const updatedApp = await ApplicationModel.findOneAndUpdate({ appId: result.appId }, result, {
     new: true,

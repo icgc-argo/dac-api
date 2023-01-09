@@ -8,14 +8,11 @@ import logger from '../logger';
 import { AppConfig, getAppConfig } from '../config';
 import { NOTIFICATION_UNIT_OF_TIME, REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { ApplicationDocument, ApplicationModel } from '../domain/model';
-import { Application, NotificationSentFlags } from '../domain/interface';
+import { Application } from '../domain/interface';
 import { buildReportDetails, getEmptyReportDetails, setEmailSentFlag } from './utils';
 import { sendAttestationRequiredEmail } from '../domain/service/emails';
-import { getDayRange } from '../utils/calculations';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 import { Identity } from '@overture-stack/ego-token-middleware';
-import { ApplicationStateManager } from '../domain/state';
-import { getUpdateAuthor } from '../utils/misc';
 
 export const JOB_NAME = 'ATTESTATION REQUIRED NOTIFICATIONS';
 
@@ -66,13 +63,11 @@ const getAttestableNotificationReportDetails = async (
   const query = getAttestableQuery(config, currentDate);
   const attestableAppCount = await ApplicationModel.find(query).countDocuments();
   if (attestableAppCount === 0) {
-    logger.info(`${JOB_NAME} - No applications are entering the attestation period.`);
+    logger.info(`${JOB_NAME} - No applications require attestation.`);
     logger.info(`${JOB_NAME} - Generating report.`);
     return getEmptyReportDetails();
   }
-  logger.info(
-    `${JOB_NAME} - ${attestableAppCount} applications are entering the attestation period.`,
-  );
+  logger.info(`${JOB_NAME} - ${attestableAppCount} applications require attestation.`);
   const attestableApps = await ApplicationModel.find(query).exec();
   const apps: Application[] = attestableApps.map((app: ApplicationDocument) => {
     return app.toObject();
@@ -85,7 +80,6 @@ const getAttestableNotificationReportDetails = async (
       const updatedApp = await setEmailSentFlag(
         app,
         'attestationRequiredNotificationSent',
-        user,
         JOB_NAME,
       );
       return { success: true, app: updatedApp };
@@ -134,7 +128,10 @@ const getAttestableQuery = (
     .toDate();
   // add expiry to query to account for possible custom expiry dates
   const expiryThreshold = moment(referenceDate).endOf('day').toDate();
-  logger.info(`${JOB_NAME} - Approval day period is ${startOfRange} to ${endOfRange}`);
+
+  logger.info(`${JOB_NAME} - [approvedAtUtc] date range is ${startOfRange} to ${endOfRange}.`);
+  logger.info(`${JOB_NAME} - [expiresAtUtc] date threshold is ${expiryThreshold}.`);
+
   const query: FilterQuery<ApplicationDocument> = {
     state: 'APPROVED',
     approvedAtUtc: {

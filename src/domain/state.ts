@@ -54,6 +54,7 @@ import {
   DacoRole,
   PauseReason,
   SubmitterInfo,
+  NotificationSentFlags,
 } from './interface';
 import {
   validateAppendices,
@@ -522,6 +523,15 @@ export class ApplicationStateManager {
 
     // save / error
     onAppUpdate(current);
+    return current;
+  }
+
+  updateEmailNotifications(notificationType: keyof NotificationSentFlags): Application {
+    const current = this.currentApplication;
+    if (!current.emailNotifications) {
+      current.emailNotifications = {};
+    }
+    current.emailNotifications[notificationType] = true;
     return current;
   }
 }

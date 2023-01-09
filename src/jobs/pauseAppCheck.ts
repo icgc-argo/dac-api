@@ -111,7 +111,10 @@ const getPauseableQuery = (
     .startOf('day')
     .toDate();
   const expiryThreshold = moment(referenceDate).endOf('day').toDate();
-  logger.info(`${JOB_NAME} - Approval threshold date is ${approvalThreshold}`);
+
+  logger.info(`${JOB_NAME} - [approvedAtUtc] date threshold is ${approvalThreshold}`);
+  logger.info(`${JOB_NAME} - [expiresAtUtc] date threshold is ${expiryThreshold}.`);
+
   const query: FilterQuery<ApplicationDocument> = {
     state: { $in: ['APPROVED', 'PAUSED'] },
     approvedAtUtc: {
@@ -154,13 +157,17 @@ const getPausedAppsReportDetails = async (
           ? app
           : await pauseApplication(app, user, PauseReason.PENDING_ATTESTATION);
       if (updatedAppObj.state === 'PAUSED') {
+        if (app.state === 'PAUSED') {
+          logger.info(
+            `${JOB_NAME} - Application ${app.appId} is already in paused state, but email failed to send on previous run. Retrying.`,
+          );
+        }
         // send required emails
         await onStateChange(updatedAppObj, app, emailClient, config);
         // setting email notification here, not in onStateChange, because this flag is set on batch jobs only (not custom cases like an admin pause)
         const appWithFlagSet = await setEmailSentFlag(
           app,
           'applicationPausedNotificationSent',
-          user,
           JOB_NAME,
         );
         return { success: true, app: appWithFlagSet };
