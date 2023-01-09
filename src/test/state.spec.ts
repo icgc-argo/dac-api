@@ -1,6 +1,6 @@
 import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
-import { isDate, pick, cloneDeep, omit, get, every } from 'lodash';
+import { isDate, pick, cloneDeep, omit, get, every, set } from 'lodash';
 import moment, { unitOfTime } from 'moment';
 
 import {
@@ -13,8 +13,8 @@ import {
   UpdateApplication,
 } from '../domain/interface';
 import { ApplicationStateManager, newApplication } from '../domain/state';
-import { BadRequest, ConflictError } from '../utils/errors';
-import { c } from '../utils/misc';
+import { BadRequest, ConflictError, Forbidden } from '../utils/errors';
+import { checkIsDefined } from '../utils/misc';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 import { mockApplicantToken, mockedConfig } from './mocks.spec';
 
@@ -59,6 +59,16 @@ function appWithMockExpiryDate(
 }
 
 describe('state manager', () => {
+  it('should fail to create an application without submitter email', () => {
+    const userWithNoEmail = cloneDeep(mockApplicantToken);
+    set(userWithNoEmail, 'tokenInfo.context.user.email', undefined);
+    expect(get(userWithNoEmail, 'tokenInfo.context.user.email')).to.be.undefined;
+    expect(() => newApplication(userWithNoEmail as UserIdentity)).to.throw(
+      Forbidden,
+      'A submitter email is required to create a new application.',
+    );
+  });
+
   it('should update applicant info', () => {
     const emptyApp: Application = cloneDeep({
       ...newApplication1,
@@ -695,13 +705,13 @@ export function getReadyToSignApp() {
     appNumber: 1,
   }) as Application;
   const updatePart: UpdateApplication['sections'] = pick(cloneDeep(app), 'sections').sections;
-  c(updatePart.applicant).info = getRandomInfo();
-  c(updatePart.applicant).address = getAddress();
-  c(updatePart.representative).address = getAddress();
-  c(updatePart.representative).info = omit(getRandomInfo(), 'googleEmail');
-  c(updatePart.dataAccessAgreement).agreements.forEach((ag) => (ag.accepted = true));
-  c(updatePart.appendices).agreements.forEach((ag) => (ag.accepted = true));
-  c(updatePart.ethicsLetter).declaredAsRequired = false;
+  checkIsDefined(updatePart.applicant).info = getRandomInfo();
+  checkIsDefined(updatePart.applicant).address = getAddress();
+  checkIsDefined(updatePart.representative).address = getAddress();
+  checkIsDefined(updatePart.representative).info = omit(getRandomInfo(), 'googleEmail');
+  checkIsDefined(updatePart.dataAccessAgreement).agreements.forEach((ag) => (ag.accepted = true));
+  checkIsDefined(updatePart.appendices).agreements.forEach((ag) => (ag.accepted = true));
+  checkIsDefined(updatePart.ethicsLetter).declaredAsRequired = false;
   const exactly100words =
     'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum in ex tellus. Vestibulum blandit egestas pharetra. Proin porttitor hendrerit ligula. Aliquam mattis in elit nec dictum. Nam ante neque, cursus ac tortor sit amet, faucibus lacinia metus. Integer vestibulum nulla mauris, a iaculis nisl auctor et. Suspendisse potenti. Nulla porttitor orci ac sapien feugiat, eu rhoncus ante iaculis. Vestibulum id neque sit amet mauris molestie dictum in sit amet odio. Integer mattis enim non ultrices aliquet. Aenean maximus leo lacus, in fringilla ex suscipit eget. Nam felis dolor, bibendum et lobortis sit amet, sodales eu orci. Nunc at elementum ex.';
   updatePart.projectInfo = {

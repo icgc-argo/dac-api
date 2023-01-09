@@ -19,7 +19,7 @@
 
 import moment from 'moment';
 import 'moment-timezone';
-import { cloneDeep, last } from 'lodash';
+import { cloneDeep, get, last } from 'lodash';
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 
 import {
@@ -53,6 +53,7 @@ import {
   Sections,
   DacoRole,
   PauseReason,
+  SubmitterInfo,
 } from './interface';
 import {
   validateAppendices,
@@ -590,8 +591,18 @@ export function getSearchFieldValues(appDoc: Application) {
   ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
 }
 
+function getSubmitterInfo(identity: UserIdentity): SubmitterInfo {
+  const email = get(identity, 'tokenInfo.context.user.email');
+  if (email && typeof email === 'string') {
+    const info: SubmitterInfo = { userId: identity.userId, email };
+    return info;
+  } else {
+    throw new Forbidden('A submitter email is required to create a new application.');
+  }
+}
 // new applications can only be created by user jwt identities
 export function newApplication(identity: UserIdentity): Partial<Application> {
+  const submitter = getSubmitterInfo(identity);
   const pristineMeta = {
     status: 'PRISTINE' as SectionStatus,
     errorsList: [],
@@ -599,8 +610,8 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
 
   const app: Partial<Application> = {
     state: 'DRAFT',
-    submitterId: identity.userId,
-    submitterEmail: identity.tokenInfo.context.user.email,
+    submitterId: submitter.userId,
+    submitterEmail: submitter.email,
     revisionRequest: emptyRevisionRequest(),
     sections: {
       collaborators: {

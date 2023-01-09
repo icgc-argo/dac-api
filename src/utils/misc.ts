@@ -2,7 +2,7 @@ import { findLast, sortBy, cloneDeep, isArray } from 'lodash';
 
 import { Application, UpdateEvent } from '../domain/interface';
 
-export function c<T>(val: T | undefined | null): T {
+export function checkIsDefined<T>(val: T | undefined | null): T {
   if (val === undefined || val === null) {
     throw new Error('value is not defined');
   }

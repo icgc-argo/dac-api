@@ -33,7 +33,7 @@ import {
 } from '../../interface';
 
 import { getAttestationByDate, isAttestable, isRenewable } from '../../../utils/calculations';
-import { getLastPausedAtDate } from '../../../utils/misc';
+import { checkIsDefined, getLastPausedAtDate } from '../../../utils/misc';
 import { hasReviewScope } from '../../../utils/permissions';
 
 export type SearchParams = {

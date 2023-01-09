@@ -28,7 +28,7 @@ import { ApplicationStateManager, getSearchFieldValues, newApplication } from '.
 import { Application, UpdateApplication } from '../../interface';
 import { Storage } from '../../../storage';
 import logger from '../../../logger';
-import { c } from '../../../utils/misc';
+import { checkIsDefined } from '../../../utils/misc';
 import {
   sendAttestationReceivedEmail,
   sendReviewEmail,
@@ -43,12 +43,12 @@ import {
 } from '../emails';
 import { findApplication } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
-import { throwApplicationClosedError } from '../../../utils/errors';
+import { Forbidden, throwApplicationClosedError } from '../../../utils/errors';
 
 export async function create(identity: UserIdentity) {
   const isAdminOrReviewerResult = hasReviewScope(identity);
   if (isAdminOrReviewerResult) {
-    throw new Error('not allowed');
+    throw new Forbidden('User is not allowed to perform this action');
   }
   const app = newApplication(identity);
   const appDoc = await ApplicationModel.create(app);
@@ -71,7 +71,7 @@ export async function updatePartial(
 ) {
   const config = getAppConfig();
   const isReviewer = hasReviewScope(identity);
-  const appDoc = await findApplication(c(appId), identity);
+  const appDoc = await findApplication(checkIsDefined(appId), identity);
   const appDocObj = appDoc.toObject() as Application;
 
   // if current state is CLOSED, modifications are not allowed
@@ -102,7 +102,7 @@ export async function updatePartial(
   deleted.map((d) =>
     storageClient.delete(d).catch((e) => logger.error(`failed to delete document ${d}`, e)),
   );
-  const updated = await findApplication(c(updatedApp.appId), identity);
+  const updated = await findApplication(checkIsDefined(updatedApp.appId), identity);
   const updatedObj = updated.toObject();
   const viewableApplication = new ApplicationStateManager(updatedObj).prepareApplicationForUser(
     isReviewer,

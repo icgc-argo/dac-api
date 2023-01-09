@@ -1,5 +1,5 @@
 import moment from 'moment';
-import { c } from '../utils/misc';
+import { checkIsDefined } from '../utils/misc';
 import { Application, PersonalInfo } from '../domain/interface';
 
 export type UILinksInfo = {
@@ -163,7 +163,7 @@ function cardBody(props: {
     <mj-wrapper padding="30px 32px 52px 32px" css-class="body-section">
       ${greeting(receiver)}
       ${message}
-      ${withClosure ? closure(c(closureData)) : ''}
+      ${withClosure ? closure(checkIsDefined(closureData)) : ''}
     </mj-wrapper>
   `;
 }
