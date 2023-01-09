@@ -20,12 +20,11 @@ export const JOB_NAME = 'ATTESTATION REQUIRED NOTIFICATIONS';
 async function attestationRequiredNotificationCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
-  user: Identity,
 ): Promise<JobReport<BatchJobDetails>> {
   const startedAt = new Date();
   try {
     logger.info(`${JOB_NAME} - Initiating...`);
-    const details = await getAttestableNotificationReportDetails(currentDate, emailClient, user);
+    const details = await getAttestableNotificationReportDetails(currentDate, emailClient);
     details.errors.length
       ? logger.warn(`${JOB_NAME} - Completed with errors.`)
       : logger.info(`${JOB_NAME} - Completed.`);
@@ -57,7 +56,6 @@ async function attestationRequiredNotificationCheck(
 const getAttestableNotificationReportDetails = async (
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
-  user: Identity,
 ): Promise<BatchJobDetails> => {
   const config = getAppConfig();
   const query = getAttestableQuery(config, currentDate);

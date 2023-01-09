@@ -22,7 +22,6 @@ export default async function (
     const attestationNotificationReport = await attestationRequiredNotification(
       currentDate,
       emailClient,
-      user,
     );
     const pausedAppReport = await runPauseAppsCheck(currentDate, emailClient, user);
 
