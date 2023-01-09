@@ -280,6 +280,7 @@ export interface Application {
   isAttestable: boolean;
   pauseReason?: PauseReason | null;
   lastPausedAtUtc?: Date;
+  emailNotifications?: NotificationSentFlags;
 }
 
 export type AppSections = keyof Application['sections'];
@@ -353,7 +354,6 @@ export interface UpdateApplication {
       signedAppDocObjId: string;
     };
   };
-  emailNotifications?: NotificationSentFlags;
 }
 
 export interface SubmitterInfo {
