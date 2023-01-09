@@ -8,7 +8,7 @@ import { sendEmail } from '../domain/service/emails';
 import { getAppConfig } from '../config';
 import { encrypt } from '../domain/service/encryption';
 import { createDacoCSVFile } from '../domain/service/files';
-import logger, { buildNamedLog } from '../logger';
+import logger, { buildMessage } from '../logger';
 import { JobReport } from './types';
 
 export const JOB_NAME = 'APPROVED USERS EMAIL';
@@ -46,14 +46,14 @@ async function runApprovedUsersEmail(
 
 export const sendEncryptedApprovedUsersEmail = async (
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
-  jobName?: string,
+  jobName: string = '',
 ): Promise<void> => {
   // generate CSV file from approved users
   const csv = await createDacoCSVFile(jobName);
   // encrypt csv content, return {content, iv}
   const secrets = await getAppSecrets();
   // encrypt the contents
-  logger.info(buildNamedLog(`Encrypting CSV file...`, jobName));
+  logger.info(buildMessage(jobName, `Encrypting CSV file...`));
   const encrypted = await encrypt(csv, secrets.auth.dacoEncryptionKey);
 
   // build streams to zip later
@@ -67,7 +67,7 @@ export const sendEncryptedApprovedUsersEmail = async (
   contentStream.push(null);
 
   // build the zip package
-  logger.info(buildNamedLog(`Creating zip...`, jobName));
+  logger.info(buildMessage(jobName, `Creating zip...`));
   const zip = new JSZip();
   const zipName = `icgc_daco_users.zip`;
   [
@@ -76,14 +76,14 @@ export const sendEncryptedApprovedUsersEmail = async (
   ].forEach((a) => {
     zip.file(a.name, a.stream);
   });
-  logger.info(buildNamedLog(`Added CSV data to ${zipName} file.`, jobName));
+  logger.info(buildMessage(jobName, `Added CSV data to ${zipName} file.`));
   const zipFileOut = await zip.generateAsync({
     type: 'nodebuffer',
   });
 
   const config = getAppConfig();
   // send the email
-  logger.info(buildNamedLog(`Zip complete. Sending email with zip attachment.`, jobName));
+  logger.info(buildMessage(jobName, `Zip complete. Sending email with zip attachment.`));
   sendEmail(
     emailClient,
     config.email.fromAddress,

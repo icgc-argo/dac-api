@@ -43,8 +43,8 @@ const options: LoggerOptions = {
 const logger = createLogger(options);
 logger.info(`Logging initialized at ${logLevel} level`);
 
-export function buildNamedLog(message: string, name?: string): string {
-  return `${name ? `${name} - ` : ''}${message}`;
+export function buildMessage(...messages: string[]): string {
+  return messages.filter((message) => !!message).join(' - ');
 }
 
 export default logger;

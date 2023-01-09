@@ -38,7 +38,7 @@ import {
   UserDataFromApprovedApplicationsResult,
 } from '../interface';
 import { Storage } from '../../storage';
-import logger, { buildNamedLog } from '../../logger';
+import logger, { buildMessage } from '../../logger';
 import {
   findApplication,
   getApplicationUpdates,
@@ -240,23 +240,23 @@ const parseApprovedUser = (
   changed: moment(lastUpdatedAtUtc).format('YYYY-MM-DDTHH:mm'), // simple formatting until value of this field is verified
 });
 
-export const createDacoCSVFile = async (jobName?: string): Promise<string> => {
+export const createDacoCSVFile = async (jobName: string = ''): Promise<string> => {
   logger.info(
-    buildNamedLog(
-      `Fetching applicant and collaborator info from all approved applications.`,
+    buildMessage(
       jobName,
+      `Fetching applicant and collaborator info from all approved applications.`,
     ),
   );
   const results = await getUsersFromApprovedApps();
   const approvedAppsCount = results.length;
   // applicant + collaborators get daco access
   logger.info(
-    buildNamedLog(
-      `Found applicant and collaborator info from ${approvedAppsCount} approved applications.`,
+    buildMessage(
       jobName,
+      `Found applicant and collaborator info from ${approvedAppsCount} approved applications.`,
     ),
   );
-  logger.info(buildNamedLog(`Parsing user info results.`, jobName));
+  logger.info(buildMessage(jobName, `Parsing user info results.`));
   const parsedResults = results
     .map((appResult) => {
       const applicantInfo = appResult.applicant.info;
@@ -272,9 +272,9 @@ export const createDacoCSVFile = async (jobName?: string): Promise<string> => {
     .flat();
 
   logger.info(
-    buildNamedLog(
-      `Parsed info for ${parsedResults.length} users from ${approvedAppsCount} applications.`,
+    buildMessage(
       jobName,
+      `Parsed info for ${parsedResults.length} users from ${approvedAppsCount} applications.`,
     ),
   );
   const fileHeaders: ColumnHeader[] = [
@@ -286,12 +286,12 @@ export const createDacoCSVFile = async (jobName?: string): Promise<string> => {
   ];
   const headerRow: string[] = fileHeaders.map((header) => header.name);
 
-  logger.info(buildNamedLog(`De-duplicating approved users list.`, jobName));
+  logger.info(buildMessage(jobName, `De-duplicating approved users list.`));
   const uniqueApprovedUsers = uniqBy(parsedResults, 'openId');
   logger.info(
-    buildNamedLog(
-      `Retrieved ${uniqueApprovedUsers.length} unique approved users from ${approvedAppsCount} applications.`,
+    buildMessage(
       jobName,
+      `Retrieved ${uniqueApprovedUsers.length} unique approved users from ${approvedAppsCount} applications.`,
     ),
   );
   const approvedUsersRows = uniqueApprovedUsers.map((row: any) => {
