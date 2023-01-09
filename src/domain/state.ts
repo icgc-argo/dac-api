@@ -531,7 +531,7 @@ export class ApplicationStateManager {
     if (!current.emailNotifications) {
       current.emailNotifications = {};
     }
-    current.emailNotifications[notificationType] = true;
+    current.emailNotifications[notificationType] = new Date();
     return current;
   }
 }

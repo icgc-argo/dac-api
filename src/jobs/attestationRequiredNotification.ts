@@ -12,7 +12,6 @@ import { Application } from '../domain/interface';
 import { buildReportDetails, getEmptyReportDetails, setEmailSentFlag } from './utils';
 import { sendAttestationRequiredEmail } from '../domain/service/emails';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
-import { Identity } from '@overture-stack/ego-token-middleware';
 
 export const JOB_NAME = 'ATTESTATION REQUIRED NOTIFICATIONS';
 

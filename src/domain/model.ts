@@ -109,12 +109,12 @@ const ApprovedAppDocument = new mongoose.Schema(
 
 const NotificationSentFlags = new mongoose.Schema(
   {
-    attestationRequiredNotificationSent: { type: Boolean, required: false },
-    applicationPausedNotificationSent: { type: Boolean, required: false },
-    firstExpiryNotificationSent: { type: Boolean, required: false },
-    secondExpiryNotificationSent: { type: Boolean, required: false },
-    applicationExpiredNotificationSent: { type: Boolean, required: false },
-    applicationClosedNotificationSent: { type: Boolean, required: false },
+    attestationRequiredNotificationSent: { type: Date, required: false },
+    applicationPausedNotificationSent: { type: Date, required: false },
+    firstExpiryNotificationSent: { type: Date, required: false },
+    secondExpiryNotificationSent: { type: Date, required: false },
+    applicationExpiredNotificationSent: { type: Date, required: false },
+    applicationClosedNotificationSent: { type: Date, required: false },
   },
   { _id: false },
 );

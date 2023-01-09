@@ -298,12 +298,12 @@ export type RevisionSections =
 export type RevisionRequestUpdate = Partial<Record<RevisionSections, RevisionRequest>>;
 
 export interface NotificationSentFlags {
-  attestationRequiredNotificationSent?: boolean;
-  applicationPausedNotificationSent?: boolean;
-  firstExpiryNotificationSent?: boolean;
-  secondExpiryNotificationSent?: boolean;
-  applicationExpiredNotificationSent?: boolean;
-  applicationClosedNotificationSent?: boolean;
+  attestationRequiredNotificationSent?: Date;
+  applicationPausedNotificationSent?: Date;
+  firstExpiryNotificationSent?: Date;
+  secondExpiryNotificationSent?: Date;
+  applicationExpiredNotificationSent?: Date;
+  applicationClosedNotificationSent?: Date;
 }
 
 export interface UpdateApplication {
