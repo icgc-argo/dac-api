@@ -284,6 +284,32 @@ export async function findApplication(appId: string, identity: Identity) {
   return appDoc;
 }
 
+/**
+ * Parses search params from a Request, to use in a mongoose query
+ * @param {Request} req - request object from express
+ * @param {string} [defaultSort] - default sort direction for the query
+ * @example
+ * // returns {
+    query: '',
+    states: [ 'APPROVED' ],
+    page: 0,
+    pageSize: 35,
+    sortBy: [ { field: 'appId', direction: 'desc' } ],
+    includeStats: false
+  }
+ * getSearchParams({...req, { states: 'APPROVED', page:0, pageSize:35, sort:'appId:desc' }}, 'states:desc')
+   * @example
+ * // returns {
+    query: 'new',
+    states: [],
+    page: 0,
+    pageSize: 25,
+    sortBy: [ { field: 'state', direction: 'desc' } ],
+    includeStats: false
+  }
+ * getSearchParams({...req, { query: 'new', page:0 }}, 'state:desc')
+ * @returns SearchParams
+ */
 export const getSearchParams = (req: Request, defaultSort?: string): SearchParams => {
   const query = (req.query.query as string | undefined) || '';
   const states = req.query.states ? ((req.query.states as string).split(',') as State[]) : [];
