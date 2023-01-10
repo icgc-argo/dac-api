@@ -118,8 +118,8 @@ const getAttestableQuery = (
   // we use a range here from (1 year) to (1 year - 45 days) to account for missed job runs or email send failures
   const referenceDate = moment(currentDate).utc();
   const startDate = moment(referenceDate).subtract(count, unitOfTime);
-  const startOfRange = startDate.startOf('day').toDate();
-  const endOfRange = startDate
+  const startOfRange = moment(startDate).startOf('day').toDate();
+  const endOfRange = moment(startDate)
     .add(daysToAttestation, NOTIFICATION_UNIT_OF_TIME)
     .endOf('day')
     .toDate();
