@@ -284,6 +284,7 @@ export interface Application {
   isAttestable: boolean;
   pauseReason?: PauseReason | null;
   lastPausedAtUtc?: Date;
+  emailNotifications?: NotificationSentFlags;
 }
 
 export type AppSections = keyof Application['sections'];
@@ -299,6 +300,15 @@ export type RevisionSections =
     >
   | 'general';
 export type RevisionRequestUpdate = Partial<Record<RevisionSections, RevisionRequest>>;
+
+export interface NotificationSentFlags {
+  attestationRequiredNotificationSent?: Date;
+  applicationPausedNotificationSent?: Date;
+  firstExpiryNotificationSent?: Date;
+  secondExpiryNotificationSent?: Date;
+  applicationExpiredNotificationSent?: Date;
+  applicationClosedNotificationSent?: Date;
+}
 
 export interface UpdateApplication {
   state?: State;
@@ -384,7 +394,7 @@ export interface ApprovedUserRowData {
   changed: string;
 }
 
-export const TERMS_AGREEMENT_NAME = 'introduction_agree_to_terms';
+// agreements constants
 export const IT_AGREEMENT_SOFTWARE_UPDATES = 'it_agreement_software_updates';
 export const IT_AGREEMENT_PROTECT_DATA = 'it_agreement_protect_data';
 export const IT_AGREEMENT_MONITOR_ACCESS = 'it_agreement_monitor_access';

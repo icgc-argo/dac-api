@@ -19,7 +19,7 @@ export function validateId(id: string) {
     throw new BadRequest('Invalid id');
   }
   const numericId = id.replace('DACO-', '');
-  if (Number(numericId) == NaN) {
+  if (Number.isNaN(numericId)) {
     throw new BadRequest('Invalid id');
   }
 }

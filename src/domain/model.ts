@@ -107,6 +107,18 @@ const ApprovedAppDocument = new mongoose.Schema(
   { _id: false },
 );
 
+const NotificationSentFlags = new mongoose.Schema(
+  {
+    attestationRequiredNotificationSent: { type: Date, required: false },
+    applicationPausedNotificationSent: { type: Date, required: false },
+    firstExpiryNotificationSent: { type: Date, required: false },
+    secondExpiryNotificationSent: { type: Date, required: false },
+    applicationExpiredNotificationSent: { type: Date, required: false },
+    applicationClosedNotificationSent: { type: Date, required: false },
+  },
+  { _id: false },
+);
+
 const ApplicationSchema = new mongoose.Schema(
   {
     appNumber: { type: Number, unique: true },
@@ -181,6 +193,7 @@ const ApplicationSchema = new mongoose.Schema(
     },
     updates: [ApplicationUpdate],
     approvedAppDocs: [ApprovedAppDocument],
+    emailNotifications: NotificationSentFlags,
   },
   {
     timestamps: {

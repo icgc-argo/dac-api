@@ -59,7 +59,7 @@ export async function sendEmail(
   html: string,
   bcc?: Set<string>,
   attachments?: Attachment[],
-) {
+): Promise<void> {
   const info = await emailClient.sendMail({
     from: `"${fromName}" <${fromEmail}>`, // sender address
     to: Array.from(to).join(','), // list of receivers

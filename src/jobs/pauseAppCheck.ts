@@ -13,7 +13,7 @@ import { ApplicationStateManager } from '../domain/state';
 import { getDacoRole } from '../utils/permissions';
 import { REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { onStateChange } from '../domain/service/applications';
-import { buildReportDetails, getEmptyReportDetails } from './utils';
+import { buildReportDetails, getEmptyReportDetails, setEmailSentFlag } from './utils';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 
 export const JOB_NAME = 'PAUSING APPLICATIONS';
@@ -104,22 +104,29 @@ const getPauseableQuery = (
     },
   } = config;
   // find all apps that are APPROVED with an approval date matching the configured time period, check vs the start of the day this check is run
-  const approvalReferenceDate = moment(currentDate).startOf('day');
+  const referenceDate = moment(currentDate).utc();
+  // default is 1 year to match DACO
+  const approvalThreshold = moment(referenceDate)
+    .subtract(count, unitOfTime)
+    .startOf('day')
+    .toDate();
+  const expiryThreshold = moment(referenceDate).endOf('day').toDate();
 
-  // default is 1 year to match DACO but we will need this for testing
-  const approvalThreshold = approvalReferenceDate.subtract(count, unitOfTime).toDate();
-  logger.info(`${JOB_NAME} - Approval threshold date is ${approvalThreshold}`);
-  // TODO: depending on how expiry/renewal is handled for applications that are never attested, will need to modify this query
-  // to check for PAUSED state and date range of attestationByUtc to expiresAtUtc
+  logger.info(`${JOB_NAME} - [approvedAtUtc] date threshold is ${approvalThreshold}`);
+  logger.info(`${JOB_NAME} - [expiresAtUtc] date threshold is ${expiryThreshold}.`);
+
   const query: FilterQuery<ApplicationDocument> = {
-    state: 'APPROVED',
+    state: { $in: ['APPROVED', 'PAUSED'] },
     approvedAtUtc: {
       // filter for any time period equal to or past attestationByUtc in case an application that should have been paused previously
-      // is caught on a subsequent job run, as it will still be APPROVED and not have an attestedAtUtc value
-      $lte: approvalThreshold,
+      // is caught on a subsequent job run, as it will still be APPROVED or PAUSED and not have an attestedAtUtc value
+      $lt: approvalThreshold,
     },
-    // tslint:disable-next-line:no-null-keyword
-    $or: [{ attestedAtUtc: { $exists: false } }, { attestedAtUtc: { $eq: null } }], // check the applicant has not already attested, value may be null after renewal
+    expiresAtUtc: {
+      $gt: expiryThreshold,
+    },
+    attestedAtUtc: { $exists: false },
+    'emailNotifications.applicationPausedNotificationSent': { $exists: false },
   };
 
   return query;
@@ -144,11 +151,26 @@ const getPausedAppsReportDetails = async (
 
   const doPauseApplication = async (app: ApplicationDocument): Promise<JobResultForApplication> => {
     try {
-      const updatedAppObj = await pauseApplication(app, user, PauseReason.PENDING_ATTESTATION);
+      // check if already PAUSED so operation is not repeated, as the query may catch already paused apps that are missing the email flag
+      const updatedAppObj =
+        app.state === 'PAUSED'
+          ? app
+          : await pauseApplication(app, user, PauseReason.PENDING_ATTESTATION);
       if (updatedAppObj.state === 'PAUSED') {
+        if (app.state === 'PAUSED') {
+          logger.info(
+            `${JOB_NAME} - Application ${app.appId} is already in paused state, but email failed to send on previous run. Retrying.`,
+          );
+        }
         // send required emails
         await onStateChange(updatedAppObj, app, emailClient, config);
-        return { success: true, app: updatedAppObj };
+        // setting email notification here, not in onStateChange, because this flag is set on batch jobs only (not custom cases like an admin pause)
+        const appWithFlagSet = await setEmailSentFlag(
+          app,
+          'applicationPausedNotificationSent',
+          JOB_NAME,
+        );
+        return { success: true, app: appWithFlagSet };
       } else {
         // State change failed
         logger.error(
