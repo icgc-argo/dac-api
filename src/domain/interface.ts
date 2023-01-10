@@ -1,3 +1,7 @@
+import { Request } from 'express';
+
+import { Identity } from '@overture-stack/ego-token-middleware';
+
 export type State =
   | 'DRAFT'
   | 'SIGN AND SUBMIT'
@@ -370,6 +374,25 @@ export type ColumnHeader = {
   name: string;
   format?: (value: any) => any;
 };
+
+export interface IRequest extends Request {
+  identity: Identity;
+}
+
+export interface UserDataFromApprovedApplicationsResult {
+  applicant: Sections['applicant'];
+  collaborators: Sections['collaborators'];
+  lastUpdatedAtUtc?: Date;
+  appId: string;
+}
+
+export interface ApprovedUserRowData {
+  userName: string;
+  openId: string;
+  email: string;
+  affiliation: string;
+  changed: string;
+}
 
 // agreements constants
 export const IT_AGREEMENT_SOFTWARE_UPDATES = 'it_agreement_software_updates';
