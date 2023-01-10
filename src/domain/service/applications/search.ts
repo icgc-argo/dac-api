@@ -290,24 +290,14 @@ export async function findApplication(appId: string, identity: Identity) {
  * @param {string} [defaultSort] - default sort direction for the query
  * @example
  * // returns {
-    query: '',
-    states: [ 'APPROVED' ],
-    page: 0,
-    pageSize: 35,
-    sortBy: [ { field: 'appId', direction: 'desc' } ],
-    includeStats: false
-  }
- * getSearchParams({...req, { states: 'APPROVED', page:0, pageSize:35, sort:'appId:desc' }}, 'states:desc')
-   * @example
- * // returns {
-    query: 'new',
-    states: [],
-    page: 0,
-    pageSize: 25,
-    sortBy: [ { field: 'state', direction: 'desc' } ],
-    includeStats: false
-  }
- * getSearchParams({...req, { query: 'new', page:0 }}, 'state:desc')
+ *   query: '',
+ *   states: [],
+ *   page: 0,
+ *   pageSize: 25,
+ *   sortBy: [ { field: 'state', direction: 'desc' } ],
+ *   includeStats: false
+ * }
+ * getSearchParams({ ...req })
  * @returns SearchParams
  */
 export const getSearchParams = (req: Request, defaultSort?: string): SearchParams => {
