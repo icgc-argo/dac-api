@@ -19,11 +19,18 @@
 
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 import { FilterQuery } from 'mongoose';
+import { Request } from 'express';
 
 import { NotFound } from '../../../utils/errors';
 import { ApplicationDocument, ApplicationModel } from '../../model';
 import { ApplicationStateManager, wasInRevisionRequestState } from '../../state';
-import { ApplicationSummary, Collaborator, SearchResult, State } from '../../interface';
+import {
+  ApplicationSummary,
+  Collaborator,
+  SearchResult,
+  State,
+  UserDataFromApprovedApplicationsResult,
+} from '../../interface';
 
 import { getAttestationByDate, isAttestable, isRenewable } from '../../../utils/calculations';
 import { checkIsDefined, getLastPausedAtDate } from '../../../utils/misc';
@@ -276,3 +283,78 @@ export async function findApplication(appId: string, identity: Identity) {
   }
   return appDoc;
 }
+
+/**
+ * Parses search params from a Request, to use in a mongoose query
+ * @param {Request} req - request object from express
+ * @param {string} [defaultSort] - default sort direction for the query
+ * @example
+ * // returns {
+    query: '',
+    states: [ 'APPROVED' ],
+    page: 0,
+    pageSize: 35,
+    sortBy: [ { field: 'appId', direction: 'desc' } ],
+    includeStats: false
+  }
+ * getSearchParams({...req, { states: 'APPROVED', page:0, pageSize:35, sort:'appId:desc' }}, 'states:desc')
+   * @example
+ * // returns {
+    query: 'new',
+    states: [],
+    page: 0,
+    pageSize: 25,
+    sortBy: [ { field: 'state', direction: 'desc' } ],
+    includeStats: false
+  }
+ * getSearchParams({...req, { query: 'new', page:0 }}, 'state:desc')
+ * @returns SearchParams
+ */
+export const getSearchParams = (req: Request, defaultSort?: string): SearchParams => {
+  const query = (req.query.query as string | undefined) || '';
+  const states = req.query.states ? ((req.query.states as string).split(',') as State[]) : [];
+  const page = Number(req.query.page) || 0;
+  const pageSize = Number(req.query.pageSize) || 25;
+  const sort = (req.query.sort as string | undefined) || defaultSort;
+  const includeStats = Boolean(req.query.includeStats === 'true') || false;
+  const sortBy = sort
+    ? sort.split(',').map((s) => {
+        const sortField = s.trim().split(':');
+        return { field: sortField[0].trim(), direction: sortField[1].trim() };
+      })
+    : [];
+
+  return {
+    query,
+    states,
+    page,
+    pageSize,
+    sortBy,
+    includeStats,
+  };
+};
+
+export const getUsersFromApprovedApps = async (): Promise<
+  UserDataFromApprovedApplicationsResult[]
+> => {
+  const query: FilterQuery<ApplicationDocument> = {
+    state: 'APPROVED',
+  };
+  // retrieve applicant + collaborators, only they get daco access
+  const results = await ApplicationModel.find(query, {
+    appId: 1,
+    'sections.applicant': 1,
+    'sections.collaborators': 1,
+    lastUpdatedAtUtc: 1,
+  }).exec();
+
+  return results.map((result) => {
+    const approvedUsersInfo: UserDataFromApprovedApplicationsResult = {
+      applicant: result.sections.applicant,
+      collaborators: result.sections.collaborators,
+      appId: result.appId,
+      lastUpdatedAtUtc: result.lastUpdatedAtUtc,
+    };
+    return approvedUsersInfo;
+  });
+};

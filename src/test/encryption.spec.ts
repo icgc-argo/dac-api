@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { createDecipheriv } from 'crypto';
-import { encrypt } from '../utils/misc';
+import { encrypt } from '../domain/service/encryption';
 import {
   EMAIL_ENCRYPTION_CREDENTIALS_ENCODING,
   DACO_ENCRYPTION_ALGO,
