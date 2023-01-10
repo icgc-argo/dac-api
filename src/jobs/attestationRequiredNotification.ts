@@ -138,8 +138,10 @@ const getAttestableQuery = (
     expiresAtUtc: {
       $gt: expiryThreshold,
     },
-    attestedAtUtc: { $exists: false }, // check the applicant has not already attested. Will only be undefined or a datestring
-    // check email has not already been sent. Should only be undefined or true. We do not set the value at all if the email op has failed on a previous run
+    // check the applicant has not already attested. Will only be undefined or a datestring
+    attestedAtUtc: { $exists: false },
+    // check email has not already been sent. Should only be undefined or a datestring.
+    // We do not set the value at all if the email op has failed on a previous run
     'emailNotifications.attestationRequiredNotificationSent': { $exists: false },
   };
 
