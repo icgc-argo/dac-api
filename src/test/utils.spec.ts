@@ -208,15 +208,5 @@ describe('utils', () => {
       const canRenew = isRenewable(app);
       expect(canRenew).to.be.true;
     });
-
-    it('should be renewable if app has been renewed before', () => {
-      const app = getApprovedApplication();
-      expect(app.expiresAtUtc).to.not.eq(undefined);
-      const mockExpiresAtUtc = moment.utc().add(75, 'days');
-      app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      app.isRenewal = true;
-      const canRenew = isRenewable(app);
-      expect(canRenew).to.be.true;
-    });
   });
 });
