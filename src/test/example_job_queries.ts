@@ -1,6 +1,18 @@
 // sample queries for each job run on a particular date to show how the date ranges would line up
 
 // Jan.7 2023
+// with DACO default durations
+
+// DAYS_TO_EXPIRY_1=90
+// DAYS_TO_EXPIRY_2=45
+// DAYS_POST_EXPIRY=90
+// EXPIRY_UNIT_COUNT=2
+// EXPIRY_UNIT_OF_TIME=years
+
+// ATTESTATION_UNIT_COUNT=1
+// ATTESTATION_UNIT_OF_TIME=year
+// DAYS_TO_ATTESTATION=45
+
 const examples = {
   attestation: {
     state: 'APPROVED',
@@ -34,7 +46,10 @@ const examples = {
   },
   expiring: {
     state: { $in: ['APPROVED', 'PAUSED', 'EXPIRED'] },
-    expiresAtUtc: { $lte: '2023-01-07T23:59:59.999Z', $gte: '2022-10-09T00:00:00.000Z' },
+    expiresAtUtc: {
+      $lte: '2023-01-07T23:59:59.999Z',
+      $gte: '2022-10-09T00:00:00.000Z',
+    },
     'emailNotifications.applicationExpiredNotificationSent': { $exists: false },
   },
   closing: {
