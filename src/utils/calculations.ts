@@ -53,10 +53,13 @@ export const isAttestable: (currentApp: Application) => boolean = (currentApp) =
 };
 
 export const isRenewable: (currentApp: Application) => boolean = (currentApp) => {
-  // if the user has already started the renewal process, app state will be in DRAFT, SIGN AND SUBMIT, REVIEW or REVISIONS REQUESTED,
-  // so need to look for apps still in APPROVED or EXPIRED state, which means no action has been taken yet
-  // TODO: verify whether PAUSED apps can be renewed
-  if (!(currentApp.expiresAtUtc && ['APPROVED', 'EXPIRED'].includes(currentApp.state))) {
+  // can only renew an app in these states
+  if (!(currentApp.expiresAtUtc && ['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state))) {
+    return false;
+  }
+  // can only create one renewal application
+  // TODO: should this id be deletable if the renewal app is accidentally closed before approval?
+  if (currentApp.renewalAppId) {
     return false;
   }
   const config = getAppConfig();

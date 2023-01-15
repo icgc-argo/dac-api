@@ -208,5 +208,19 @@ describe('utils', () => {
       const canRenew = isRenewable(app);
       expect(canRenew).to.be.true;
     });
+
+    it('should be renewable in PAUSED state', () => {
+      const app = getPausedApplication();
+      expect(app.expiresAtUtc).to.not.eq(undefined);
+      const mockExpiresAtUtc = moment.utc().add(75, 'days');
+      app.expiresAtUtc = mockExpiresAtUtc.toDate();
+      const canRenew = isRenewable(app);
+      expect(canRenew).to.be.true;
+    });
+
+    // TODO: implement
+    it('should not be renewable if a renewal app has already been created', () => {});
+    // TODO: implement
+    it('should be renewable in EXPIRED state', () => {});
   });
 });
