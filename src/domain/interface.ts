@@ -285,6 +285,8 @@ export interface Application {
   pauseReason?: PauseReason | null;
   lastPausedAtUtc?: Date;
   emailNotifications?: NotificationSentFlags;
+  sourceAppId?: string; // appId of original application, added to a renewal application
+  renewalAppId?: string; // appId of renewal application, added to the original application
 }
 
 export type AppSections = keyof Application['sections'];
@@ -317,6 +319,7 @@ export interface UpdateApplication {
   revisionRequest?: RevisionRequestUpdate;
   pauseReason?: PauseReason;
   isAttesting?: boolean;
+  isRenewing?: boolean;
   sections: {
     applicant?: {
       info?: Partial<PersonalInfo>;
