@@ -33,8 +33,9 @@ import {
 } from '../../interface';
 
 import { getAttestationByDate, isAttestable, isRenewable } from '../../../utils/calculations';
-import { checkIsDefined, getLastPausedAtDate } from '../../../utils/misc';
+import { getLastPausedAtDate } from '../../../utils/misc';
 import { hasReviewScope } from '../../../utils/permissions';
+import logger from '../../../logger';
 
 export type SearchParams = {
   query: string;
@@ -331,20 +332,23 @@ export const getUsersFromApprovedApps = async (): Promise<
     state: 'APPROVED',
   };
   // retrieve applicant + collaborators, only they get daco access
-  const results = await ApplicationModel.find(query, {
+  let results: UserDataFromApprovedApplicationsResult[] = [];
+  const cursor = ApplicationModel.find(query, {
     appId: 1,
     'sections.applicant': 1,
     'sections.collaborators': 1,
     lastUpdatedAtUtc: 1,
-  }).exec();
+  }).cursor();
 
-  return results.map((result) => {
+  for (let doc = await cursor.next(); doc != null; doc = await cursor.next()) {
     const approvedUsersInfo: UserDataFromApprovedApplicationsResult = {
-      applicant: result.sections.applicant,
-      collaborators: result.sections.collaborators,
-      appId: result.appId,
-      lastUpdatedAtUtc: result.lastUpdatedAtUtc,
+      applicant: doc.sections.applicant,
+      collaborators: doc.sections.collaborators,
+      appId: doc.appId,
+      lastUpdatedAtUtc: doc.lastUpdatedAtUtc,
     };
-    return approvedUsersInfo;
-  });
+    results.push(approvedUsersInfo);
+  }
+  logger.info('Finished retrieving all users from APPROVED applications.');
+  return results;
 };
