@@ -192,6 +192,9 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         }),
         lastPausedAtUtc: getLastPausedAtDate(app),
         isRenewal: app.isRenewal,
+        sourceAppId: app.sourceAppId,
+        renewalAppId: app.renewalAppId,
+        renewalPeriodEndDateUtc: app.renewalPeriodEndDateUtc,
       } as ApplicationSummary),
   );
 

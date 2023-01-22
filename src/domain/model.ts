@@ -196,6 +196,7 @@ const ApplicationSchema = new mongoose.Schema(
     emailNotifications: NotificationSentFlags,
     sourceAppId: { type: String, required: false },
     renewalAppId: { type: String, required: false },
+    renewalPeriodEndDateUtc: { type: Date, required: false },
   },
   {
     timestamps: {
