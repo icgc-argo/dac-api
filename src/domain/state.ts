@@ -71,6 +71,7 @@ import {
   getAttestationByDate,
   getDaysElapsed,
   isAttestable,
+  isExpirable,
   isRenewable,
 } from '../utils/calculations';
 import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
@@ -1129,18 +1130,22 @@ function updateAppStateForApprovedApplication(
   }
 
   if (updatePart.state === 'EXPIRED') {
-    if (updatedBy.role === DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
+    // only SYSTEM can expire an application
+    if (updatedBy.role !== DacoRole.SYSTEM) {
+      throw new Error('Users cannot expire an application.');
+    }
+    if (!isExpirable(currentApplication)) {
+      throw new Error('Application has not reached expiry date.');
     }
     return transitionToExpired(currentApplication, updatedBy);
   }
 
   if (updatePart.isAttesting === true) {
     if (!isAttestable(currentApplication)) {
-      throw new Error('Application is not attestable');
+      throw new Error('Application is not attestable.');
     }
     if (updatedBy.role !== DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
+      throw new Error('Only submitters can attest an application.');
     }
     return updateAttestedAtUtc(currentApplication, updatedBy);
   }
@@ -1167,14 +1172,18 @@ function updateAppStateForPausedApplication(
   if (updatePart.state === 'APPROVED') {
     // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
     if (updatedBy.role === DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
+      throw new Error('Submitters cannot approve an application.');
     }
     return transitionFromPausedToApproved(currentApplication, updatedBy);
   }
 
   if (updatePart.state === 'EXPIRED') {
-    if (updatedBy.role === DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
+    // only SYSTEM can expire an application
+    if (updatedBy.role !== DacoRole.SYSTEM) {
+      throw new Error('Users cannot expire an application.');
+    }
+    if (!isExpirable(currentApplication)) {
+      throw new Error('Application has not reached expiry date.');
     }
     return transitionToExpired(currentApplication, updatedBy);
   }
