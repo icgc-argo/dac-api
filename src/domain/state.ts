@@ -517,6 +517,10 @@ export class ApplicationStateManager {
         updateAppStateForPausedApplication(current, updatePart, updatedBy);
         break;
 
+      case 'EXPIRED':
+        updateAppStateForExpiredApplication(current, updatePart, updatedBy);
+        break;
+
       default:
         throw new Error(`Invalid app state: ${current.state}`);
     }
@@ -984,6 +988,15 @@ const transitionToPaused: (
   return current;
 };
 
+const transitionToExpired: (current: Application, expiredBy: UpdateAuthor) => Application = (
+  current,
+  expiredBy,
+) => {
+  current.state = 'EXPIRED';
+  current.updates.push(createUpdateEvent(current, expiredBy, UpdateEvent.EXPIRED));
+  return current;
+};
+
 function validateRevisionRequest(revisionRequest: RevisionRequestUpdate) {
   const atleastOneRequested = Object.keys(revisionRequest)
     .map((k) => k as keyof RevisionRequestUpdate)
@@ -1115,6 +1128,13 @@ function updateAppStateForApprovedApplication(
     }
   }
 
+  if (updatePart.state === 'EXPIRED') {
+    if (updatedBy.role === DacoRole.SUBMITTER) {
+      throw new Error('Not allowed');
+    }
+    return transitionToExpired(currentApplication, updatedBy);
+  }
+
   if (updatePart.isAttesting === true) {
     if (!isAttestable(currentApplication)) {
       throw new Error('Application is not attestable');
@@ -1150,6 +1170,13 @@ function updateAppStateForPausedApplication(
       throw new Error('Not allowed');
     }
     return transitionFromPausedToApproved(currentApplication, updatedBy);
+  }
+
+  if (updatePart.state === 'EXPIRED') {
+    if (updatedBy.role === DacoRole.SUBMITTER) {
+      throw new Error('Not allowed');
+    }
+    return transitionToExpired(currentApplication, updatedBy);
   }
 
   // can only attest if it is the configured # of days to attestationByUtc date or later
@@ -1222,6 +1249,16 @@ function updateAppStateForDraftApplication(
   // check if it's ready to move to the next state [DRAFT => SIGN & SUBMIT]
   // OR should move back to draft from SIGN & SUBMIT
   transitionToSignAndSubmitOrRollBack(current, 'PRISTINE', 'DISABLED', 'DRAFT');
+}
+
+function updateAppStateForExpiredApplication(
+  currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  updatedBy: UpdateAuthor,
+): void {
+  if (updatePart.state === 'CLOSED') {
+    transitionToClosed(currentApplication, updatedBy);
+  }
 }
 
 function transitionToSignAndSubmitOrRollBack(

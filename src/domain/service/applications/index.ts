@@ -40,6 +40,7 @@ import {
   sendCollaboratorRemovedEmail,
   sendApplicationClosedEmail,
   sendApplicationPausedEmail,
+  sendAccessHasExpiredEmail,
 } from '../emails';
 import { findApplication } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
@@ -156,6 +157,10 @@ export async function onStateChange(
   }
   if (updatedApp.state === 'PAUSED') {
     await sendApplicationPausedEmail(updatedApp, config, emailClient);
+  }
+
+  if (updatedApp.state === 'EXPIRED') {
+    await sendAccessHasExpiredEmail(updatedApp, config, emailClient);
   }
 }
 
