@@ -1,45 +1,46 @@
-import { Router, Request, Response, RequestHandler } from 'express';
+import { Router, Request, Response, RequestHandler, NextFunction } from 'express';
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import moment from 'moment';
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import JSZip from 'jszip';
-import _ from 'lodash';
+import { isArray } from 'lodash';
 
 import wrapAsync from '../utils/wrapAsync';
+import { create, updatePartial } from '../domain/service/applications';
 import {
-  create,
   createCollaborator,
-  deleteApp,
   deleteCollaborator,
-  getById,
-  search,
   updateCollaborator,
-  uploadDocument,
-  updatePartial,
+} from '../domain/service/collaborators';
+import {
   deleteDocument,
   getApplicationAssetsAsStream,
-  sendEmail,
-  searchCollaboratorApplications,
+  uploadDocument,
   createAppHistoryTSV,
-} from '../domain/service';
-import { BadRequest } from '../utils/errors';
+  createDacoCSVFile,
+} from '../domain/service/files';
+import {
+  deleteApp,
+  getById,
+  search,
+  searchCollaboratorApplications,
+  getSearchParams,
+} from '../domain/service/applications/search';
+import { BadRequest, Forbidden } from '../utils/errors';
 import logger from '../logger';
 import {
   FileFormat,
+  IRequest,
   PauseReason,
   UpdateApplication,
   UploadDocumentType,
 } from '../domain/interface';
-import { AppConfig, getAppConfig } from '../config';
+import { AppConfig } from '../config';
 import { Storage } from '../storage';
-import { getSearchParams, createDacoCSVFile, encrypt } from '../utils/misc';
-import { Readable } from 'stream';
 import runAllJobs from '../jobs/runAllJobs';
-
-export interface IRequest extends Request {
-  identity: Identity;
-}
+import { sendEncryptedApprovedUsersEmail } from '../jobs/approvedUsersEmail';
+import { isUserJwt } from '../utils/permissions';
 
 const createApplicationsRouter = (
   config: AppConfig,
@@ -128,7 +129,7 @@ const createApplicationsRouter = (
       if (!uploadedFile) {
         throw new BadRequest('File is required');
       }
-      if (_.isArray(uploadedFile)) {
+      if (isArray(uploadedFile)) {
         throw new BadRequest('Only one file');
       }
       const appId = validateId(req.params.id);
@@ -153,10 +154,20 @@ const createApplicationsRouter = (
   router.post(
     '/applications/',
     authFilter([]),
-    wrapAsync(async (req: Request, res: Response) => {
-      logger.info(`creating new application [user id: ${(req as IRequest).identity.userId}]`);
-      const app = await create((req as IRequest).identity);
-      return res.status(201).send(app);
+    wrapAsync(async (req: Request, res: Response, next: NextFunction) => {
+      const identity = (req as IRequest).identity;
+      try {
+        const isValidUser = isUserJwt(identity);
+        if (isValidUser) {
+          logger.info(`creating new application [user id: ${identity.userId}]`);
+          const app = await create(identity as UserIdentity);
+          return res.status(201).send(app);
+        } else {
+          throw new Forbidden('Invalid user!');
+        }
+      } catch (err) {
+        next(err);
+      }
     }),
   );
 
@@ -247,7 +258,7 @@ const createApplicationsRouter = (
       // other formats may be added in future but for now only handling DACO_FILE_FORMAT type, all else will return 400
       if (fileFormat === FileFormat.DACO_FILE_FORMAT) {
         // createCSV
-        const csv = await createDacoCSVFile(req);
+        const csv = await createDacoCSVFile();
         const currentDate = moment().tz('America/Toronto').format('YYYY-MM-DDTHH:mm');
         res.set('Content-Type', 'text/csv');
         res.status(200).attachment(`daco-users-${currentDate}.csv`).send(csv);
@@ -261,57 +272,12 @@ const createApplicationsRouter = (
     '/jobs/export-and-email/',
     authFilter([config.auth.reviewScope]),
     wrapAsync(async (req: Request, res: Response) => {
-      // generate CSV file from approved users
-      const csv = await createDacoCSVFile(req);
-      // encrypt csv content, return {content, iv}
-      const config = await getAppConfig();
       try {
-        // encrypt the contents
-        const encrypted = await encrypt(csv, config.auth.dacoEncryptionKey);
-
-        // build streams to zip later
-        const ivStream = new Readable();
-        ivStream.push(encrypted.iv);
-        // tslint:disable-next-line:no-null-keyword
-        ivStream.push(null);
-        const contentStream = new Readable();
-        contentStream.push(encrypted.content);
-        // tslint:disable-next-line:no-null-keyword
-        contentStream.push(null);
-
-        // build the zip package
-        const zip = new JSZip();
-        [
-          { name: 'iv.txt', stream: ivStream },
-          { name: 'approved_users.csv.enc', stream: contentStream },
-        ].forEach((a) => {
-          zip.file(a.name, a.stream);
-        });
-        const zipFileOut = await zip.generateAsync({
-          type: 'nodebuffer',
-        });
-        const zipName = `icgc_daco_users.zip`;
-
-        // send the email
-        sendEmail(
-          emailClient,
-          config.email.fromAddress,
-          config.email.fromName,
-          new Set([config.email.dccMailingList]),
-          'Approved DACO Users',
-          `find the attached zip package`,
-          undefined,
-          [
-            {
-              filename: zipName,
-              content: zipFileOut,
-              contentType: 'application/zip',
-            },
-          ],
-        );
+        logger.info('Retrieving approved users list');
+        sendEncryptedApprovedUsersEmail(emailClient);
         return res.status(200).send('OK');
       } catch (err) {
-        logger.error('failed to export users and email them');
+        logger.error('Failed to export approved users and email them');
         logger.error(err);
         if (err instanceof Error) {
           return res.status(500).send(err.message);
@@ -414,10 +380,19 @@ const createApplicationsRouter = (
   router.get(
     '/collaborators/applications',
     authFilter([]),
-    wrapAsync(async (req: Request, res: Response) => {
+    wrapAsync(async (req: Request, res: Response, next: NextFunction) => {
       const user = (req as IRequest).identity;
-      const applications = await searchCollaboratorApplications(user);
-      return res.status(200).send(applications);
+      try {
+        const isValidUser = isUserJwt(user);
+        if (isValidUser) {
+          const applications = await searchCollaboratorApplications(user as UserIdentity);
+          return res.status(200).send(applications);
+        } else {
+          throw new Forbidden('Invalid user!');
+        }
+      } catch (err) {
+        next(err);
+      }
     }),
   );
 
@@ -425,6 +400,7 @@ const createApplicationsRouter = (
     '/jobs/batch-transitions/',
     authFilter([config.auth.dacoSystemScope]),
     wrapAsync(async (req: Request, res: Response) => {
+      // TODO: add new system role check here to reject user jwts with system permission
       // respond immediately so cron job doesn't time out
       res.status(200).send('Starting all batch jobs...');
 

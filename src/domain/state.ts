@@ -1,9 +1,29 @@
+/*
+ * Copyright (c) 2022 The Ontario Institute for Cancer Research. All rights reserved
+ *
+ * This program and the accompanying materials are made available under the terms of
+ * the GNU Affero General Public License v3.0. You should have received a copy of the
+ * GNU Affero General Public License along with this program.
+ *  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+ * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 import moment from 'moment';
 import 'moment-timezone';
-import { cloneDeep, last } from 'lodash';
+import { cloneDeep, get, last } from 'lodash';
+import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
+
 import {
   Application,
-  TERMS_AGREEMENT_NAME,
   IT_AGREEMENT_PROTECT_DATA,
   IT_AGREEMENT_MONITOR_ACCESS,
   IT_AGREEMENT_SOFTWARE_UPDATES,
@@ -33,8 +53,9 @@ import {
   Sections,
   DacoRole,
   PauseReason,
+  SubmitterInfo,
+  NotificationSentFlags,
 } from './interface';
-import { Identity } from '@overture-stack/ego-token-middleware';
 import {
   validateAppendices,
   validateApplicantSection,
@@ -44,15 +65,16 @@ import {
   validateProjectInfo,
   validateRepresentativeSection,
 } from './validations';
-import { BadRequest, ConflictError, NotFound } from '../utils/errors';
-import { AppConfig } from '../config';
+import { BadRequest, ConflictError, Forbidden, NotFound } from '../utils/errors';
+import { getAppConfig } from '../config';
 import {
   getAttestationByDate,
   getDaysElapsed,
   isAttestable,
   isRenewable,
 } from '../utils/calculations';
-import { getLastPausedAtDate, getUpdateAuthor, mergeKnown } from '../utils/misc';
+import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
+import { getUpdateAuthor, hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -127,13 +149,21 @@ const stateToLockedSectionsMap: Record<
   },
 };
 
+// SYSTEM role is not allowed to do any modifications to collaborators or documents no matter what state the app is in
+// ADMIN role can add or delete collaborators and documents under certain conditions
+function checkAppIsApprovedAndUserCanAmend(current: Application, identity: Identity): void {
+  const isReviewer = hasReviewScope(identity);
+  const isSystem = hasDacoSystemScope(identity);
+  if ((isReviewer && current.state !== 'APPROVED') || isSystem) {
+    throw new Forbidden('User cannot perform action in this application state.');
+  }
+}
+
 export class ApplicationStateManager {
   public readonly currentApplication: Application;
-  public readonly currentAppConfig: AppConfig;
 
-  constructor(application: Application, config: AppConfig) {
+  constructor(application: Application) {
     this.currentApplication = cloneDeep(application);
-    this.currentAppConfig = cloneDeep(config);
   }
 
   prepareApplicationForUser(isReviewer: boolean) {
@@ -167,20 +197,13 @@ export class ApplicationStateManager {
     if (this.currentApplication.approvedAtUtc) {
       this.currentApplication.attestationByUtc = getAttestationByDate(
         this.currentApplication.approvedAtUtc,
-        this.currentAppConfig,
       );
     }
     // add isAttestable so FE doesn't need to do the calculation
-    this.currentApplication.isAttestable = isAttestable(
-      this.currentApplication,
-      this.currentAppConfig,
-    );
+    this.currentApplication.isAttestable = isAttestable(this.currentApplication);
 
     // calculate renewable status
-    this.currentApplication.ableToRenew = isRenewable(
-      this.currentApplication,
-      this.currentAppConfig,
-    );
+    this.currentApplication.ableToRenew = isRenewable(this.currentApplication);
 
     // adding to response for convenience in FE, so it doesn't need to parse value from updates array
     this.currentApplication.lastPausedAtUtc = getLastPausedAtDate(this.currentApplication);
@@ -188,18 +211,13 @@ export class ApplicationStateManager {
     return this.currentApplication;
   }
 
-  deleteDocument(
-    objectId: string,
-    type: UploadDocumentType,
-    updatedBy: string,
-    isReviewer: boolean,
-  ) {
+  deleteDocument(objectId: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
-    if (isReviewer && current.state !== 'APPROVED') {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend(current, identity);
+    const isReviewer = hasReviewScope(identity);
+
     if (type == 'ETHICS') {
-      return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(updatedBy, isReviewer));
+      return deleteEthicsLetterDocument(current, objectId, getUpdateAuthor(identity));
     }
 
     if (type == 'SIGNED_APP' && current.state == 'SIGN AND SUBMIT') {
@@ -215,26 +233,12 @@ export class ApplicationStateManager {
     throw new BadRequest('Operation not allowed');
   }
 
-  addDocument(
-    id: string,
-    name: string,
-    type: UploadDocumentType,
-    updatedBy: string,
-    isReviewer: boolean,
-  ) {
+  addDocument(id: string, name: string, type: UploadDocumentType, identity: Identity) {
     const current = this.currentApplication;
-    if (isReviewer && current.state !== 'APPROVED') {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend(current, identity);
 
     if (type == 'ETHICS') {
-      uploadEthicsLetter(
-        current,
-        id,
-        name,
-        getUpdateAuthor(updatedBy, isReviewer),
-        this.currentAppConfig,
-      );
+      uploadEthicsLetter(current, id, name, getUpdateAuthor(identity));
       return current;
     }
 
@@ -251,6 +255,7 @@ export class ApplicationStateManager {
     }
 
     if (type === 'APPROVED_PDF') {
+      const isReviewer = hasReviewScope(identity);
       if (current.state === 'APPROVED' && isReviewer) {
         const currentApprovedDoc = current.approvedAppDocs.find((doc) => doc.isCurrent);
         if (currentApprovedDoc) {
@@ -286,11 +291,10 @@ export class ApplicationStateManager {
     throw new BadRequest('Unknown file type');
   }
 
-  deleteCollaborator(collaboratorId: string, updatedBy: string, isReviewer: boolean) {
+  deleteCollaborator(collaboratorId: string, identity: Identity) {
     const current = this.currentApplication;
-    if (isReviewer && current.state !== 'APPROVED') {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend(current, identity);
+
     current.sections.collaborators.list = current.sections.collaborators.list.filter(
       (c) => c.id?.toString() !== collaboratorId,
     );
@@ -303,7 +307,7 @@ export class ApplicationStateManager {
     if (current.state == 'SIGN AND SUBMIT') {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
-      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(identity));
     } else if (current.state == 'DRAFT') {
       // This is to handle the scenario where changing the primary affiliation in applicant section in an application that is in the state 'SIGN & SUBMIT'
       // will invalidate the collaborators section
@@ -386,11 +390,10 @@ export class ApplicationStateManager {
     return current;
   }
 
-  addCollaborator(collaborator: CollaboratorDto, updatedBy: string, isReviewer: boolean) {
+  addCollaborator(collaborator: CollaboratorDto, identity: Identity) {
     const current = this.currentApplication;
-    if (isReviewer && current.state !== 'APPROVED') {
-      throw new Error('not allowed');
-    }
+    checkAppIsApprovedAndUserCanAmend(current, identity);
+
     const defaultCollaboratorInfo = {
       title: '',
       firstName: '',
@@ -476,7 +479,7 @@ export class ApplicationStateManager {
       resetSignedDocument(current);
     } else if (current.state == 'REVISIONS REQUESTED') {
       // trigger transition in application state and sign and submit check
-      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(updatedBy, isReviewer));
+      updateAppStateForReturnedApplication(current, {}, getUpdateAuthor(identity));
     }
 
     onAppUpdate(current);
@@ -487,14 +490,7 @@ export class ApplicationStateManager {
     const current = this.currentApplication;
     switch (this.currentApplication.state) {
       case 'APPROVED':
-        updateAppStateForApprovedApplication(
-          current,
-          updatePart,
-          isReviewer,
-          updatedBy,
-          this.currentAppConfig,
-          false,
-        );
+        updateAppStateForApprovedApplication(current, updatePart, updatedBy, false);
         break;
 
       case 'REVISIONS REQUESTED':
@@ -518,7 +514,7 @@ export class ApplicationStateManager {
         break;
 
       case 'PAUSED':
-        updateAppStateForPausedApplication(current, updatePart, updatedBy, this.currentAppConfig);
+        updateAppStateForPausedApplication(current, updatePart, updatedBy);
         break;
 
       default:
@@ -527,6 +523,15 @@ export class ApplicationStateManager {
 
     // save / error
     onAppUpdate(current);
+    return current;
+  }
+
+  updateEmailNotifications(notificationType: keyof NotificationSentFlags): Application {
+    const current = this.currentApplication;
+    if (!current.emailNotifications) {
+      current.emailNotifications = {};
+    }
+    current.emailNotifications[notificationType] = new Date();
     return current;
   }
 }
@@ -596,7 +601,18 @@ export function getSearchFieldValues(appDoc: Application) {
   ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
 }
 
-export function newApplication(identity: Identity): Partial<Application> {
+function getSubmitterInfo(identity: UserIdentity): SubmitterInfo {
+  const email = get(identity, 'tokenInfo.context.user.email');
+  if (email && typeof email === 'string') {
+    const info: SubmitterInfo = { userId: identity.userId, email };
+    return info;
+  } else {
+    throw new Forbidden('A submitter email is required to create a new application.');
+  }
+}
+// new applications can only be created by user jwt identities
+export function newApplication(identity: UserIdentity): Partial<Application> {
+  const submitter = getSubmitterInfo(identity);
   const pristineMeta = {
     status: 'PRISTINE' as SectionStatus,
     errorsList: [],
@@ -604,8 +620,8 @@ export function newApplication(identity: Identity): Partial<Application> {
 
   const app: Partial<Application> = {
     state: 'DRAFT',
-    submitterId: identity.userId,
-    submitterEmail: identity.tokenInfo.context.user.email,
+    submitterId: submitter.userId,
+    submitterEmail: submitter.email,
     revisionRequest: emptyRevisionRequest(),
     sections: {
       collaborators: {
@@ -697,7 +713,7 @@ export function newApplication(identity: Identity): Partial<Application> {
     ableToRenew: false,
   };
 
-  const author = getUpdateAuthor(identity.userId, false); // set to false as we already know user scopes have been checked
+  const author = getUpdateAuthor(identity);
   const createdEvent = createUpdateEvent(app as Application, author, UpdateEvent.CREATED);
   app.updates?.push(createdEvent);
 
@@ -742,7 +758,6 @@ function uploadEthicsLetter(
   id: string,
   name: string,
   updatedBy: UpdateAuthor,
-  config: AppConfig,
 ) {
   if (!current.sections.ethicsLetter.declaredAsRequired) {
     throw new Error('Must declare ethics letter as required first');
@@ -771,7 +786,7 @@ function uploadEthicsLetter(
   } else if (current.state == 'REVISIONS REQUESTED') {
     updateAppStateForReturnedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'APPROVED') {
-    updateAppStateForApprovedApplication(current, updatePart, false, updatedBy, config, true);
+    updateAppStateForApprovedApplication(current, updatePart, updatedBy, true);
   } else if (current.state == 'SIGN AND SUBMIT') {
     updateAppStateForSignAndSubmit(current, updatePart, updatedBy, true);
   } else {
@@ -924,12 +939,18 @@ function transitionFromPausedToApproved(
 }
 
 function transitionToApproved(current: Application, approvedBy: UpdateAuthor) {
+  const config = getAppConfig();
   current.state = 'APPROVED';
   current.approvedAtUtc = new Date();
   current.updates.push(createUpdateEvent(current, approvedBy, UpdateEvent.APPROVED));
   // if there was no custom expiry date set already
   if (!current.expiresAtUtc) {
-    current.expiresAtUtc = moment().add(2, 'year').toDate();
+    const {
+      durations: {
+        expiry: { count, unitOfTime },
+      },
+    } = config;
+    current.expiresAtUtc = moment().add(count, unitOfTime).toDate();
   }
   return current;
 }
@@ -1063,9 +1084,7 @@ function isReadyForReview(application: Application) {
 function updateAppStateForApprovedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
-  isReviewer: boolean,
   updatedBy: UpdateAuthor,
-  config: AppConfig,
   updateDocs?: boolean,
 ) {
   if (updatePart.state === 'CLOSED') {
@@ -1097,7 +1116,7 @@ function updateAppStateForApprovedApplication(
   }
 
   if (updatePart.isAttesting === true) {
-    if (!isAttestable(currentApplication, config)) {
+    if (!isAttestable(currentApplication)) {
       throw new Error('Application is not attestable');
     }
     if (updatedBy.role !== DacoRole.SUBMITTER) {
@@ -1105,6 +1124,7 @@ function updateAppStateForApprovedApplication(
     }
     return updateAttestedAtUtc(currentApplication, updatedBy);
   }
+
   if (currentApplication.sections.ethicsLetter.declaredAsRequired && updateDocs) {
     delete updatePart.sections?.ethicsLetter?.declaredAsRequired;
     updateEthics(updatePart, currentApplication, updateDocs);
@@ -1123,8 +1143,6 @@ function updateAppStateForPausedApplication(
   currentApplication: Application,
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
-  config: AppConfig,
-  updateDocs?: boolean,
 ) {
   if (updatePart.state === 'APPROVED') {
     // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
@@ -1135,7 +1153,7 @@ function updateAppStateForPausedApplication(
   }
 
   // can only attest if it is the configured # of days to attestationByUtc date or later
-  if (updatePart.isAttesting === true && isAttestable(currentApplication, config)) {
+  if (updatePart.isAttesting === true && isAttestable(currentApplication)) {
     // only submitters can attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
       return transitionFromPausedToApproved(currentApplication, updatedBy, updatePart);

@@ -32,9 +32,11 @@ import { countriesList } from './utils/constants';
 import { Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { BadRequest, ConflictError, NotFound } from './utils/errors';
-const App = (config: AppConfig,
-             storageClient: Storage,
-             emailClient: Transporter<SMTPTransport.SentMessageInfo>): express.Express => {
+const App = (
+  config: AppConfig,
+  storageClient: Storage,
+  emailClient: Transporter<SMTPTransport.SentMessageInfo>,
+): express.Express => {
   // Auth middleware
   const noOpReqHandler: RequestHandler = (req, res, next) => {
     logger.warn('calling protected endpoint without auth enabled');
@@ -71,11 +73,7 @@ const App = (config: AppConfig,
   });
   const swaggerDoc = yaml.load(path.join(__dirname, './resources/swagger.yaml'));
   swaggerDoc.servers = [{ url: config.basePath }];
-  app.use(
-    config.openApiPath,
-    swaggerUi.serve,
-    swaggerUi.setup(swaggerDoc)
-  );
+  app.use(config.openApiPath, swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 
   app.use(errorHandler);
   return app;
@@ -115,7 +113,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
     error: err.name,
     message: customizableMsg,
     code: (err as any).code,
-    details: (err as any).details
+    details: (err as any).details,
   });
   next(err);
 };

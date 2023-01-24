@@ -1,3 +1,7 @@
+import { Request } from 'express';
+
+import { Identity } from '@overture-stack/ego-token-middleware';
+
 export type State =
   | 'DRAFT'
   | 'SIGN AND SUBMIT'
@@ -280,6 +284,7 @@ export interface Application {
   isAttestable: boolean;
   pauseReason?: PauseReason | null;
   lastPausedAtUtc?: Date;
+  emailNotifications?: NotificationSentFlags;
 }
 
 export type AppSections = keyof Application['sections'];
@@ -295,6 +300,16 @@ export type RevisionSections =
     >
   | 'general';
 export type RevisionRequestUpdate = Partial<Record<RevisionSections, RevisionRequest>>;
+
+export interface NotificationSentFlags {
+  attestationRequiredNotificationSent?: Date;
+  applicationPausedNotificationSent?: Date;
+  firstExpiryNotificationSent?: Date;
+  secondExpiryNotificationSent?: Date;
+  applicationExpiredNotificationSent?: Date;
+  applicationClosedNotificationSent?: Date;
+}
+
 export interface UpdateApplication {
   state?: State;
   expiresAtUtc?: Date;
@@ -344,6 +359,11 @@ export interface UpdateApplication {
   };
 }
 
+export interface SubmitterInfo {
+  userId: string;
+  email: string;
+}
+
 export enum FileFormat {
   DACO_FILE_FORMAT = 'daco-file-format',
 }
@@ -354,7 +374,26 @@ export type ColumnHeader = {
   format?: (value: any) => any;
 };
 
-export const TERMS_AGREEMENT_NAME = 'introduction_agree_to_terms';
+export interface IRequest extends Request {
+  identity: Identity;
+}
+
+export interface UserDataFromApprovedApplicationsResult {
+  applicant: Sections['applicant'];
+  collaborators: Sections['collaborators'];
+  lastUpdatedAtUtc?: Date;
+  appId: string;
+}
+
+export interface ApprovedUserRowData {
+  userName: string;
+  openId: string;
+  email: string;
+  affiliation: string;
+  changed: string;
+}
+
+// agreements constants
 export const IT_AGREEMENT_SOFTWARE_UPDATES = 'it_agreement_software_updates';
 export const IT_AGREEMENT_PROTECT_DATA = 'it_agreement_protect_data';
 export const IT_AGREEMENT_MONITOR_ACCESS = 'it_agreement_monitor_access';

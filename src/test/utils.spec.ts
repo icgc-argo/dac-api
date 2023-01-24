@@ -1,10 +1,9 @@
-import { Identity } from '@overture-stack/ego-token-middleware';
+import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
 import moment from 'moment';
 
 import { cloneDeep } from 'lodash';
 import { newApplication } from '../domain/state';
-import { AppConfig } from '../config';
 import { getDaysElapsed, isAttestable, isRenewable } from '../utils/calculations';
 import {
   getAppInReview,
@@ -17,27 +16,9 @@ import {
   getRejectedApplication,
 } from './state.spec';
 import { Application } from '../domain/interface';
+import { mockApplicantToken } from './mocks.spec';
 
-const mockConfig = {
-  durations: {
-    attestation: {
-      count: 1,
-      unitOfTime: 'years',
-      daysToAttestation: 45,
-    },
-  },
-} as AppConfig;
-
-const newApplication1: Partial<Application> = newApplication({
-  userId: 'abc123',
-  tokenInfo: {
-    context: {
-      user: {
-        email: 'test@example.com',
-      },
-    },
-  },
-} as Identity);
+const newApplication1: Partial<Application> = newApplication(mockApplicantToken as UserIdentity);
 
 describe('utils', () => {
   describe('daysElapsed', () => {
@@ -80,7 +61,7 @@ describe('utils', () => {
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(11, 'months').toDate();
       approvedApp.approvedAtUtc = mockApprovalDate;
-      const canAttest = isAttestable(approvedApp, mockConfig);
+      const canAttest = isAttestable(approvedApp);
       expect(canAttest).to.be.true;
     });
 
@@ -89,63 +70,51 @@ describe('utils', () => {
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(10, 'months').toDate();
       approvedApp.approvedAtUtc = mockApprovalDate;
-      const canAttest = isAttestable(approvedApp, mockConfig);
+      const canAttest = isAttestable(approvedApp);
       expect(canAttest).to.be.false;
     });
 
     it('should be attestable after attestationByUtc date', () => {
-      const pausedApp = getPausedApplication(mockConfig);
+      const pausedApp = getPausedApplication();
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(13, 'months').toDate();
       pausedApp.approvedAtUtc = mockApprovalDate;
-      const canAttest = isAttestable(pausedApp, mockConfig);
+      const canAttest = isAttestable(pausedApp);
       expect(canAttest).to.be.true;
     });
 
     it('should be attestable on the attestationByUtc date', () => {
-      const pausedApp = getPausedApplication(mockConfig);
+      const pausedApp = getPausedApplication();
       const now = moment.utc().toDate();
       const mockApprovalDate = moment(now).subtract(1, 'year').toDate();
       pausedApp.approvedAtUtc = mockApprovalDate;
-      const canAttest = isAttestable(pausedApp, mockConfig);
+      const canAttest = isAttestable(pausedApp);
       expect(canAttest).to.be.true;
     });
   });
 
   describe('isRenewable', () => {
-    const mockRenewalConfig = {
-      durations: {
-        expiry: {
-          daysToExpiry1: 90,
-          daysToExpiry2: 45,
-          daysPostExpiry: 90,
-          count: 150,
-          unitOfTime: 'days',
-        },
-      },
-    } as AppConfig;
-
     it('should not be renewable in CLOSED after approval state', () => {
       const closedApp = getClosedAfterApprovalApplication();
-      const canRenew = isRenewable(closedApp, mockRenewalConfig);
+      const canRenew = isRenewable(closedApp);
       expect(canRenew).to.be.false;
     });
 
     it('should not be renewable in CLOSED before approval state', () => {
       const closedApp = getClosedBeforeApprovalApplication();
-      const canRenew = isRenewable(closedApp, mockRenewalConfig);
+      const canRenew = isRenewable(closedApp);
       expect(canRenew).to.be.false;
     });
 
     it('should not be renewable in REJECTED state', () => {
       const rejectedApp = getRejectedApplication();
-      const canRenew = isRenewable(rejectedApp, mockRenewalConfig);
+      const canRenew = isRenewable(rejectedApp);
       expect(canRenew).to.be.false;
     });
 
     it('should not be renewable in REVIEW state', () => {
       const reviewApp = getAppInReview();
-      const canRenew = isRenewable(reviewApp, mockRenewalConfig);
+      const canRenew = isRenewable(reviewApp);
       expect(canRenew).to.be.false;
     });
 
@@ -155,25 +124,25 @@ describe('utils', () => {
         appId: 'DACO-1',
         appNumber: 1,
       }) as Application;
-      const canRenew = isRenewable(draftApp, mockRenewalConfig);
+      const canRenew = isRenewable(draftApp);
       expect(canRenew).to.be.false;
     });
 
     it('should not be renewable in SIGN AND SUBMIT state', () => {
       const signSubmitApp = getReadyToSignApp();
-      const canRenew = isRenewable(signSubmitApp, mockRenewalConfig);
+      const canRenew = isRenewable(signSubmitApp);
       expect(canRenew).to.be.false;
     });
 
     it('should not be renewable in REVISIONS REQUESTED state', () => {
       const revisionsApp = getAppInRevisionRequested();
-      const canRenew = isRenewable(revisionsApp, mockRenewalConfig);
+      const canRenew = isRenewable(revisionsApp);
       expect(canRenew).to.be.false;
     });
 
     it('should not be renewable if app has never been APPROVED', () => {
       const readyToSignApp = getReadyToSignApp();
-      const canRenew = isRenewable(readyToSignApp, mockRenewalConfig);
+      const canRenew = isRenewable(readyToSignApp);
       expect(canRenew).to.be.false;
     });
 
@@ -182,7 +151,7 @@ describe('utils', () => {
       expect(app.expiresAtUtc).to.not.eq(undefined);
       const mockExpiresAtUtc = moment.utc().subtract(45, 'days');
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      const canRenew = isRenewable(app, mockRenewalConfig);
+      const canRenew = isRenewable(app);
       expect(canRenew).to.be.true;
     });
 
@@ -191,7 +160,7 @@ describe('utils', () => {
       expect(app.expiresAtUtc).to.not.eq(undefined);
       const mockExpiresAtUtc = moment.utc().subtract(100, 'days');
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      const canRenew = isRenewable(app, mockRenewalConfig);
+      const canRenew = isRenewable(app);
       expect(canRenew).to.be.false;
     });
 
@@ -200,7 +169,7 @@ describe('utils', () => {
       expect(app.expiresAtUtc).to.not.eq(undefined);
       const mockExpiresAtUtc = moment.utc().subtract(90, 'days');
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      const canRenew = isRenewable(app, mockRenewalConfig);
+      const canRenew = isRenewable(app);
       expect(canRenew).to.be.true;
     });
 
@@ -209,7 +178,7 @@ describe('utils', () => {
       expect(app.expiresAtUtc).to.not.eq(undefined);
       const mockExpiresAtUtc = moment.utc().add(75, 'days');
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      const canRenew = isRenewable(app, mockRenewalConfig);
+      const canRenew = isRenewable(app);
       expect(canRenew).to.be.true;
     });
 
@@ -218,7 +187,7 @@ describe('utils', () => {
       expect(app.expiresAtUtc).to.not.eq(undefined);
       const mockExpiresAtUtc = moment.utc().add(90, 'days');
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      const canRenew = isRenewable(app, mockRenewalConfig);
+      const canRenew = isRenewable(app);
       expect(canRenew).to.be.true;
     });
 
@@ -227,7 +196,7 @@ describe('utils', () => {
       expect(app.expiresAtUtc).to.not.eq(undefined);
       const mockExpiresAtUtc = moment.utc().add(120, 'days');
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      const canRenew = isRenewable(app, mockRenewalConfig);
+      const canRenew = isRenewable(app);
       expect(canRenew).to.be.false;
     });
 
@@ -236,17 +205,7 @@ describe('utils', () => {
       expect(app.expiresAtUtc).to.not.eq(undefined);
       const mockExpiresAtUtc = moment.utc();
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      const canRenew = isRenewable(app, mockRenewalConfig);
-      expect(canRenew).to.be.true;
-    });
-
-    it('should be renewable if app has been renewed before', () => {
-      const app = getApprovedApplication();
-      expect(app.expiresAtUtc).to.not.eq(undefined);
-      const mockExpiresAtUtc = moment.utc().add(75, 'days');
-      app.expiresAtUtc = mockExpiresAtUtc.toDate();
-      app.isRenewal = true;
-      const canRenew = isRenewable(app, mockRenewalConfig);
+      const canRenew = isRenewable(app);
       expect(canRenew).to.be.true;
     });
   });

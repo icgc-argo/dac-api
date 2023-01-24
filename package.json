@@ -1,6 +1,6 @@
 {
   "name": "dac-api",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "",
   "scripts": {
     "start": "npm run serve",
@@ -11,7 +11,7 @@
     "build": "npm run build-ts && npm run resources && npm run tslint",
     "debug": "npm run build && sleep 3 && npm run watch-debug",
     "watch-debug": "nodemon --delay 1000ms --inspect --watch 'src/**/*.ts' --exec node -r ts-node/register ./src/server.ts",
-    "test": "mocha --exit -r ts-node/register src/test/**/*.spec.ts",
+    "test": "mocha --exit",
     "migrate-up": "migrate-mongo up",
     "migrate-down": "migrate-mongo down",
     "migrate-status": "migrate-mongo status"
@@ -83,10 +83,9 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.18.0",
     "@aws-sdk/s3-request-presigner": "^3.18.0",
-    "@overture-stack/ego-token-middleware": "^2.3.0",
+    "@overture-stack/ego-token-middleware": "^2.4.1",
     "archiver": "^5.3.0",
     "aws-sdk": "^2.923.0",
-    "axios": "^0.21.1",
     "body-parser": "^1.19.0",
     "cd": "^0.3.3",
     "connect-mongo": "^4.4.1",
