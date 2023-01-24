@@ -647,7 +647,7 @@ describe('state manager', () => {
         false,
         user,
       ),
-    ).to.throw(Error, 'Not allowed');
+    ).to.throw(Error, 'Only submitters can attest an application.');
     const userApp = state.prepareApplicationForUser(false);
     expect(userApp.attestedAtUtc).to.eq(undefined);
   });
