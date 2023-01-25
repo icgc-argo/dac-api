@@ -17,14 +17,19 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { difference, isEmpty } from 'lodash';
+import { difference, filter, isEmpty } from 'lodash';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 
 import { AppConfig, getAppConfig } from '../../../config';
 import { ApplicationModel } from '../../model';
-import { ApplicationStateManager, getSearchFieldValues, newApplication } from '../../state';
+import {
+  ApplicationStateManager,
+  renewalApplication,
+  getSearchFieldValues,
+  newApplication,
+} from '../../state';
 import { Application, UpdateApplication } from '../../interface';
 import { Storage } from '../../../storage';
 import logger from '../../../logger';
@@ -41,9 +46,14 @@ import {
   sendApplicationClosedEmail,
   sendApplicationPausedEmail,
 } from '../emails';
-import { findApplication } from './search';
+import { checkEthicsDocWasUnique, findApplication, getById } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
 import { Forbidden, throwApplicationClosedError } from '../../../utils/errors';
+import { isRenewable } from '../../../utils/calculations';
+
+function createAppId(app: Application): string {
+  return `DACO-${app.appNumber}`;
+}
 
 export async function create(identity: UserIdentity) {
   const isAdminOrReviewerResult = hasReviewScope(identity);
@@ -52,7 +62,7 @@ export async function create(identity: UserIdentity) {
   }
   const app = newApplication(identity);
   const appDoc = await ApplicationModel.create(app);
-  appDoc.appId = `DACO-${appDoc.appNumber}`;
+  appDoc.appId = createAppId(appDoc);
   appDoc.searchValues = getSearchFieldValues(appDoc);
   await appDoc.save();
   const copy = appDoc.toObject();
@@ -93,7 +103,7 @@ export async function updatePartial(
     await sendAttestationReceivedEmail(updatedApp, config, emailClient);
   }
 
-  const deleted = checkDeletedDocuments(appDocObj, updatedApp);
+  const deleted = await checkDeletedDocuments(appDocObj, updatedApp);
   // Delete orphan documents that are no longer associated with the application in the background
   // this can be a result of application getting updated :
   // - Changing selection of ethics letter from required to not required
@@ -159,7 +169,7 @@ export async function onStateChange(
   }
 }
 
-function checkDeletedDocuments(appDocObj: Application, result: Application) {
+async function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const removedIds: string[] = [];
   const ethicsArrayBefore = appDocObj.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
@@ -168,7 +178,19 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
   const ethicsDiff = difference(ethicsArrayBefore, ethicsArrayAfter);
-  ethicsDiff.forEach((o) => removedIds.push(o));
+  // for the renewal/source app ethics letter scenario with the same file id referenced in 2 (or more) different apps
+  // if the ethics letter declaredAsRequired is changed to false in the renewal, this will trigger the checkDeletedDocuments,
+  // and delete the file in storage (because the id has been removed from the approvalLetterDocs array)
+  // here we check that objectIds are unique, to ensure they are not deleted from object storage if associated with another application
+  const uniqueEthicsIds: string[] = [];
+  for await (const id of ethicsDiff) {
+    const isUnique = await checkEthicsDocWasUnique(id);
+    if (isUnique) {
+      uniqueEthicsIds.push(id);
+    }
+    break;
+  }
+  uniqueEthicsIds.forEach((o) => removedIds.push(o));
 
   if (
     appDocObj.sections.signature.signedAppDocObjId &&
@@ -186,6 +208,54 @@ function checkDeletedDocuments(appDocObj: Application, result: Application) {
   const approvedDiff = difference(approvedArrayBefore, approvedArrayAfter);
   approvedDiff.forEach((o) => removedIds.push(o));
 
-  logger.info('removing docs: ', removedIds);
+  logger.info(`removing docs: ${removedIds}`);
   return removedIds;
+}
+
+export async function handleRenewalRequest(
+  appId: string,
+  identity: UserIdentity,
+): Promise<Application | undefined> {
+  // fetch original app by id
+  // findApplication queries submitterId by identity.userId, so if request is from an applicant, the userId must match application.submitterId
+  // TODO: admins can query for all applications, should they be allowed to create renewals?
+  const originalAppDoc = await findApplication(checkIsDefined(appId), identity);
+  const originalAppDocObj: Application = originalAppDoc.toObject();
+
+  if (!isRenewable(originalAppDocObj)) {
+    throw new Error('Application is not renewable.');
+  }
+
+  logger.info('Starting session for renewal transaction.');
+  const session = await ApplicationModel.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const renewalApp = renewalApplication(identity, originalAppDocObj);
+      logger.info(`Creating renewal application from ${originalAppDocObj.appId}.`);
+      const created = await ApplicationModel.create([renewalApp], { session: session });
+      const renewalAppDoc = created[0];
+      renewalAppDoc.appId = createAppId(renewalAppDoc);
+      renewalAppDoc.searchValues = getSearchFieldValues(renewalAppDoc);
+      logger.info(`Created renewal application ${renewalAppDoc.appId}, saving.`);
+      await renewalAppDoc.save({ session: session });
+      const stateManager = new ApplicationStateManager(originalAppDocObj);
+      // add to original application
+      const updated = stateManager.updateAsRenewed(renewalAppDoc.appId);
+      // save updated source app in db
+      logger.info(`Updating original application with renewalId [${updated.renewalAppId}].`);
+      await ApplicationModel.updateOne({ appId: originalAppDocObj.appId }, updated, {
+        session: session,
+      });
+      logger.info('Renewal successful!');
+    });
+  } catch (err) {
+    logger.error('There was an error, rolling back!');
+    logger.error(err);
+  } finally {
+    logger.info('Ending session');
+    session.endSession();
+  }
+  // refetch original application and return
+  const updatedOriginal = await getById(appId, identity);
+  return updatedOriginal;
 }

@@ -264,10 +264,10 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
+  const viewableApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
-  return viewAbleApplication;
+  return viewableApplication;
 }
 
 export async function findApplication(appId: string, identity: Identity) {
@@ -351,3 +351,11 @@ export const getUsersFromApprovedApps = async (): Promise<
     return approvedUsersInfo;
   });
 };
+
+export async function checkEthicsDocWasUnique(objectId: string): Promise<boolean> {
+  const query: FilterQuery<ApplicationDocument> = {
+    'sections.ethicsLetter.approvalLetterDocs': { $elemMatch: { objectId: objectId } },
+  };
+  const result = await ApplicationModel.countDocuments(query).exec();
+  return result === 0;
+}

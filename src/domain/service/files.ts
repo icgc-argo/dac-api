@@ -40,6 +40,7 @@ import {
 import { Storage } from '../../storage';
 import logger, { buildMessage } from '../../logger';
 import {
+  checkEthicsDocWasUnique,
   findApplication,
   getApplicationUpdates,
   getUsersFromApprovedApps,
@@ -58,9 +59,21 @@ export async function deleteDocument(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
   const stateManager = new ApplicationStateManager(appDocObj);
+  // delete the document reference in app state
   const result = stateManager.deleteDocument(objectId, type, identity);
+  // update application docs in db
   await ApplicationModel.updateOne({ appId: result.appId }, result);
-  await storageClient.delete(objectId);
+  // if doc type is ethics letter, check if the objectId is referenced in another application
+  // if not referenced elsewhere, it is safe to delete from object storage
+  let shouldDeleteFile = true;
+  if (type === 'ETHICS') {
+    shouldDeleteFile = await checkEthicsDocWasUnique(objectId);
+  }
+  if (shouldDeleteFile) {
+    logger.info(`File with objectId [${objectId}] was unique, can delete from storage`);
+    // delete the file from object storage
+    await storageClient.delete(objectId);
+  }
   const updated = await findApplication(checkIsDefined(result.appId), identity);
   const viewableApplication = new ApplicationStateManager(
     updated.toObject(),
