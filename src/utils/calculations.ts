@@ -57,8 +57,7 @@ export const isRenewable: (currentApp: Application) => boolean = (currentApp) =>
   if (!(currentApp.expiresAtUtc && ['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state))) {
     return false;
   }
-  // can only create one renewal application
-  // TODO: should this id be deletable if the renewal app is accidentally closed before approval?
+  // can only create one renewal application per source application
   if (currentApp.renewalAppId) {
     return false;
   }

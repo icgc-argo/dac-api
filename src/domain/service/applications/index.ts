@@ -216,9 +216,12 @@ export async function handleRenewalRequest(
   appId: string,
   identity: UserIdentity,
 ): Promise<Application | undefined> {
+  // admins cannot create renewals
+  if (hasReviewScope(identity)) {
+    throw new Error('Admins cannot create renewal applications.');
+  }
   // fetch original app by id
   // findApplication queries submitterId by identity.userId, so if request is from an applicant, the userId must match application.submitterId
-  // TODO: admins can query for all applications, should they be allowed to create renewals?
   const originalAppDoc = await findApplication(checkIsDefined(appId), identity);
   const originalAppDocObj: Application = originalAppDoc.toObject();
 
@@ -239,9 +242,9 @@ export async function handleRenewalRequest(
       logger.info(`Created renewal application ${renewalAppDoc.appId}, saving.`);
       await renewalAppDoc.save({ session: session });
       const stateManager = new ApplicationStateManager(originalAppDocObj);
-      // add to original application
+      // add renewal info to original application
       const updated = stateManager.updateAsRenewed(renewalAppDoc.appId);
-      // save updated source app in db
+      // save updated original app in db
       logger.info(`Updating original application with renewalId [${updated.renewalAppId}].`);
       await ApplicationModel.updateOne({ appId: originalAppDocObj.appId }, updated, {
         session: session,

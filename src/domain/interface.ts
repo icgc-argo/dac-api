@@ -323,7 +323,6 @@ export interface UpdateApplication {
   revisionRequest?: RevisionRequestUpdate;
   pauseReason?: PauseReason;
   isAttesting?: boolean;
-  isRenewing?: boolean;
   sections: {
     applicant?: {
       info?: Partial<PersonalInfo>;

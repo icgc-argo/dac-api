@@ -639,9 +639,10 @@ export function renewalApplication(
   identity: UserIdentity,
   originalApp: Application,
 ): Partial<Application> {
+  const submitter = getSubmitterInfo(identity);
   const newApplication: Partial<Application> = {
-    submitterId: originalApp.submitterId,
-    submitterEmail: originalApp.submitterEmail,
+    submitterId: submitter.userId,
+    submitterEmail: submitter.email,
     state: 'DRAFT',
     revisionRequest: emptyRevisionRequest(),
     sections: {
