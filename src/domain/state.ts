@@ -68,6 +68,7 @@ import {
 import { BadRequest, ConflictError, Forbidden, NotFound } from '../utils/errors';
 import { getAppConfig } from '../config';
 import {
+  cannotReviseRenewal,
   getAttestationByDate,
   getDaysElapsed,
   isAttestable,
@@ -883,6 +884,9 @@ function updateAppStateForReviewApplication(
   }
 
   if (updatePart.state == 'REVISIONS REQUESTED') {
+    if (cannotReviseRenewal(current)) {
+      throw new Error('An application past its renewal period can only be APPROVED or REJECTED.');
+    }
     return transitionToRevisionsRequested(current, updatePart, updatedBy);
   }
 

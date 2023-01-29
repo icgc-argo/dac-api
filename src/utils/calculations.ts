@@ -78,3 +78,8 @@ export const isRenewable: (currentApp: Application) => boolean = (currentApp) =>
   // between DAYS_TO_EXPIRY_1 days prior to today and DAYS_POST_EXPIRY after
   return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
 };
+
+export const cannotReviseRenewal = (currentApp: Application): boolean => {
+  const today = moment.utc().startOf('day');
+  return currentApp.isRenewal && moment(currentApp?.renewalPeriodEndDateUtc).isBefore(today);
+};
