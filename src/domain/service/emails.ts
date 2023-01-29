@@ -41,6 +41,7 @@ import renderAccessHasExpiredEmail from '../../emails/access-has-expired';
 import renderAttestationRequiredEmail from '../../emails/attestation-required';
 import renderApplicationPausedEmail from '../../emails/application-paused';
 import renderAttestationReceivedEmail from '../../emails/attestation-received';
+import renderReviewRenewalEmail from '../../emails/review-renewal';
 
 function getApplicantEmails(app: Application) {
   return new Set([
@@ -279,6 +280,21 @@ export async function sendReviewEmail(
     );
     emailContent = reviewEmail.html;
     title = `[${updatedApp.appId}] A Revised Application has been Submitted`;
+  } else if (oldApplication.isRenewal) {
+    // send a renewal for review email
+    const reviewEmail = await renderReviewRenewalEmail(
+      updatedApp,
+      {
+        firstName: config.email.reviewerFirstName,
+        lastName: config.email.reviewerLastName,
+      },
+      {
+        baseUrl: config.ui.baseUrl,
+        pathTemplate: config.ui.sectionPath,
+      },
+    );
+    emailContent = reviewEmail.html;
+    title = `[${updatedApp.appId}] A Renewal Application has been Submitted`;
   } else {
     // send new app for review email
     const reviewEmail = await renderReviewEmail(
