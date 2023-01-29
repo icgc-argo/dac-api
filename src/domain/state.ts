@@ -1132,7 +1132,7 @@ function updateAppStateForApprovedApplication(
   if (updatePart.state === 'EXPIRED') {
     // only SYSTEM can expire an application
     if (updatedBy.role !== DacoRole.SYSTEM) {
-      throw new Error('Users cannot expire an application.');
+      throw new Forbidden('Users cannot expire an application.');
     }
     if (!isExpirable(currentApplication)) {
       throw new Error('Application has not reached expiry date.');
@@ -1180,7 +1180,7 @@ function updateAppStateForPausedApplication(
   if (updatePart.state === 'EXPIRED') {
     // only SYSTEM can expire an application
     if (updatedBy.role !== DacoRole.SYSTEM) {
-      throw new Error('Users cannot expire an application.');
+      throw new Forbidden('Users cannot expire an application.');
     }
     if (!isExpirable(currentApplication)) {
       throw new Error('Application has not reached expiry date.');

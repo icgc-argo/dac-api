@@ -681,20 +681,49 @@ describe('state manager', () => {
     expect(get(app, 'sections.signature.meta.lastUpdatedAtUtc')).to.not.be.undefined;
   }
 
-  it('should renew a renewable APPROVED application', () => {
-    // TODO: implement
+  it('should expire an APPROVED app that has reached its expiry date', () => {
+    const app = getApprovedApplication();
+    app.expiresAtUtc = new Date();
+    const stateManager = new ApplicationStateManager(app);
+    const user = { id: 'System User', role: DacoRole.SYSTEM };
+    stateManager.updateApp({ state: 'EXPIRED' }, false, user);
+    const viewableApp = stateManager.prepareApplicationForUser(false);
+
+    expect(viewableApp.state).to.eq('EXPIRED');
   });
 
-  it('should renew an EXPIRED application', () => {
-    // TODO: EXPIRED state to be implemented
+  it('should expire a PAUSED app that has reached its expiry date', () => {
+    const app = getPausedApplication();
+    app.expiresAtUtc = new Date();
+    const stateManager = new ApplicationStateManager(app);
+    const user = { id: 'System User', role: DacoRole.SYSTEM };
+    stateManager.updateApp({ state: 'EXPIRED' }, false, user);
+    const viewableApp = stateManager.prepareApplicationForUser(false);
+
+    expect(viewableApp.state).to.eq('EXPIRED');
   });
 
-  it('should not renew a non-renewable application', () => {
-    // TODO: implement
+  it('should not allow a non-SYSTEM actor to expire an app', () => {
+    const app = getPausedApplication();
+    app.expiresAtUtc = new Date();
+    const stateManager = new ApplicationStateManager(app);
+    const user = { id: 'Admin User', role: DacoRole.ADMIN };
+
+    expect(() => stateManager.updateApp({ state: 'EXPIRED' }, true, user)).to.throw(
+      Forbidden,
+      'Users cannot expire an application.',
+    );
   });
 
-  it('should renew an application that has been previously renewed', () => {
-    // TODO: implement
+  it('should not expire an app that has not reached its expiry date', () => {
+    const app = getPausedApplication();
+    const stateManager = new ApplicationStateManager(app);
+    const user = { id: 'System User', role: DacoRole.SYSTEM };
+
+    expect(() => stateManager.updateApp({ state: 'EXPIRED' }, true, user)).to.throw(
+      Error,
+      'Application has not reached expiry date.',
+    );
   });
 });
 

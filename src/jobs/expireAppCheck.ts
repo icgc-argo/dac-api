@@ -161,8 +161,8 @@ const getAppExpiringQuery = (
     },
   } = config;
   // is expiry between today and 90 days ago
-  const lowerThreshold = moment(referenceDate).endOf('day');
-  const range2 = moment(referenceDate)
+  const upperThreshold = moment(referenceDate).endOf('day').toDate();
+  const lowerThreshold = moment(referenceDate)
     .startOf('day')
     .subtract(daysPostExpiry, NOTIFICATION_UNIT_OF_TIME)
     .toDate();
@@ -172,8 +172,8 @@ const getAppExpiringQuery = (
       $in: ['APPROVED', 'PAUSED', 'EXPIRED'],
     },
     expiresAtUtc: {
-      $lte: lowerThreshold.toDate(),
-      $gte: range2,
+      $lte: upperThreshold,
+      $gte: lowerThreshold,
     },
     'emailNotifications.applicationExpiredNotificationSent': { $exists: false },
   };
