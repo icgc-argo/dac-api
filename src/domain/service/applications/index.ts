@@ -231,6 +231,7 @@ export async function handleRenewalRequest(
 
   logger.info('Starting session for renewal transaction.');
   const session = await ApplicationModel.startSession();
+  let renewalAppId: string | undefined;
   try {
     await session.withTransaction(async () => {
       const renewalApp = renewalApplication(identity, originalAppDocObj);
@@ -250,6 +251,7 @@ export async function handleRenewalRequest(
         session: session,
       });
       logger.info('Renewal successful!');
+      renewalAppId = renewalAppDoc.appId;
     });
   } catch (err) {
     logger.error('There was an error, rolling back!');
@@ -258,7 +260,10 @@ export async function handleRenewalRequest(
     logger.info('Ending session');
     session.endSession();
   }
-  // refetch original application and return
-  const updatedOriginal = await getById(appId, identity);
-  return updatedOriginal;
+
+  if (renewalAppId) {
+    // refetch renewal app and return
+    const renewal = await getById(renewalAppId, identity);
+    return renewal;
+  }
 }
