@@ -14,7 +14,30 @@ import { sendAccessExpiringEmail } from '../domain/service/emails';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 
 const JOB_NAME = 'FIRST EXPIRY NOTIFICATIONS';
-// 1st notification for applications entering renewal period (DAYS_TO_EXPIRY_1)
+/**
+ * ```
+ * Batch job to find all applications entering the renewal period (expiresAtUtc - DAYS_TO_EXPIRY_1) and notify applicants via email
+ * Returns a BatchJobReport with details on appIds retrieved, report start and end time, job success status, and any errors encountered
+ * Query uses a date range (DAYS_TO_EXPIRY_1 to DAYS_TO_EXPIRY_2) to account for days where the batch job run may have been missed
+ * Sets a flag on the app, firstExpiryNotificationSent, to indicate an email has been sent and application can be ignored on a subsequent run
+ * ```
+ * @param currentDate
+ * @param emailClient
+ * @returns BatchJobReport
+ * @example
+ * // returns {
+ *  "jobName":"FIRST EXPIRY NOTIFICATIONS",
+ *  "startedAt":"2023-01-20T08:00:04.817Z",
+ *  "finishedAt":"2023-01-20T08:00:05.394Z",
+ *  "success":true,
+ *  "details":{
+ *    "ids":[],
+ *    "count":0,
+ *    "errors":[],
+ *    "errorCount":0
+ *   }
+ * }
+ */
 async function firstExpiryNotificationCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,

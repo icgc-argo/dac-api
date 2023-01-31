@@ -15,7 +15,30 @@ import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 
 const JOB_NAME = 'SECOND EXPIRY NOTIFICATIONS';
 
-// 2nd notification for applications that are expiring (DAYS_TO_EXPIRY_2)
+/**
+ * ```
+ * Batch job to find all applications still within the renewal period (expiresAtUtc - DAYS_TO_EXPIRY_2) and send a second notification to the applicant
+ * Returns a BatchJobReport with details on appIds retrieved, report start and end time, job success status, and any errors encountered
+ * Query uses a date range (DAYS_TO_EXPIRY_2 to expiresAtUtc) to account for days where the batch job run may have been missed
+ * Sets a flag on the app, secondExpiryNotificationSent, to indicate an email has been sent and application can be ignored on a subsequent run
+ * ```
+ * @param currentDate
+ * @param emailClient
+ * @returns BatchJobReport
+ * @example
+ * // returns {
+ *  "jobName":"SECOND EXPIRY NOTIFICATIONS",
+ *  "startedAt":"2023-01-20T08:00:04.817Z",
+ *  "finishedAt":"2023-01-20T08:00:05.394Z",
+ *  "success":true,
+ *  "details":{
+ *    "ids":[],
+ *    "count":0,
+ *    "errors":[],
+ *    "errorCount":0
+ *   }
+ * }
+ */
 async function secondExpiryNotificationCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
