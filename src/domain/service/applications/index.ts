@@ -46,7 +46,7 @@ import {
   sendApplicationClosedEmail,
   sendApplicationPausedEmail,
 } from '../emails';
-import { checkEthicsDocWasUnique, findApplication, getById } from './search';
+import { isEthicsDocReferenced, findApplication, getById } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
 import { Forbidden, throwApplicationClosedError } from '../../../utils/errors';
 import { isRenewable } from '../../../utils/calculations';
@@ -104,11 +104,6 @@ export async function updatePartial(
   }
 
   const deleted = await checkDeletedDocuments(appDocObj, updatedApp);
-  // Delete orphan documents that are no longer associated with the application in the background
-  // this can be a result of application getting updated :
-  // - Changing selection of ethics letter from required to not required
-  // - Admin requests revisions (signed app has to be uploaded again)
-  // - Applicant changes a completed section when the application is in state sign & submit
   deleted.map((d) =>
     storageClient.delete(d).catch((e) => logger.error(`failed to delete document ${d}`, e)),
   );
@@ -169,22 +164,32 @@ export async function onStateChange(
   }
 }
 
-async function checkDeletedDocuments(appDocObj: Application, result: Application) {
+/**
+ * ```
+ * Delete orphan documents that are no longer associated with the application in the background, due to application updates:
+ * 1) Changing selection of ethics letter from required to not required
+ * 2) Admin requests revisions (signed app has to be uploaded again)
+ * 3) Applicant changes a completed section when the application is in state sign & submit
+ *
+ * Compares document id arrays (ethics letters, signed app and approved pdf docs) from original application and updated application
+ * Returns array of all objectIds that are not present in the updated application. This marks them for deletion from object storage
+ * ```
+ * @returns string[]
+ */
+async function checkDeletedDocuments(originalApp: Application, updatedApp: Application) {
   const removedIds: string[] = [];
-  const ethicsArrayBefore = appDocObj.sections.ethicsLetter.approvalLetterDocs
+  const ethicsArrayBefore = originalApp.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
-  const ethicsArrayAfter = result.sections.ethicsLetter.approvalLetterDocs
+  const ethicsArrayAfter = updatedApp.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
   const ethicsDiff = difference(ethicsArrayBefore, ethicsArrayAfter);
-  // for the renewal/source app ethics letter scenario with the same file id referenced in 2 (or more) different apps
-  // if the ethics letter declaredAsRequired is changed to false in the renewal, this will trigger the checkDeletedDocuments,
-  // and delete the file in storage (because the id has been removed from the approvalLetterDocs array)
-  // here we check that objectIds are unique, to ensure they are not deleted from object storage if associated with another application
+  // for the renewal/source app ethics letter scenario #1, with the same file id referenced in 2 (or more) different apps
+  // we check that objectIds are unique, to ensure they are not deleted from object storage if associated with another application
   const uniqueEthicsIds: string[] = [];
   for await (const id of ethicsDiff) {
-    const isUnique = await checkEthicsDocWasUnique(id);
+    const isUnique = await isEthicsDocReferenced(id);
     if (isUnique) {
       uniqueEthicsIds.push(id);
     }
@@ -193,16 +198,17 @@ async function checkDeletedDocuments(appDocObj: Application, result: Application
   uniqueEthicsIds.forEach((o) => removedIds.push(o));
 
   if (
-    appDocObj.sections.signature.signedAppDocObjId &&
-    appDocObj.sections.signature.signedAppDocObjId != result.sections.signature.signedAppDocObjId
+    originalApp.sections.signature.signedAppDocObjId &&
+    originalApp.sections.signature.signedAppDocObjId !=
+      updatedApp.sections.signature.signedAppDocObjId
   ) {
-    removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
+    removedIds.push(originalApp.sections.signature.signedAppDocObjId);
   }
 
-  const approvedArrayBefore = appDocObj.approvedAppDocs
+  const approvedArrayBefore = originalApp.approvedAppDocs
     .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
     .map((e) => e.approvedAppDocObjId);
-  const approvedArrayAfter = result.approvedAppDocs
+  const approvedArrayAfter = updatedApp.approvedAppDocs
     .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
     .map((e) => e.approvedAppDocObjId);
   const approvedDiff = difference(approvedArrayBefore, approvedArrayAfter);
@@ -212,10 +218,43 @@ async function checkDeletedDocuments(appDocObj: Application, result: Application
   return removedIds;
 }
 
+/**
+ * ```
+ * Creates a renewal application from an existing application
+ * Uses mongoose withTransaction, so any error in execution will rollback all db changes and return an Error
+ * Only non-reviewer users can create renewal applications
+ * UserIdentity userId must match application submitterId
+ * ```
+ * @param appId  string
+ * @param identity UserIdentity
+ * @returns Promise<Application> | undefined
+ */
 export async function handleRenewalRequest(
   appId: string,
   identity: UserIdentity,
 ): Promise<Application | undefined> {
+  /**
+   * ```
+   * Steps:
+   * 1) Verifies UserIdentity is not a Reviewer
+   * 2) Fetches source application by id.
+   * 3) Verifies application is renewable
+   * 4) Creates a db session
+   * 5) Initializes renewalAppId variable
+   * Inside transaction:
+   * 6) Creates a renewal application object, which copies over all source app sections except dataAccessAgreements, appendices and signature
+   * 7) Creates document in db with renewal app object
+   * 8) Sets appId, searchValues on document
+   * 9) Saves document in db
+   * 10) Sets original app in state mgr, adds renewal appId
+   * 11) Updates original app in db
+   * 12) sets variable renewalAppId to be renewal application appId
+   * 13) closes session
+   * Outside transaction:
+   * 14) Retrieves newly created renewal application by renewalAppId, and returns application object
+   * ```
+   */
+
   // admins cannot create renewals
   if (hasReviewScope(identity)) {
     throw new Error('Admins cannot create renewal applications.');

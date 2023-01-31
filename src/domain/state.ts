@@ -608,7 +608,7 @@ export function getSearchFieldValues(appDoc: Application) {
     appDoc.isRenewal ? AppType.RENEWAL : AppType.NEW,
     appDoc.renewalAppId ? appDoc.renewalAppId : '', // empty string will be filtered
     appDoc.sourceAppId ? appDoc.sourceAppId : '', // empty string will be filtered
-  ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
+  ].filter((x) => x && x.trim());
 }
 
 function getSubmitterInfo(identity: UserIdentity): SubmitterInfo {

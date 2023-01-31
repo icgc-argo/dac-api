@@ -54,11 +54,16 @@ export const isAttestable: (currentApp: Application) => boolean = (currentApp) =
 
 export const isRenewable: (currentApp: Application) => boolean = (currentApp) => {
   // can only renew an app in these states
-  if (!(currentApp.expiresAtUtc && ['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state))) {
+  if (!['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state)) {
     return false;
   }
   // can only create one renewal application per source application
   if (currentApp.renewalAppId) {
+    return false;
+  }
+
+  // must have expiresAtUtc value to check renewal period eligibility
+  if (!currentApp.expiresAtUtc) {
     return false;
   }
   const config = getAppConfig();
@@ -75,6 +80,6 @@ export const isRenewable: (currentApp: Application) => boolean = (currentApp) =>
     .endOf('day')
     .add(config.durations.expiry.daysPostExpiry, 'days');
 
-  // between DAYS_TO_EXPIRY_1 days prior to today and DAYS_POST_EXPIRY after
+  // can only renew if the expiry falls between DAYS_TO_EXPIRY_1 days prior to today and DAYS_POST_EXPIRY after
   return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
 };
