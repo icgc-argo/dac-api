@@ -61,6 +61,7 @@ export const isRenewable: (currentApp: Application) => boolean = (currentApp) =>
   }
   const config = getAppConfig();
   const now = moment.utc();
+  // need to calculate renewability relative to expiry date, because this date may be custom (not matching the configured access period)
   // expiry - DAYS_TO_EXPIRY_1
   const expiryPeriodStart = moment
     .utc(currentApp.expiresAtUtc)
