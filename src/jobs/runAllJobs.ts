@@ -7,6 +7,8 @@ import logger from '../logger';
 import attestationRequiredNotification from './attestationRequiredNotification';
 import runPauseAppsCheck from './pauseAppCheck';
 import approvedUsersEmail from './approvedUsersEmail';
+import firstExpiryNotificationCheck from './firstExpiryNotification';
+import secondExpiryNotificationCheck from './secondExpiryNotification';
 import { Report, JobReport } from './types';
 
 const JOB_NAME = 'ALL BATCH JOBS';
@@ -25,8 +27,14 @@ export default async function (
       emailClient,
     );
     const pausedAppReport = await runPauseAppsCheck(currentDate, emailClient, user);
-    // TODO: const expiryNotification1Report
-    // TODO: const expiryNotification2Report
+    const firstExpiryNotificationReport = await firstExpiryNotificationCheck(
+      currentDate,
+      emailClient,
+    );
+    const secondExpiryNotificationReport = await secondExpiryNotificationCheck(
+      currentDate,
+      emailClient,
+    );
     // TODO: const expiredAppsReport
     // TODO: const closedAppsReport
     const approvedUsersEmailReport = await approvedUsersEmail(emailClient);
@@ -46,8 +54,8 @@ export default async function (
       attestationNotifications: attestationNotificationReport,
       pausedApps: pausedAppReport,
       // TODO: implement expiry/renewal jobs. Add to report
-      expiryNotifications1: getReportToBeImplemented('FIRST EXPIRY NOTIFICATIONS'),
-      expiryNotifications2: getReportToBeImplemented('SECOND EXPIRY NOTIFICATIONS'),
+      expiryNotifications1: firstExpiryNotificationReport,
+      expiryNotifications2: secondExpiryNotificationReport,
       expiredApps: getReportToBeImplemented('EXPIRING APPLICATIONS'),
       closedApps: getReportToBeImplemented('CLOSING EXPIRED APPLICATIONS'),
       approvedUsers: approvedUsersEmailReport,
