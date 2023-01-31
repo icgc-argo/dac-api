@@ -52,7 +52,7 @@ export const isAttestable: (currentApp: Application) => boolean = (currentApp) =
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
 
-export const isRenewable: (currentApp: Application) => boolean = (currentApp) => {
+export const isRenewable = (currentApp: Application): boolean => {
   // can only renew an app in these states
   if (!['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state)) {
     return false;
