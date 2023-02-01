@@ -45,8 +45,9 @@ import {
   sendCollaboratorRemovedEmail,
   sendApplicationClosedEmail,
   sendApplicationPausedEmail,
+  sendAccessHasExpiredEmail,
 } from '../emails';
-import { checkEthicsDocWasUnique, findApplication, getById } from './search';
+import { isEthicsDocReferenced, findApplication, getById } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
 import { Forbidden, throwApplicationClosedError } from '../../../utils/errors';
 import { isRenewable } from '../../../utils/calculations';
@@ -104,11 +105,6 @@ export async function updatePartial(
   }
 
   const deleted = await checkDeletedDocuments(appDocObj, updatedApp);
-  // Delete orphan documents that are no longer associated with the application in the background
-  // this can be a result of application getting updated :
-  // - Changing selection of ethics letter from required to not required
-  // - Admin requests revisions (signed app has to be uploaded again)
-  // - Applicant changes a completed section when the application is in state sign & submit
   deleted.map((d) =>
     storageClient.delete(d).catch((e) => logger.error(`failed to delete document ${d}`, e)),
   );
@@ -120,71 +116,104 @@ export async function updatePartial(
   return viewableApplication;
 }
 
+/**
+ * Function to trigger email notifications based on the new application state, and in some cases a specific combination of a former state
+ * with a new state
+ * @param updatedApp
+ * @param oldApplication
+ * @param emailClient
+ * @param config
+ */
 export async function onStateChange(
   updatedApp: Application,
   oldApplication: Application,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   config: AppConfig,
 ) {
-  // if application state changed to REVIEW (ie submitted) send an email to Admin
-  if (updatedApp.state == 'REVIEW') {
-    await sendReviewEmail(oldApplication, updatedApp, config, emailClient);
+  switch (updatedApp.state) {
+    case 'REVIEW':
+      // if application state changed to REVIEW (ie submitted) send an email to Admin
+      await sendReviewEmail(oldApplication, updatedApp, config, emailClient);
 
-    // send applicant email
-    await sendSubmissionConfirmation(updatedApp, emailClient, config);
-  }
+      // send applicant email
+      await sendSubmissionConfirmation(updatedApp, emailClient, config);
+      break;
 
-  if (updatedApp.state == 'REVISIONS REQUESTED') {
-    await sendRevisionsRequestEmail(updatedApp, emailClient, config);
-  }
+    case 'REVISIONS REQUESTED':
+      await sendRevisionsRequestEmail(updatedApp, emailClient, config);
+      break;
 
-  if (updatedApp.state === 'REJECTED') {
-    await sendRejectedEmail(updatedApp, emailClient, config);
-  }
+    case 'REJECTED':
+      await sendRejectedEmail(updatedApp, emailClient, config);
+      break;
 
-  // prevent usual approval emails going out when state changes from PAUSED to APPROVED, as this is not a new approval event
-  if (updatedApp.state === 'APPROVED' && oldApplication.state !== 'PAUSED') {
-    await sendApplicationApprovedEmail(updatedApp, config, emailClient);
-    Promise.all(
-      updatedApp.sections.collaborators.list.map((collab) => {
-        sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
-          logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
-        );
-      }),
-    ).catch((err) => logger.error(err));
-  }
+    case 'APPROVED':
+      // prevent usual approval emails going out when state changes from PAUSED to APPROVED, as this is not a new approval event
+      if (oldApplication.state !== 'PAUSED') {
+        await sendApplicationApprovedEmail(updatedApp, config, emailClient);
+        Promise.all(
+          updatedApp.sections.collaborators.list.map((collab) => {
+            sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
+              logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
+            );
+          }),
+        ).catch((err) => logger.error(err));
+      }
+      break;
 
-  if (updatedApp.state === 'CLOSED' && oldApplication.state == 'APPROVED') {
-    await sendApplicationClosedEmail(updatedApp, config, emailClient);
-    Promise.all(
-      updatedApp.sections.collaborators.list.map((collab) => {
-        sendCollaboratorRemovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
-          logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
-        );
-      }),
-    ).catch((err) => logger.error(err));
-  }
-  if (updatedApp.state === 'PAUSED') {
-    await sendApplicationPausedEmail(updatedApp, config, emailClient);
+    case 'CLOSED':
+      // only applications that have been previously approved get a CLOSED notification
+      if (oldApplication.state === 'APPROVED') {
+        await sendApplicationClosedEmail(updatedApp, config, emailClient);
+        Promise.all(
+          updatedApp.sections.collaborators.list.map((collab) => {
+            sendCollaboratorRemovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
+              logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
+            );
+          }),
+        ).catch((err) => logger.error(err));
+      }
+      break;
+
+    case 'PAUSED':
+      await sendApplicationPausedEmail(updatedApp, config, emailClient);
+      break;
+
+    case 'EXPIRED':
+      await sendAccessHasExpiredEmail(updatedApp, config, emailClient);
+      break;
+
+    default:
+      throw new Error(`Invalid app state: ${updatedApp.state}`);
   }
 }
 
-async function checkDeletedDocuments(appDocObj: Application, result: Application) {
+/**
+ * ```
+ * Delete orphan documents that are no longer associated with the application in the background, due to application updates:
+ * 1) Changing selection of ethics letter from required to not required
+ * 2) Admin requests revisions (signed app has to be uploaded again)
+ * 3) Applicant changes a completed section when the application is in state sign & submit
+ *
+ * Compares document id arrays (ethics letters, signed app and approved pdf docs) from original application and updated application
+ * Returns array of all objectIds that are not present in the updated application. This marks them for deletion from object storage
+ * ```
+ * @returns string[]
+ */
+async function checkDeletedDocuments(originalApp: Application, updatedApp: Application) {
   const removedIds: string[] = [];
-  const ethicsArrayBefore = appDocObj.sections.ethicsLetter.approvalLetterDocs
+  const ethicsArrayBefore = originalApp.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
-  const ethicsArrayAfter = result.sections.ethicsLetter.approvalLetterDocs
+  const ethicsArrayAfter = updatedApp.sections.ethicsLetter.approvalLetterDocs
     .sort((a, b) => a.objectId.localeCompare(b.objectId))
     .map((e) => e.objectId);
   const ethicsDiff = difference(ethicsArrayBefore, ethicsArrayAfter);
-  // for the renewal/source app ethics letter scenario with the same file id referenced in 2 (or more) different apps
-  // if the ethics letter declaredAsRequired is changed to false in the renewal, this will trigger the checkDeletedDocuments,
-  // and delete the file in storage (because the id has been removed from the approvalLetterDocs array)
-  // here we check that objectIds are unique, to ensure they are not deleted from object storage if associated with another application
+  // for the renewal/source app ethics letter scenario #1, with the same file id referenced in 2 (or more) different apps
+  // we check that objectIds are unique, to ensure they are not deleted from object storage if associated with another application
   const uniqueEthicsIds: string[] = [];
   for await (const id of ethicsDiff) {
-    const isUnique = await checkEthicsDocWasUnique(id);
+    const isUnique = await !isEthicsDocReferenced(id);
     if (isUnique) {
       uniqueEthicsIds.push(id);
     }
@@ -193,16 +222,17 @@ async function checkDeletedDocuments(appDocObj: Application, result: Application
   uniqueEthicsIds.forEach((o) => removedIds.push(o));
 
   if (
-    appDocObj.sections.signature.signedAppDocObjId &&
-    appDocObj.sections.signature.signedAppDocObjId != result.sections.signature.signedAppDocObjId
+    originalApp.sections.signature.signedAppDocObjId &&
+    originalApp.sections.signature.signedAppDocObjId !=
+      updatedApp.sections.signature.signedAppDocObjId
   ) {
-    removedIds.push(appDocObj.sections.signature.signedAppDocObjId);
+    removedIds.push(originalApp.sections.signature.signedAppDocObjId);
   }
 
-  const approvedArrayBefore = appDocObj.approvedAppDocs
+  const approvedArrayBefore = originalApp.approvedAppDocs
     .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
     .map((e) => e.approvedAppDocObjId);
-  const approvedArrayAfter = result.approvedAppDocs
+  const approvedArrayAfter = updatedApp.approvedAppDocs
     .sort((a, b) => a.approvedAppDocObjId.localeCompare(b.approvedAppDocObjId))
     .map((e) => e.approvedAppDocObjId);
   const approvedDiff = difference(approvedArrayBefore, approvedArrayAfter);
@@ -212,10 +242,43 @@ async function checkDeletedDocuments(appDocObj: Application, result: Application
   return removedIds;
 }
 
+/**
+ * ```
+ * Creates a renewal application from an existing application
+ * Uses mongoose withTransaction, so any error in execution will rollback all db changes and return an Error
+ * Only non-reviewer users can create renewal applications
+ * UserIdentity userId must match application submitterId
+ * ```
+ * @param appId  string
+ * @param identity UserIdentity
+ * @returns Promise<Application> | undefined
+ */
 export async function handleRenewalRequest(
   appId: string,
   identity: UserIdentity,
 ): Promise<Application | undefined> {
+  /**
+   * ```
+   * Steps:
+   * 1) Verifies UserIdentity is not a Reviewer
+   * 2) Fetches source application by id.
+   * 3) Verifies application is renewable
+   * 4) Creates a db session
+   * 5) Initializes renewalAppId variable
+   * Inside transaction:
+   * 6) Creates a renewal application object, which copies over all source app sections except dataAccessAgreements, appendices and signature
+   * 7) Creates document in db with renewal app object
+   * 8) Sets appId, searchValues on document
+   * 9) Saves document in db
+   * 10) Sets original app in state mgr, adds renewal appId
+   * 11) Updates original app in db
+   * 12) sets variable renewalAppId to be renewal application appId
+   * 13) closes session
+   * Outside transaction:
+   * 14) Retrieves newly created renewal application by renewalAppId, and returns application object
+   * ```
+   */
+
   // admins cannot create renewals
   if (hasReviewScope(identity)) {
     throw new Error('Admins cannot create renewal applications.');

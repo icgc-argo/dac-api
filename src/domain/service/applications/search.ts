@@ -352,10 +352,13 @@ export const getUsersFromApprovedApps = async (): Promise<
   });
 };
 
-export async function checkEthicsDocWasUnique(objectId: string): Promise<boolean> {
+/**
+ * For an ethics document objectId, find if the number of references in the applications collection is greater than zero
+ */
+export async function isEthicsDocReferenced(objectId: string): Promise<boolean> {
   const query: FilterQuery<ApplicationDocument> = {
     'sections.ethicsLetter.approvalLetterDocs': { $elemMatch: { objectId: objectId } },
   };
   const result = await ApplicationModel.countDocuments(query).exec();
-  return result === 0;
+  return result > 0;
 }
