@@ -40,6 +40,7 @@ import {
   sendCollaboratorRemovedEmail,
   sendApplicationClosedEmail,
   sendApplicationPausedEmail,
+  sendAccessHasExpiredEmail,
 } from '../emails';
 import { findApplication } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
@@ -110,52 +111,75 @@ export async function updatePartial(
   return viewableApplication;
 }
 
+/**
+ * Function to trigger email notifications based on the new application state, and in some cases a specific combination of a former state
+ * with a new state
+ * @param updatedApp
+ * @param oldApplication
+ * @param emailClient
+ * @param config
+ */
 export async function onStateChange(
   updatedApp: Application,
   oldApplication: Application,
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
   config: AppConfig,
 ) {
-  // if application state changed to REVIEW (ie submitted) send an email to Admin
-  if (updatedApp.state == 'REVIEW') {
-    await sendReviewEmail(oldApplication, updatedApp, config, emailClient);
+  switch (updatedApp.state) {
+    case 'REVIEW':
+      // if application state changed to REVIEW (ie submitted) send an email to Admin
+      await sendReviewEmail(oldApplication, updatedApp, config, emailClient);
 
-    // send applicant email
-    await sendSubmissionConfirmation(updatedApp, emailClient, config);
-  }
+      // send applicant email
+      await sendSubmissionConfirmation(updatedApp, emailClient, config);
+      break;
 
-  if (updatedApp.state == 'REVISIONS REQUESTED') {
-    await sendRevisionsRequestEmail(updatedApp, emailClient, config);
-  }
+    case 'REVISIONS REQUESTED':
+      await sendRevisionsRequestEmail(updatedApp, emailClient, config);
+      break;
 
-  if (updatedApp.state === 'REJECTED') {
-    await sendRejectedEmail(updatedApp, emailClient, config);
-  }
+    case 'REJECTED':
+      await sendRejectedEmail(updatedApp, emailClient, config);
+      break;
 
-  // prevent usual approval emails going out when state changes from PAUSED to APPROVED, as this is not a new approval event
-  if (updatedApp.state === 'APPROVED' && oldApplication.state !== 'PAUSED') {
-    await sendApplicationApprovedEmail(updatedApp, config, emailClient);
-    Promise.all(
-      updatedApp.sections.collaborators.list.map((collab) => {
-        sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
-          logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
-        );
-      }),
-    ).catch((err) => logger.error(err));
-  }
+    case 'APPROVED':
+      // prevent usual approval emails going out when state changes from PAUSED to APPROVED, as this is not a new approval event
+      if (oldApplication.state !== 'PAUSED') {
+        await sendApplicationApprovedEmail(updatedApp, config, emailClient);
+        Promise.all(
+          updatedApp.sections.collaborators.list.map((collab) => {
+            sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
+              logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
+            );
+          }),
+        ).catch((err) => logger.error(err));
+      }
+      break;
 
-  if (updatedApp.state === 'CLOSED' && oldApplication.state == 'APPROVED') {
-    await sendApplicationClosedEmail(updatedApp, config, emailClient);
-    Promise.all(
-      updatedApp.sections.collaborators.list.map((collab) => {
-        sendCollaboratorRemovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
-          logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
-        );
-      }),
-    ).catch((err) => logger.error(err));
-  }
-  if (updatedApp.state === 'PAUSED') {
-    await sendApplicationPausedEmail(updatedApp, config, emailClient);
+    case 'CLOSED':
+      // only applications that have been previously approved get a CLOSED notification
+      if (oldApplication.state === 'APPROVED') {
+        await sendApplicationClosedEmail(updatedApp, config, emailClient);
+        Promise.all(
+          updatedApp.sections.collaborators.list.map((collab) => {
+            sendCollaboratorRemovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
+              logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
+            );
+          }),
+        ).catch((err) => logger.error(err));
+      }
+      break;
+
+    case 'PAUSED':
+      await sendApplicationPausedEmail(updatedApp, config, emailClient);
+      break;
+
+    case 'EXPIRED':
+      await sendAccessHasExpiredEmail(updatedApp, config, emailClient);
+      break;
+
+    default:
+      throw new Error(`Invalid app state: ${updatedApp.state}`);
   }
 }
 

@@ -48,7 +48,6 @@ const examples = {
     state: { $in: ['APPROVED', 'PAUSED', 'EXPIRED'] },
     expiresAtUtc: {
       $lte: '2023-01-07T23:59:59.999Z',
-      $gte: '2022-10-09T00:00:00.000Z',
     },
     'emailNotifications.applicationExpiredNotificationSent': { $exists: false },
   },

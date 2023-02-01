@@ -71,6 +71,7 @@ import {
   getAttestationByDate,
   getDaysElapsed,
   isAttestable,
+  isExpirable,
   isRenewable,
 } from '../utils/calculations';
 import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
@@ -517,6 +518,10 @@ export class ApplicationStateManager {
         updateAppStateForPausedApplication(current, updatePart, updatedBy);
         break;
 
+      case 'EXPIRED':
+        updateAppStateForExpiredApplication(current, updatePart, updatedBy);
+        break;
+
       default:
         throw new Error(`Invalid app state: ${current.state}`);
     }
@@ -930,7 +935,6 @@ function transitionFromPausedToApproved(
   // this transition does not equal an APPROVED update event
   current.state = 'APPROVED';
   // reset pauseReason if no longer in PAUSED state
-  // TODO: right now there is no other transition for a PAUSED app, but may need to revisit this for a possible PAUSED -> EXPIRED transition
   current.pauseReason = undefined;
   if (updatePart?.isAttesting === true) {
     updateAttestedAtUtc(current, updatedBy);
@@ -981,6 +985,15 @@ const transitionToPaused: (
     current.pauseReason = reason;
   }
   current.updates.push(createUpdateEvent(current, pausedBy, UpdateEvent.PAUSED));
+  return current;
+};
+
+const transitionToExpired: (current: Application, expiredBy: UpdateAuthor) => Application = (
+  current,
+  expiredBy,
+) => {
+  current.state = 'EXPIRED';
+  current.updates.push(createUpdateEvent(current, expiredBy, UpdateEvent.EXPIRED));
   return current;
 };
 
@@ -1115,12 +1128,23 @@ function updateAppStateForApprovedApplication(
     }
   }
 
+  if (updatePart.state === 'EXPIRED') {
+    // only SYSTEM can expire an application
+    if (updatedBy.role !== DacoRole.SYSTEM) {
+      throw new Forbidden('Users cannot expire an application.');
+    }
+    if (!isExpirable(currentApplication)) {
+      throw new Error('Application has not reached expiry date.');
+    }
+    return transitionToExpired(currentApplication, updatedBy);
+  }
+
   if (updatePart.isAttesting === true) {
     if (!isAttestable(currentApplication)) {
-      throw new Error('Application is not attestable');
+      throw new Error('Application is not attestable.');
     }
     if (updatedBy.role !== DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
+      throw new Error('Only submitters can attest an application.');
     }
     return updateAttestedAtUtc(currentApplication, updatedBy);
   }
@@ -1145,11 +1169,22 @@ function updateAppStateForPausedApplication(
   updatedBy: UpdateAuthor,
 ) {
   if (updatePart.state === 'APPROVED') {
-    // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
+    // Admins can directly APPROVE a PAUSED application, submitters must attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
+      throw new Error('Submitters cannot approve an application.');
     }
     return transitionFromPausedToApproved(currentApplication, updatedBy);
+  }
+
+  if (updatePart.state === 'EXPIRED') {
+    // only SYSTEM can expire an application
+    if (updatedBy.role !== DacoRole.SYSTEM) {
+      throw new Forbidden('Users cannot expire an application.');
+    }
+    if (!isExpirable(currentApplication)) {
+      throw new Error('Application has not reached expiry date.');
+    }
+    return transitionToExpired(currentApplication, updatedBy);
   }
 
   // can only attest if it is the configured # of days to attestationByUtc date or later
@@ -1222,6 +1257,16 @@ function updateAppStateForDraftApplication(
   // check if it's ready to move to the next state [DRAFT => SIGN & SUBMIT]
   // OR should move back to draft from SIGN & SUBMIT
   transitionToSignAndSubmitOrRollBack(current, 'PRISTINE', 'DISABLED', 'DRAFT');
+}
+
+function updateAppStateForExpiredApplication(
+  currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  updatedBy: UpdateAuthor,
+): void {
+  if (updatePart.state === 'CLOSED') {
+    transitionToClosed(currentApplication, updatedBy);
+  }
 }
 
 function transitionToSignAndSubmitOrRollBack(

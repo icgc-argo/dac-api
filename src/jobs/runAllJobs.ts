@@ -6,6 +6,7 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import logger from '../logger';
 import attestationRequiredNotification from './attestationRequiredNotification';
 import runPauseAppsCheck from './pauseAppCheck';
+import runExpiringAppsCheck from './expireAppCheck';
 import approvedUsersEmail from './approvedUsersEmail';
 import firstExpiryNotificationCheck from './firstExpiryNotification';
 import secondExpiryNotificationCheck from './secondExpiryNotification';
@@ -35,7 +36,7 @@ export default async function (
       currentDate,
       emailClient,
     );
-    // TODO: const expiredAppsReport
+    const expiringAppsReport = await runExpiringAppsCheck(currentDate, emailClient, user);
     // TODO: const closedAppsReport
     const approvedUsersEmailReport = await approvedUsersEmail(emailClient);
     // define report to collect all affected appIds
@@ -56,7 +57,7 @@ export default async function (
       // TODO: implement expiry/renewal jobs. Add to report
       expiryNotifications1: firstExpiryNotificationReport,
       expiryNotifications2: secondExpiryNotificationReport,
-      expiredApps: getReportToBeImplemented('EXPIRING APPLICATIONS'),
+      expiredApps: expiringAppsReport,
       closedApps: getReportToBeImplemented('CLOSING EXPIRED APPLICATIONS'),
       approvedUsers: approvedUsersEmailReport,
     };
