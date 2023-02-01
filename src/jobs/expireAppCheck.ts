@@ -6,7 +6,7 @@ import { Identity } from '@overture-stack/ego-token-middleware';
 import { chunk } from 'lodash';
 
 import logger from '../logger';
-import { AppConfig, getAppConfig } from '../config';
+import { getAppConfig } from '../config';
 import { ApplicationModel, ApplicationDocument } from '../domain/model';
 import { Application } from '../domain/interface';
 import { ApplicationStateManager } from '../domain/state';
@@ -15,14 +15,13 @@ import { REQUEST_CHUNK_SIZE } from '../utils/constants';
 import { onStateChange } from '../domain/service/applications';
 import { buildReportDetails, getEmptyReportDetails, setEmailSentFlag } from './utils';
 import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
-import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 
 const JOB_NAME = 'EXPIRING APPLICATIONS';
 /**
  * ```
  * Batch job to find all applications that have reached expiry date (expiresAtUtc), transition to EXPIRED state and notify applicants via email
  * Returns a BatchJobReport with details on appIds retrieved, report start and end time, job success status, and any errors encountered
- * Query uses a date range (expiresAtUtc to DAYS_POST_EXPIRY) to account for days where the batch job run may have been missed
+ * Query checks for any expiresAtUtc value that is before the end of the day, to account for days where the batch job run may have been missed
  * Sets a flag on the app, applicationExpiredNotificationSent, to indicate an email has been sent and application can be ignored on a subsequent run
  * ```
  * @param currentDate
@@ -109,7 +108,7 @@ const getExpiredAppsReportDetails = async (
   currentDate: Date,
 ): Promise<BatchJobDetails> => {
   const config = getAppConfig();
-  const query = getAppExpiringQuery(config, currentDate);
+  const query = getAppExpiringQuery(currentDate);
   const expiringAppCount = await ApplicationModel.find(query).countDocuments();
   // if no applications fit the criteria, return empty report details
   if (expiringAppCount === 0) {
@@ -172,34 +171,19 @@ const getExpiredAppsReportDetails = async (
   return details;
 };
 
-const getAppExpiringQuery = (
-  config: AppConfig,
-  currentDate: Date,
-): FilterQuery<ApplicationDocument> => {
+const getAppExpiringQuery = (currentDate: Date): FilterQuery<ApplicationDocument> => {
   const referenceDate = moment(currentDate).utc();
-  const {
-    durations: {
-      expiry: { daysPostExpiry },
-    },
-  } = config;
-  // is expiry between today and 90 days ago
+  // is expiry before the end of today
   const upperThreshold = moment(referenceDate).endOf('day').toDate();
-  const lowerThreshold = moment(referenceDate)
-    .startOf('day')
-    .subtract(daysPostExpiry, NOTIFICATION_UNIT_OF_TIME)
-    .toDate();
-
   const query: FilterQuery<ApplicationDocument> = {
     state: {
       $in: ['APPROVED', 'PAUSED', 'EXPIRED'],
     },
     expiresAtUtc: {
       $lte: upperThreshold,
-      $gte: lowerThreshold,
     },
     'emailNotifications.applicationExpiredNotificationSent': { $exists: false },
   };
-
   return query;
 };
 
