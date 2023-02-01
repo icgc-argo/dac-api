@@ -18,8 +18,30 @@ import { BatchJobDetails, JobReport, JobResultForApplication } from './types';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 
 const JOB_NAME = 'EXPIRING APPLICATIONS';
-// Check for applications that have reached expiry date
-// this will transition applications to EXPIRED and expiry notifications sent
+/**
+ * ```
+ * Batch job to find all applications that have reached expiry date (expiresAtUtc), transition to EXPIRED state and notify applicants via email
+ * Returns a BatchJobReport with details on appIds retrieved, report start and end time, job success status, and any errors encountered
+ * Query uses a date range (expiresAtUtc to DAYS_POST_EXPIRY) to account for days where the batch job run may have been missed
+ * Sets a flag on the app, applicationExpiredNotificationSent, to indicate an email has been sent and application can be ignored on a subsequent run
+ * ```
+ * @param currentDate
+ * @param emailClient
+ * @returns BatchJobReport
+ * @example
+ * // returns {
+ *  "jobName":"EXPIRING APPLICATIONS",
+ *  "startedAt":"2023-02-01T08:00:04.817Z",
+ *  "finishedAt":"2023-02-01T08:00:05.394Z",
+ *  "success":true,
+ *  "details":{
+ *    "ids":[],
+ *    "count":0,
+ *    "errors":[],
+ *    "errorCount":0
+ *   }
+ * }
+ */
 async function runExpiringAppsCheck(
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
