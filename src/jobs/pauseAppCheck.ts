@@ -166,7 +166,7 @@ const getPausedAppsReportDetails = async (
         await onStateChange(updatedAppObj, app, emailClient, config);
         // setting email notification here, not in onStateChange, because this flag is set on batch jobs only (not custom cases like an admin pause)
         const appWithFlagSet = await setEmailSentFlag(
-          app,
+          updatedAppObj,
           'applicationPausedNotificationSent',
           JOB_NAME,
         );
