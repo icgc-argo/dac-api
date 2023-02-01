@@ -935,7 +935,6 @@ function transitionFromPausedToApproved(
   // this transition does not equal an APPROVED update event
   current.state = 'APPROVED';
   // reset pauseReason if no longer in PAUSED state
-  // TODO: right now there is no other transition for a PAUSED app, but may need to revisit this for a possible PAUSED -> EXPIRED transition
   current.pauseReason = undefined;
   if (updatePart?.isAttesting === true) {
     updateAttestedAtUtc(current, updatedBy);
@@ -1170,7 +1169,7 @@ function updateAppStateForPausedApplication(
   updatedBy: UpdateAuthor,
 ) {
   if (updatePart.state === 'APPROVED') {
-    // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
+    // Admins can directly APPROVE a PAUSED application, submitters must attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
       throw new Error('Submitters cannot approve an application.');
     }
