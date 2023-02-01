@@ -52,7 +52,7 @@ export const isAttestable: (currentApp: Application) => boolean = (currentApp) =
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
 
-export const isRenewable: (currentApp: Application) => boolean = (currentApp) => {
+export const isRenewable = (currentApp: Application): boolean => {
   // can only renew an app in these states
   if (!['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state)) {
     return false;
@@ -68,6 +68,7 @@ export const isRenewable: (currentApp: Application) => boolean = (currentApp) =>
   }
   const config = getAppConfig();
   const now = moment.utc();
+  // need to calculate renewability relative to expiry date, because this date may be custom (not matching the configured access period)
   // expiry - DAYS_TO_EXPIRY_1
   const expiryPeriodStart = moment
     .utc(currentApp.expiresAtUtc)
@@ -82,4 +83,12 @@ export const isRenewable: (currentApp: Application) => boolean = (currentApp) =>
 
   // can only renew if the expiry falls between DAYS_TO_EXPIRY_1 days prior to today and DAYS_POST_EXPIRY after
   return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
+};
+
+export const isExpirable: (currentApp: Application) => boolean = (currentApp) => {
+  if (!['APPROVED', 'PAUSED'].includes(currentApp.state)) {
+    return false;
+  }
+  const today = moment.utc().endOf('day');
+  return moment.utc(currentApp.expiresAtUtc).isBefore(today);
 };
