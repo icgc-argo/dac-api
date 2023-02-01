@@ -189,7 +189,7 @@ async function checkDeletedDocuments(originalApp: Application, updatedApp: Appli
   // we check that objectIds are unique, to ensure they are not deleted from object storage if associated with another application
   const uniqueEthicsIds: string[] = [];
   for await (const id of ethicsDiff) {
-    const isUnique = await isEthicsDocReferenced(id);
+    const isUnique = await !isEthicsDocReferenced(id);
     if (isUnique) {
       uniqueEthicsIds.push(id);
     }
