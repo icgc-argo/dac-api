@@ -1,6 +1,6 @@
 import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
-import { isDate, pick, cloneDeep, omit, get, every, set } from 'lodash';
+import { isDate, pick, cloneDeep, omit, get, every, set, isEqual } from 'lodash';
 import moment, { unitOfTime } from 'moment';
 
 import {
@@ -12,7 +12,7 @@ import {
   PauseReason,
   UpdateApplication,
 } from '../domain/interface';
-import { ApplicationStateManager, newApplication } from '../domain/state';
+import { ApplicationStateManager, newApplication, renewalApplication } from '../domain/state';
 import { BadRequest, ConflictError, Forbidden } from '../utils/errors';
 import { checkIsDefined } from '../utils/misc';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
@@ -652,34 +652,46 @@ describe('state manager', () => {
     expect(userApp.attestedAtUtc).to.eq(undefined);
   });
 
-  function verifyRenewedSectionsStatus(app: Application): void {
+  function verifyRenewedSectionsStatus(
+    renewalApp: Partial<Application>,
+    sourceApp: Application,
+  ): void {
+    expect(isEqual(renewalApp?.sections?.applicant, sourceApp.sections?.applicant)).to.be.true;
+    expect(isEqual(renewalApp?.sections?.representative, sourceApp.sections?.representative)).to.be
+      .true;
+    expect(isEqual(renewalApp?.sections?.collaborators, sourceApp.sections?.collaborators)).to.be
+      .true;
+    expect(isEqual(renewalApp?.sections?.projectInfo, sourceApp.sections?.projectInfo)).to.be.true;
+    expect(isEqual(renewalApp?.sections?.ethicsLetter, sourceApp.sections?.ethicsLetter)).to.be
+      .true;
+
+    expect(get(renewalApp, 'sections.appendices.meta.status')).to.eq('PRISTINE');
+    expect(
+      every(get(renewalApp, 'sections.appendices.agreements'), (ag: AgreementItem) => !ag.accepted),
+    ).to.be.true;
+    expect(get(renewalApp, 'sections.appendices.meta.lastUpdatedAtUtc')).to.be.undefined;
+    expect(get(renewalApp, 'sections.dataAccessAgreement.meta.status')).to.eq('PRISTINE');
     expect(
       every(
-        pick(app.sections, [
-          'applicant',
-          'representative',
-          'projectInfo',
-          'ethicsLetter',
-          'collaborators',
-        ]),
-        (section) => section.meta.status === 'COMPLETE',
-      ),
-    ).is.true;
-    expect(get(app, 'sections.appendices.meta.status')).to.eq('PRISTINE');
-    expect(every(get(app, 'sections.appendices.agreements'), (ag: AgreementItem) => !ag.accepted))
-      .to.be.true;
-    expect(get(app, 'sections.appendices.meta.lastUpdatedAtUtc')).to.not.be.undefined;
-    expect(get(app, 'sections.dataAccessAgreement.meta.status')).to.eq('PRISTINE');
-    expect(
-      every(
-        get(app, 'sections.dataAccessAgreement.agreements'),
+        get(renewalApp, 'sections.dataAccessAgreement.agreements'),
         (ag: AgreementItem) => !ag.accepted,
       ),
     ).to.be.true;
-    expect(get(app, 'sections.dataAccessAgreement.meta.lastUpdatedAtUtc')).to.not.be.undefined;
-    expect(get(app, 'sections.signature.meta.status')).to.eq('DISABLED');
-    expect(get(app, 'sections.signature.meta.lastUpdatedAtUtc')).to.not.be.undefined;
+    expect(get(renewalApp, 'sections.dataAccessAgreement.meta.lastUpdatedAtUtc')).to.be.undefined;
+    expect(get(renewalApp, 'sections.signature.meta.status')).to.eq('DISABLED');
+    expect(get(renewalApp, 'sections.signature.meta.lastUpdatedAtUtc')).to.be.undefined;
+    expect(renewalApp.sourceAppId).to.eq(sourceApp.appId);
+    expect(sourceApp.renewalAppId).to.eq(renewalApp.appId);
+    expect(renewalApp.isRenewal).to.be.true;
+    expect(renewalApp.renewalPeriodEndDateUtc).to.not.be.undefined;
+    expect(renewalApp.state).to.eq('DRAFT');
   }
+
+  it('should create a renewal app from an existing application', () => {
+    const app = getApprovedApplication();
+    const renewalApp = renewalApplication(mockApplicantToken as UserIdentity, app);
+    verifyRenewedSectionsStatus(renewalApp, app);
+   });
 
   it('should expire an APPROVED app that has reached its expiry date', () => {
     const app = getApprovedApplication();

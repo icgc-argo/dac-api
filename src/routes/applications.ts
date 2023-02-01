@@ -7,7 +7,7 @@ import JSZip from 'jszip';
 import { isArray } from 'lodash';
 
 import wrapAsync from '../utils/wrapAsync';
-import { create, updatePartial } from '../domain/service/applications';
+import { create, handleRenewalRequest, updatePartial } from '../domain/service/applications';
 import {
   createCollaborator,
   deleteCollaborator,
@@ -347,6 +347,32 @@ const createApplicationsRouter = (
         emailClient,
       );
       return res.status(200).send(updated);
+    }),
+  );
+
+  router.post(
+    '/applications/:id/renew',
+    authFilter([]),
+    wrapAsync(async (req: Request, res: Response, next: NextFunction) => {
+      const id = req.params.id;
+      const validatedId = validateId(id);
+      const identity = (req as IRequest).identity;
+      try {
+        const isValidUser = isUserJwt(identity);
+        if (isValidUser) {
+          logger.info(`Trying to create renewal application for ${id}.`);
+          const updatedApp = await handleRenewalRequest(id, identity as UserIdentity);
+          if (updatedApp) {
+            return res.status(201).send(updatedApp);
+          } else {
+            throw new Error('Renewal failed!');
+          }
+        } else {
+          throw new Forbidden('Invalid user!');
+        }
+      } catch (err) {
+        next(err);
+      }
     }),
   );
 

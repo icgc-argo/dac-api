@@ -194,6 +194,9 @@ const ApplicationSchema = new mongoose.Schema(
     updates: [ApplicationUpdate],
     approvedAppDocs: [ApprovedAppDocument],
     emailNotifications: NotificationSentFlags,
+    sourceAppId: { type: String, required: false },
+    renewalAppId: { type: String, required: false },
+    renewalPeriodEndDateUtc: { type: Date, required: false },
   },
   {
     timestamps: {

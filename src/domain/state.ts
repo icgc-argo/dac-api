@@ -76,6 +76,7 @@ import {
 } from '../utils/calculations';
 import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
 import { getUpdateAuthor, hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
+import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -92,7 +93,7 @@ const allSections: Array<keyof Application['sections']> = [
  * Array contains mapping that will govern which sections should be marked as locked
  * depending on which state we are and the role the viewer has.
  *
- * for example applicaions in review are completely locked for applicants but partially locked for admins.
+ * for example, applications in review are completely locked for applicants but partially locked for admins.
  */
 const stateToLockedSectionsMap: Record<
   State,
@@ -531,6 +532,13 @@ export class ApplicationStateManager {
     return current;
   }
 
+  updateAsRenewed(renewalId: string): Application {
+    const current = this.currentApplication;
+    current.renewalAppId = renewalId;
+    onAppUpdate(current);
+    return current;
+  }
+
   updateEmailNotifications(notificationType: keyof NotificationSentFlags): Application {
     const current = this.currentApplication;
     if (!current.emailNotifications) {
@@ -603,7 +611,9 @@ export function getSearchFieldValues(appDoc: Application) {
     appDoc.sections.applicant.info.primaryAffiliation,
     appDoc.sections.applicant.address.country,
     appDoc.isRenewal ? AppType.RENEWAL : AppType.NEW,
-  ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
+    appDoc.renewalAppId ? appDoc.renewalAppId : '', // empty string will be filtered
+    appDoc.sourceAppId ? appDoc.sourceAppId : '', // empty string will be filtered
+  ].filter((x) => x && x.trim());
 }
 
 function getSubmitterInfo(identity: UserIdentity): SubmitterInfo {
@@ -615,14 +625,69 @@ function getSubmitterInfo(identity: UserIdentity): SubmitterInfo {
     throw new Forbidden('A submitter email is required to create a new application.');
   }
 }
+
+function getPristineMeta(): Meta {
+  return { status: 'PRISTINE', errorsList: [] };
+}
+
+export function getRenewalPeriodEndDate(expiry: Date): Date {
+  const {
+    durations: {
+      expiry: { daysPostExpiry },
+    },
+  } = getAppConfig();
+  const endDate = moment.utc(expiry).add(daysPostExpiry, NOTIFICATION_UNIT_OF_TIME).endOf('day');
+  return endDate.toDate();
+}
+
+export function renewalApplication(
+  identity: UserIdentity,
+  originalApp: Application,
+): Partial<Application> {
+  const submitter = getSubmitterInfo(identity);
+  const newApplication: Partial<Application> = {
+    submitterId: submitter.userId,
+    submitterEmail: submitter.email,
+    state: 'DRAFT',
+    revisionRequest: emptyRevisionRequest(),
+    sections: {
+      ...originalApp.sections,
+      appendices: {
+        meta: getPristineMeta(),
+        agreements: getAppendixAgreements(),
+      },
+      dataAccessAgreement: {
+        meta: getPristineMeta(),
+        agreements: getDataAccessAgreement(),
+      },
+      signature: {
+        meta: {
+          status: 'DISABLED',
+          errorsList: [],
+        },
+        signedAppDocObjId: '',
+        signedDocName: '',
+      },
+    },
+    updates: [],
+    isRenewal: true,
+    sourceAppId: originalApp.appId,
+    renewalPeriodEndDateUtc: getRenewalPeriodEndDate(originalApp.expiresAtUtc),
+  };
+
+  const author = getUpdateAuthor(identity);
+  const createdEvent = createUpdateEvent(
+    newApplication as Application,
+    author,
+    UpdateEvent.CREATED,
+  );
+  newApplication.updates?.push(createdEvent);
+  return newApplication;
+}
+
 // new applications can only be created by user jwt identities
 export function newApplication(identity: UserIdentity): Partial<Application> {
   const submitter = getSubmitterInfo(identity);
-  const pristineMeta = {
-    status: 'PRISTINE' as SectionStatus,
-    errorsList: [],
-  } as Meta;
-
   const app: Partial<Application> = {
     state: 'DRAFT',
     submitterId: submitter.userId,
@@ -630,19 +695,19 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
     revisionRequest: emptyRevisionRequest(),
     sections: {
       collaborators: {
-        meta: pristineMeta,
+        meta: getPristineMeta(),
         list: [],
       },
       appendices: {
-        meta: pristineMeta,
+        meta: getPristineMeta(),
         agreements: getAppendixAgreements(),
       },
       dataAccessAgreement: {
-        meta: pristineMeta,
+        meta: getPristineMeta(),
         agreements: getDataAccessAgreement(),
       },
       applicant: {
-        meta: pristineMeta,
+        meta: getPristineMeta(),
         address: {
           building: '',
           cityAndProvince: '',
@@ -672,13 +737,13 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
         title: '',
         summary: '',
         publicationsURLs: [],
-        meta: pristineMeta,
+        meta: getPristineMeta(),
       },
       ethicsLetter: {
         // tslint:disable-next-line:no-null-keyword
         declaredAsRequired: null,
         approvalLetterDocs: [],
-        meta: pristineMeta,
+        meta: getPristineMeta(),
       },
       representative: {
         address: {
@@ -702,7 +767,7 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
           suffix: '',
           title: '',
         },
-        meta: pristineMeta,
+        meta: getPristineMeta(),
       },
       signature: {
         meta: {
@@ -715,7 +780,6 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
     },
     updates: [],
     isRenewal: false,
-    ableToRenew: false,
   };
 
   const author = getUpdateAuthor(identity);

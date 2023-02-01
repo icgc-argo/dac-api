@@ -17,17 +17,21 @@ services:
       VAULT_ADDR: http://0.0.0.0:8200
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
 
+  # local replica setup modified from https://github.com/bitnami/containers/blob/main/bitnami/mongodb/docker-compose-replicaset.yml
   mongodb:
     image: 'bitnami/mongodb:4.0'
     ports:
       - '27027:27017'
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_ROOT_PASSWORD=password123
+      - MONGODB_REPLICA_SET_KEY=replicasetkey123
+      - MONGODB_USERNAME=admin
+      - MONGODB_PASSWORD=password
+      - MONGODB_DATABASE=appdb
     volumes:
       - 'mongodb_data:/bitnami'
-    environment:
-      MONGODB_USERNAME: admin
-      MONGODB_PASSWORD: password
-      MONGODB_DATABASE: appdb
-      MONGODB_ROOT_PASSWORD: password123
 
   object-storage:
     image: minio/minio
@@ -37,17 +41,17 @@ services:
       MINIO_SECRET_KEY: minio123
     command: server /data
     ports:
-      - "8085:9000"
+      - '8085:9000'
     volumes:
       - 'minio_data:/data'
-      
+
   # for email services
   mailhog:
     image: mailhog/mailhog
     container_name: 'mailhog'
     ports:
-      - "1025:1025"
-      - "8025:8025"      
+      - '1025:1025'
+      - '8025:8025'
 
 volumes:
   mongodb_data:

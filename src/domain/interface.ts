@@ -178,6 +178,9 @@ export interface ApplicationSummary {
   isAttestable: boolean;
   ableToRenew: boolean;
   lastPausedAtUtc?: Date;
+  sourceAppId?: string;
+  renewalAppId?: string;
+  renewalPeriodEndDateUtc?: Date;
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -263,7 +266,7 @@ export interface Application {
   createdAtUtc?: Date;
   searchValues: string[];
   isRenewal: boolean;
-  ableToRenew: boolean;
+  ableToRenew: boolean; // calculated
   // calculated flag to indicate that revisions are being requested if any of the revisionRequest sections is true
   // and this flag will be reset before each review since we do reset the revision request portion.
   revisionsRequested: boolean;
@@ -281,10 +284,13 @@ export interface Application {
   approvedAppDocs: ApprovedAppDocument[];
   attestationByUtc?: Date; // calculated from approvedAtUtc
   attestedAtUtc?: Date | null;
-  isAttestable: boolean;
+  isAttestable: boolean; // calculated
   pauseReason?: PauseReason | null;
-  lastPausedAtUtc?: Date;
+  lastPausedAtUtc?: Date; // calculated
   emailNotifications?: NotificationSentFlags;
+  sourceAppId?: string; // appId of original application, added to a renewal application
+  renewalAppId?: string; // appId of renewal application, added to the original application
+  renewalPeriodEndDateUtc?: Date; // source app expiresAtUtc + daysPostExpiry
 }
 
 export type AppSections = keyof Application['sections'];
