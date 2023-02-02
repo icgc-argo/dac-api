@@ -52,17 +52,23 @@ export const isAttestable: (currentApp: Application) => boolean = (currentApp) =
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
 
-export const isRenewable: (currentApp: Application) => boolean = (currentApp) => {
+export const isRenewable = (currentApp: Application): boolean => {
   // can only renew an app in these states
-  if (!(currentApp.expiresAtUtc && ['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state))) {
+  if (!['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state)) {
     return false;
   }
   // can only create one renewal application per source application
   if (currentApp.renewalAppId) {
     return false;
   }
+
+  // must have expiresAtUtc value to check renewal period eligibility
+  if (!currentApp.expiresAtUtc) {
+    return false;
+  }
   const config = getAppConfig();
   const now = moment.utc();
+  // need to calculate renewability relative to expiry date, because this date may be custom (not matching the configured access period)
   // expiry - DAYS_TO_EXPIRY_1
   const expiryPeriodStart = moment
     .utc(currentApp.expiresAtUtc)
@@ -75,11 +81,19 @@ export const isRenewable: (currentApp: Application) => boolean = (currentApp) =>
     .endOf('day')
     .add(config.durations.expiry.daysPostExpiry, 'days');
 
-  // between DAYS_TO_EXPIRY_1 days prior to today and DAYS_POST_EXPIRY after
+  // can only renew if the expiry falls between DAYS_TO_EXPIRY_1 days prior to today and DAYS_POST_EXPIRY after
   return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
 };
 
 export const renewalPeriodIsEnded = (currentApp: Application): boolean => {
   const today = moment.utc().startOf('day');
   return currentApp.isRenewal && moment(currentApp?.renewalPeriodEndDateUtc).isBefore(today);
+};
+
+export const isExpirable: (currentApp: Application) => boolean = (currentApp) => {
+  if (!['APPROVED', 'PAUSED'].includes(currentApp.state)) {
+    return false;
+  }
+  const today = moment.utc().endOf('day');
+  return moment.utc(currentApp.expiresAtUtc).isBefore(today);
 };
