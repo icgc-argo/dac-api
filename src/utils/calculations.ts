@@ -79,7 +79,7 @@ export const isRenewable: (currentApp: Application) => boolean = (currentApp) =>
   return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
 };
 
-export const cannotReviseRenewal = (currentApp: Application): boolean => {
+export const renewalPeriodIsEnded = (currentApp: Application): boolean => {
   const today = moment.utc().startOf('day');
   return currentApp.isRenewal && moment(currentApp?.renewalPeriodEndDateUtc).isBefore(today);
 };
