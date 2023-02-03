@@ -19,7 +19,7 @@
 
 import moment from 'moment';
 import 'moment-timezone';
-import { cloneDeep, get, last } from 'lodash';
+import { cloneDeep, last } from 'lodash';
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 
 import {
@@ -53,7 +53,6 @@ import {
   Sections,
   DacoRole,
   PauseReason,
-  SubmitterInfo,
   NotificationSentFlags,
 } from './interface';
 import {
@@ -74,10 +73,17 @@ import {
   isAttestable,
   isExpirable,
   isRenewable,
+  isInPreApprovalState,
 } from '../utils/calculations';
 import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
-import { getUpdateAuthor, hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
+import {
+  getUpdateAuthor,
+  hasDacoSystemScope,
+  hasReviewScope,
+  getSubmitterInfo,
+} from '../utils/permissions';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
+import logger from '../logger';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -540,6 +546,13 @@ export class ApplicationStateManager {
     return current;
   }
 
+  unlinkFromRenewal(): Application {
+    const current = this.currentApplication;
+    current.renewalAppId = undefined;
+    onAppUpdate(current);
+    return current;
+  }
+
   updateEmailNotifications(notificationType: keyof NotificationSentFlags): Application {
     const current = this.currentApplication;
     if (!current.emailNotifications) {
@@ -615,16 +628,6 @@ export function getSearchFieldValues(appDoc: Application) {
     appDoc.renewalAppId ? appDoc.renewalAppId : '', // empty string will be filtered
     appDoc.sourceAppId ? appDoc.sourceAppId : '', // empty string will be filtered
   ].filter((x) => x && x.trim());
-}
-
-function getSubmitterInfo(identity: UserIdentity): SubmitterInfo {
-  const email = get(identity, 'tokenInfo.context.user.email');
-  if (email && typeof email === 'string') {
-    const info: SubmitterInfo = { userId: identity.userId, email };
-    return info;
-  } else {
-    throw new Forbidden('A submitter email is required to create a new application.');
-  }
 }
 
 function getPristineMeta(): Meta {
@@ -889,7 +892,7 @@ function updateAppStateForReviewApplication(
   }
 
   if (updatePart.state == 'REVISIONS REQUESTED') {
-    if (renewalPeriodIsEnded(current)) {
+    if (current.isRenewal && renewalPeriodIsEnded(current)) {
       throw new Error('An application past its renewal period can only be APPROVED or REJECTED.');
     }
     return transitionToRevisionsRequested(current, updatePart, updatedBy);
@@ -1031,6 +1034,11 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
   current,
   closedBy,
 ) => {
+  if (current.isRenewal && !renewalPeriodIsEnded(current) && isInPreApprovalState(current)) {
+    // unlink renewal from source application
+    logger.info(`Unsetting sourceAppId for renewal app ${current.appId}.`);
+    current.sourceAppId = undefined;
+  }
   current.state = 'CLOSED';
   current.closedBy = closedBy.id;
   const closedDate = moment().toDate();
@@ -1236,6 +1244,9 @@ function updateAppStateForPausedApplication(
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
 ) {
+  if (updatePart.state === 'CLOSED') {
+    return transitionToClosed(currentApplication, updatedBy);
+  }
   if (updatePart.state === 'APPROVED') {
     // Admins can directly APPROVE a PAUSED application, submitters must attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
