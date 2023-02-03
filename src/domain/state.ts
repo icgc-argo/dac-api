@@ -83,7 +83,6 @@ import {
   getSubmitterInfo,
 } from '../utils/permissions';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
-import logger from '../logger';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -1036,7 +1035,6 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
 ) => {
   if (current.isRenewal && !renewalPeriodIsEnded(current) && isInPreApprovalState(current)) {
     // unlink renewal from source application
-    logger.info(`Unsetting sourceAppId for renewal app ${current.appId}.`);
     current.sourceAppId = undefined;
   }
   current.state = 'CLOSED';
