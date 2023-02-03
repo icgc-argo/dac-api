@@ -18,9 +18,11 @@
  */
 
 import { Identity, UserIdentity, ApplicationIdentity } from '@overture-stack/ego-token-middleware';
+import { get } from 'lodash';
 
-import { DacoRole, UpdateAuthor } from '../domain/interface';
+import { DacoRole, SubmitterInfo, UpdateAuthor } from '../domain/interface';
 import { getAppConfig } from '../config';
+import { Forbidden } from './errors';
 
 export const isUserJwt = (identity: Identity): identity is UserIdentity =>
   identity.tokenInfo.context.hasOwnProperty('user');
@@ -60,4 +62,14 @@ export const getDacoRole: (identity: Identity) => DacoRole = (identity) => {
   const isSystem = hasDacoSystemScope(identity);
   const isAdmin = hasReviewScope(identity);
   return isSystem ? DacoRole.SYSTEM : isAdmin ? DacoRole.ADMIN : DacoRole.SUBMITTER;
+};
+
+export const getSubmitterInfo = (identity: UserIdentity): SubmitterInfo => {
+  const email = get(identity, 'tokenInfo.context.user.email');
+  if (email && typeof email === 'string') {
+    const info: SubmitterInfo = { userId: identity.userId, email };
+    return info;
+  } else {
+    throw new Forbidden('A submitter email is required to create a new application.');
+  }
 };

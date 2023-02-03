@@ -87,7 +87,10 @@ export const isRenewable = (currentApp: Application): boolean => {
 
 export const renewalPeriodIsEnded = (currentApp: Application): boolean => {
   const today = moment.utc().startOf('day');
-  return currentApp.isRenewal && moment(currentApp?.renewalPeriodEndDateUtc).isBefore(today);
+  return (
+    !!currentApp.renewalPeriodEndDateUtc &&
+    moment(currentApp?.renewalPeriodEndDateUtc).isBefore(today)
+  );
 };
 
 export const isExpirable: (currentApp: Application) => boolean = (currentApp) => {
@@ -96,4 +99,8 @@ export const isExpirable: (currentApp: Application) => boolean = (currentApp) =>
   }
   const today = moment.utc().endOf('day');
   return moment.utc(currentApp.expiresAtUtc).isBefore(today);
+};
+
+export const isInPreApprovalState = (currentApp: Application): boolean => {
+  return ['DRAFT', 'SIGN AND SUBMIT', 'REVISIONS REQUESTED'].includes(currentApp.state);
 };

@@ -178,8 +178,8 @@ export interface ApplicationSummary {
   isAttestable: boolean;
   ableToRenew: boolean;
   lastPausedAtUtc?: Date;
-  sourceAppId?: string;
-  renewalAppId?: string;
+  sourceAppId?: string | null;
+  renewalAppId?: string | null;
   renewalPeriodEndDateUtc?: Date;
 }
 
@@ -288,8 +288,8 @@ export interface Application {
   pauseReason?: PauseReason | null;
   lastPausedAtUtc?: Date; // calculated
   emailNotifications?: NotificationSentFlags;
-  sourceAppId?: string; // appId of original application, added to a renewal application
-  renewalAppId?: string; // appId of renewal application, added to the original application
+  sourceAppId?: string | null; // appId of original application, added to a renewal application
+  renewalAppId?: string | null; // appId of renewal application, added to the original application
   renewalPeriodEndDateUtc?: Date; // source app expiresAtUtc + daysPostExpiry
 }
 
