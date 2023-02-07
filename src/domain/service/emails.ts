@@ -266,48 +266,18 @@ export async function sendReviewEmail(
   let emailContent: string;
   let title: string;
   if (wasInRevisionRequestState(oldApplication)) {
-    // send new app for review email
-    const reviewEmail = await renderReviewRevisedEmail(
-      updatedApp,
-      {
-        firstName: config.email.reviewerFirstName,
-        lastName: config.email.reviewerLastName,
-      },
-      {
-        baseUrl: config.ui.baseUrl,
-        pathTemplate: config.ui.sectionPath,
-      },
-    );
+    // send revised application for review email
+    const reviewEmail = await renderReviewRevisedEmail(updatedApp);
     emailContent = reviewEmail.html;
     title = `[${updatedApp.appId}] A Revised Application has been Submitted`;
   } else if (oldApplication.isRenewal) {
-    // send a renewal for review email
-    const reviewEmail = await renderReviewRenewalEmail(
-      updatedApp,
-      {
-        firstName: config.email.reviewerFirstName,
-        lastName: config.email.reviewerLastName,
-      },
-      {
-        baseUrl: config.ui.baseUrl,
-        pathTemplate: config.ui.sectionPath,
-      },
-    );
+    // send renewal application for review email
+    const reviewEmail = await renderReviewRenewalEmail(updatedApp);
     emailContent = reviewEmail.html;
     title = `[${updatedApp.appId}] A Renewal Application has been Submitted`;
   } else {
-    // send new app for review email
-    const reviewEmail = await renderReviewEmail(
-      updatedApp,
-      {
-        firstName: config.email.reviewerFirstName,
-        lastName: config.email.reviewerLastName,
-      },
-      {
-        baseUrl: config.ui.baseUrl,
-        pathTemplate: config.ui.sectionPath,
-      },
-    );
+    // send new application for review email
+    const reviewEmail = await renderReviewEmail(updatedApp);
     emailContent = reviewEmail.html;
     title = `[${updatedApp.appId}] A New Application has been Submitted`;
   }

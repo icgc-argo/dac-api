@@ -41,11 +41,7 @@ describe('emails', () => {
 
     it('should render reviewer email', async () => {
       const app = getAppInReview();
-      const email = await renderNewReview(
-        app,
-        { lastName: 'Dough', firstName: 'Pizza' },
-        uiLinksStub,
-      );
+      const email = await renderNewReview(app);
     });
 
     it('should render revisions requested email', async () => {
@@ -184,14 +180,9 @@ describe('emails', () => {
     });
 
     it('should render a renewal for review email', async () => {
-      const config = mockedConfig();
       const app = getAppInReview();
       app.isRenewal = true;
-      const email = await renderRenewalReviewEmail(
-        app,
-        { firstName: config.email.reviewerFirstName, lastName: config.email.reviewerLastName },
-        uiLinksStub,
-      );
+      const email = await renderRenewalReviewEmail(app);
     });
   });
 });
