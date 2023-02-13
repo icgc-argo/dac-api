@@ -737,6 +737,69 @@ describe('state manager', () => {
       'Application has not reached expiry date.',
     );
   });
+
+  it('should not allow revisions after renewal period ends', () => {
+    const app = getAppInReview();
+    app.isRenewal = true;
+    app.renewalPeriodEndDateUtc = moment.utc().subtract(1, 'day').toDate();
+    const stateManager = new ApplicationStateManager(app);
+    const update: Partial<UpdateApplication> = {
+      revisionRequest: {
+        ethicsLetter: {
+          details: 'Better letter plz',
+          requested: true,
+        },
+      },
+      state: 'REVISIONS REQUESTED',
+    };
+    const reviewer = { id: 'Mme Reviewer', role: DacoRole.ADMIN };
+    expect(() => stateManager.updateApp(update, true, reviewer)).to.throw(
+      Error,
+      'An application past its renewal period can only be APPROVED or REJECTED.',
+    );
+  });
+
+  it('should allow revisions before renewal period ends', () => {
+    const app = getAppInReview();
+    app.isRenewal = true;
+    app.renewalPeriodEndDateUtc = moment.utc().add(5, 'days').toDate();
+    expect(app.state).to.eq('REVIEW');
+    const stateManager = new ApplicationStateManager(app);
+    const update: Partial<UpdateApplication> = {
+      revisionRequest: {
+        applicant: {
+          details: 'More info plz',
+          requested: true,
+        },
+      },
+      state: 'REVISIONS REQUESTED',
+    };
+    const reviewer = { id: 'Mme Reviewer', role: DacoRole.ADMIN };
+    stateManager.updateApp(update, true, reviewer);
+    const updatedApp = stateManager.prepareApplicationForUser(true);
+    expect(updatedApp.state).to.eq('REVISIONS REQUESTED');
+  });
+
+  it('should allow revisions on last day of renewal period', () => {
+    const app = getAppInReview();
+    app.isRenewal = true;
+    app.renewalPeriodEndDateUtc = moment.utc().toDate();
+    expect(app.state).to.eq('REVIEW');
+    const stateManager = new ApplicationStateManager(app);
+    const update: Partial<UpdateApplication> = {
+      revisionRequest: {
+        applicant: {
+          details: 'More info plz',
+          requested: true,
+        },
+      },
+      state: 'REVISIONS REQUESTED',
+    };
+    const reviewer = { id: 'Mme Reviewer', role: DacoRole.ADMIN };
+    stateManager.updateApp(update, true, reviewer);
+    const updatedApp = stateManager.prepareApplicationForUser(true);
+    expect(updatedApp.state).to.eq('REVISIONS REQUESTED');
+  });
 });
 
 export function getReadyToSignApp() {

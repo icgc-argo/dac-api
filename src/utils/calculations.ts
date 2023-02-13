@@ -85,6 +85,11 @@ export const isRenewable = (currentApp: Application): boolean => {
   return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
 };
 
+export const renewalPeriodIsEnded = (currentApp: Application): boolean => {
+  const today = moment.utc().startOf('day');
+  return currentApp.isRenewal && moment(currentApp?.renewalPeriodEndDateUtc).isBefore(today);
+};
+
 export const isExpirable: (currentApp: Application) => boolean = (currentApp) => {
   if (!['APPROVED', 'PAUSED'].includes(currentApp.state)) {
     return false;
