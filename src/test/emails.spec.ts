@@ -11,6 +11,7 @@ import renderAccessHasExpiredEmail from '../emails/access-has-expired';
 import renderAttestationRequiredEmail from '../emails/attestation-required';
 import renderApplicationPausedEmail from '../emails/application-paused';
 import renderAttestationReceivedEmail from '../emails/attestation-received';
+import renderRenewalReviewEmail from '../emails/review-renewal';
 
 import {
   getAppInReview,
@@ -40,11 +41,7 @@ describe('emails', () => {
 
     it('should render reviewer email', async () => {
       const app = getAppInReview();
-      const email = await renderNewReview(
-        app,
-        { lastName: 'Dough', firstName: 'Pizza' },
-        uiLinksStub,
-      );
+      const email = await renderNewReview(app);
     });
 
     it('should render revisions requested email', async () => {
@@ -180,6 +177,12 @@ describe('emails', () => {
       const app = getApprovedApplication();
       app.attestedAtUtc = new Date();
       const email = await renderAttestationReceivedEmail(app, emailLinksStub);
+    });
+
+    it('should render a renewal for review email', async () => {
+      const app = getAppInReview();
+      app.isRenewal = true;
+      const email = await renderRenewalReviewEmail(app);
     });
   });
 });
