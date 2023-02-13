@@ -107,6 +107,32 @@ export const getAppsClosingQuery = (currentDate: Date): FilterQuery<ApplicationD
   return query;
 };
 
+const doCloseApplication = async (
+  app: ApplicationDocument,
+  user: Identity,
+): Promise<JobResultForApplication> => {
+  try {
+    const updatedAppObj = await closeApplication(app, user);
+    if (updatedAppObj.state === 'CLOSED') {
+      return { success: true, app: updatedAppObj };
+    } else {
+      // State change failed
+      logger.error(
+        `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to CLOSED state.`,
+      );
+      return {
+        success: false,
+        app: updatedAppObj,
+        message: `Failed to transition ${updatedAppObj.appId} from ${app.state} to CLOSED state.`,
+      };
+    }
+  } catch (err: unknown) {
+    // Error thrown in one of our async operations
+    logger.error(`${JOB_NAME} - Error caught while closing application ${app.appId} - ${err}`);
+    return { success: false, app, message: `${err}` };
+  }
+};
+
 const getClosedAppsReportDetails = async (
   user: Identity,
   currentDate: Date,
@@ -122,33 +148,10 @@ const getClosedAppsReportDetails = async (
   logger.info(`${JOB_NAME} - There are ${closableAppCount} apps that should be CLOSED.`);
   const closableApps = await ApplicationModel.find(query).exec();
 
-  const doCloseApplication = async (app: ApplicationDocument): Promise<JobResultForApplication> => {
-    try {
-      const updatedAppObj = await closeApplication(app, user);
-      if (updatedAppObj.state === 'CLOSED') {
-        return { success: true, app: updatedAppObj };
-      } else {
-        // State change failed
-        logger.error(
-          `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to CLOSED state.`,
-        );
-        return {
-          success: false,
-          app: updatedAppObj,
-          message: `Failed to transition ${updatedAppObj.appId} from ${app.state} to CLOSED state.`,
-        };
-      }
-    } catch (err: unknown) {
-      // Error thrown in one of our async operations
-      logger.error(`${JOB_NAME} - Error caught while closing application ${app.appId} - ${err}`);
-      return { success: false, app, message: `${err}` };
-    }
-  };
-
   const results: JobResultForApplication[][] = [];
   const chunks = chunk(closableApps, REQUEST_CHUNK_SIZE);
   for (const chunk of chunks) {
-    const result = await Promise.all(chunk.map(doCloseApplication));
+    const result = await Promise.all(chunk.map((app) => doCloseApplication(app, user)));
     results.push(result);
   }
 
