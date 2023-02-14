@@ -6,7 +6,7 @@ It represents the closest reasonable ESLint configuration to this
 project's original TSLint configuration.
 
 We recommend eventually switching this configuration to extend from
-the recommended rulesets in typescript-eslint. 
+the recommended rulesets in typescript-eslint.
 https://github.com/typescript-eslint/tslint-to-eslint-config/blob/master/docs/FAQs.md
 
 Happy linting! 💖
@@ -31,25 +31,13 @@ module.exports = {
   root: true,
   rules: {
     '@typescript-eslint/indent': 'off',
-    '@typescript-eslint/member-delimiter-style': [
-      'error',
-      {
-        multiline: {
-          delimiter: 'semi',
-          requireLast: true,
-        },
-        singleline: {
-          delimiter: 'semi',
-          requireLast: false,
-        },
-      },
-    ],
+    '@typescript-eslint/member-delimiter-style': 'off',
     '@typescript-eslint/naming-convention': 'off',
     '@typescript-eslint/prefer-namespace-keyword': 'error',
     '@typescript-eslint/quotes': 'off',
     '@typescript-eslint/require-await': 'off',
-    '@typescript-eslint/semi': ['error', 'always'],
-    '@typescript-eslint/type-annotation-spacing': 'error',
+    '@typescript-eslint/semi': 'off',
+    '@typescript-eslint/type-annotation-spacing': 'off',
     'brace-style': 'off',
     indent: 'off',
     'jsdoc/check-alignment': 'error',
