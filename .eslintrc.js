@@ -30,7 +30,7 @@ module.exports = {
   ],
   root: true,
   rules: {
-    '@typescript-eslint/indent': ['error', 2],
+    '@typescript-eslint/indent': 'off',
     '@typescript-eslint/member-delimiter-style': [
       'error',
       {
@@ -44,22 +44,16 @@ module.exports = {
         },
       },
     ],
-    '@typescript-eslint/naming-convention': 'error',
+    '@typescript-eslint/naming-convention': 'off',
     '@typescript-eslint/prefer-namespace-keyword': 'error',
-    '@typescript-eslint/quotes': [
-      'error',
-      'single',
-      {
-        avoidEscape: true,
-      },
-    ],
-    '@typescript-eslint/require-await': 'error',
+    '@typescript-eslint/quotes': 'off',
+    '@typescript-eslint/require-await': 'off',
     '@typescript-eslint/semi': ['error', 'always'],
     '@typescript-eslint/type-annotation-spacing': 'error',
-    'brace-style': ['error', '1tbs'],
+    'brace-style': 'off',
     indent: 'off',
     'jsdoc/check-alignment': 'error',
-    'jsdoc/check-indentation': 'error',
+    'jsdoc/check-indentation': 'off',
     'jsdoc/newline-after-description': 'error',
     'no-null/no-null': 'error',
     'no-trailing-spaces': 'error',

@@ -88,6 +88,7 @@ export async function create(identity: UserIdentity) {
  * Closing renewals AFTER the renewal period runs out is handled by the 'CLOSING UNSUBMITTED RENEWALS' batch job, and the
  * applications remain linked in that scenario
  * ```
+ *
  * @param renewalApp Renewal Application that has already been updated in state
  * @param sourceAppId
  */
@@ -121,7 +122,7 @@ async function unlinkRenewalFromSourceApp(
       if (!isReviewer) {
         query.submitterId = identity.userId;
       }
-      // tslint:disable-next-line:no-null-keyword
+      // eslint-disable-next-line no-null/no-null
       const sourceApp = await ApplicationModel.findOne(query, null, { session });
       if (sourceApp) {
         const sourceAppObj: Application = sourceApp.toObject();
@@ -207,6 +208,7 @@ export async function updatePartial(
 /**
  * Function to trigger email notifications based on the new application state, and in some cases a specific combination of a former state
  * with a new state
+ *
  * @param updatedApp
  * @param oldApplication
  * @param emailClient
@@ -286,6 +288,7 @@ export async function onStateChange(
  * Compares document id arrays (ethics letters, signed app and approved pdf docs) from original application and updated application
  * Returns array of all objectIds that are not present in the updated application. This marks them for deletion from object storage
  * ```
+ *
  * @returns string[]
  */
 async function checkDeletedDocuments(originalApp: Application, updatedApp: Application) {
@@ -337,6 +340,7 @@ async function checkDeletedDocuments(originalApp: Application, updatedApp: Appli
  * Only non-reviewer users can create renewal applications
  * UserIdentity userId must match application submitterId
  * ```
+ *
  * @param appId  string
  * @param identity UserIdentity
  * @returns Promise<Application> | undefined

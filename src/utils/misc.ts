@@ -3,6 +3,7 @@ import { findLast, sortBy, cloneDeep, isArray } from 'lodash';
 import { Application, UpdateEvent } from '../domain/interface';
 
 export function checkIsDefined<T>(val: T | undefined | null): T {
+  // eslint-disable-next-line no-null/no-null
   if (val === undefined || val === null) {
     throw new Error('value is not defined');
   }
@@ -21,7 +22,7 @@ const _mergeKnown = (a: any, b: any) => {
     if (b[k] === undefined) {
       return;
     }
-    // tslint:disable-next-line:no-null-keyword
+    // eslint-disable-next-line no-null/no-null
     if (a[k] == null || typeof a[k] !== 'object') {
       a[k] = b[k];
       return;

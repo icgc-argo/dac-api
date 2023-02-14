@@ -21,6 +21,7 @@ const JOB_NAME = 'FIRST EXPIRY NOTIFICATIONS';
  * Query uses a date range (DAYS_TO_EXPIRY_1 to DAYS_TO_EXPIRY_2) to account for days where the batch job run may have been missed
  * Sets a flag on the app, firstExpiryNotificationSent, to indicate an email has been sent and application can be ignored on a subsequent run
  * ```
+ *
  * @param currentDate
  * @param emailClient
  * @returns BatchJobReport

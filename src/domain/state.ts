@@ -743,7 +743,7 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
         meta: getPristineMeta(),
       },
       ethicsLetter: {
-        // tslint:disable-next-line:no-null-keyword
+        // eslint-disable-next-line no-null/no-null
         declaredAsRequired: null,
         approvalLetterDocs: [],
         meta: getPristineMeta(),

@@ -186,6 +186,7 @@ export const createAppHistoryTSV = async () => {
           projectTitle: update.applicationInfo.projectTitle,
           appType: update.applicationInfo.appType,
           ethicsLetterRequired:
+            // eslint-disable-next-line no-null/no-null
             update.applicationInfo.ethicsLetterRequired === null
               ? ''
               : update.applicationInfo.ethicsLetterRequired

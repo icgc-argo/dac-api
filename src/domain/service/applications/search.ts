@@ -174,7 +174,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         expiresAtUtc: app.expiresAtUtc,
         state: app.state,
         ethics: {
-          // tslint:disable-next-line:no-null-keyword
+          // eslint-disable-next-line no-null/no-null
           declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired,
         },
         submittedAtUtc: app.submittedAtUtc,
@@ -289,6 +289,7 @@ export async function findApplication(appId: string, identity: Identity) {
 
 /**
  * Parses search params from a Request, to use in a mongoose query
+ *
  * @param {Request} req - request object from express
  * @param {string} [defaultSort] - default sort direction for the query
  * @example

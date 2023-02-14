@@ -24,6 +24,7 @@ const JOB_NAME = 'EXPIRING APPLICATIONS';
  * Query checks for any expiresAtUtc value that is before the end of the day, to account for days where the batch job run may have been missed
  * Sets a flag on the app, applicationExpiredNotificationSent, to indicate an email has been sent and application can be ignored on a subsequent run
  * ```
+ *
  * @param currentDate
  * @param emailClient
  * @returns BatchJobReport

@@ -358,6 +358,7 @@ function validateRequired(
   errors: SectionError[],
 ): boolean {
   if (typeof val == 'boolean') {
+    // eslint-disable-next-line no-null/no-null
     return val !== null && val !== undefined;
   }
   if (!val || val.trim() == '') {
