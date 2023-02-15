@@ -174,7 +174,6 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         expiresAtUtc: app.expiresAtUtc,
         state: app.state,
         ethics: {
-          // tslint:disable-next-line:no-null-keyword
           declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired,
         },
         submittedAtUtc: app.submittedAtUtc,

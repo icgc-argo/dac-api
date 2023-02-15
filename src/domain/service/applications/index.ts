@@ -121,7 +121,6 @@ async function unlinkRenewalFromSourceApp(
       if (!isReviewer) {
         query.submitterId = identity.userId;
       }
-      // tslint:disable-next-line:no-null-keyword
       const sourceApp = await ApplicationModel.findOne(query, null, { session });
       if (sourceApp) {
         const sourceAppObj: Application = sourceApp.toObject();

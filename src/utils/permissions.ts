@@ -64,12 +64,12 @@ export const getDacoRole: (identity: Identity) => DacoRole = (identity) => {
   return isSystem ? DacoRole.SYSTEM : isAdmin ? DacoRole.ADMIN : DacoRole.SUBMITTER;
 };
 
-export const getSubmitterInfo = (identity: UserIdentity): SubmitterInfo => {
+export const requireSubmitterInfo = (identity: UserIdentity): SubmitterInfo => {
   const email = get(identity, 'tokenInfo.context.user.email');
   if (email && typeof email === 'string') {
     const info: SubmitterInfo = { userId: identity.userId, email };
     return info;
   } else {
-    throw new Forbidden('A submitter email is required to create a new application.');
+    throw new Forbidden('A submitter email is required.');
   }
 };

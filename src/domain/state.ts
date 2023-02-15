@@ -80,7 +80,7 @@ import {
   getUpdateAuthor,
   hasDacoSystemScope,
   hasReviewScope,
-  getSubmitterInfo,
+  requireSubmitterInfo,
 } from '../utils/permissions';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 
@@ -647,7 +647,7 @@ export function renewalApplication(
   identity: UserIdentity,
   originalApp: Application,
 ): Partial<Application> {
-  const submitter = getSubmitterInfo(identity);
+  const submitter = requireSubmitterInfo(identity);
   const newApplication: Partial<Application> = {
     submitterId: submitter.userId,
     submitterEmail: submitter.email,
@@ -690,7 +690,7 @@ export function renewalApplication(
 
 // new applications can only be created by user jwt identities
 export function newApplication(identity: UserIdentity): Partial<Application> {
-  const submitter = getSubmitterInfo(identity);
+  const submitter = requireSubmitterInfo(identity);
   const app: Partial<Application> = {
     state: 'DRAFT',
     submitterId: submitter.userId,
@@ -743,7 +743,6 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
         meta: getPristineMeta(),
       },
       ethicsLetter: {
-        // tslint:disable-next-line:no-null-keyword
         declaredAsRequired: null,
         approvalLetterDocs: [],
         meta: getPristineMeta(),

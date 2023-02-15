@@ -65,7 +65,7 @@ describe('state manager', () => {
     expect(get(userWithNoEmail, 'tokenInfo.context.user.email')).to.be.undefined;
     expect(() => newApplication(userWithNoEmail as UserIdentity)).to.throw(
       Forbidden,
-      'A submitter email is required to create a new application.',
+      'A submitter email is required.',
     );
   });
 
@@ -691,7 +691,7 @@ describe('state manager', () => {
     const app = getApprovedApplication();
     const renewalApp = renewalApplication(mockApplicantToken as UserIdentity, app);
     verifyRenewedSectionsStatus(renewalApp, app);
-   });
+  });
 
   it('should expire an APPROVED app that has reached its expiry date', () => {
     const app = getApprovedApplication();

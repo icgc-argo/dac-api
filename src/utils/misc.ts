@@ -21,7 +21,6 @@ const _mergeKnown = (a: any, b: any) => {
     if (b[k] === undefined) {
       return;
     }
-    // tslint:disable-next-line:no-null-keyword
     if (a[k] == null || typeof a[k] !== 'object') {
       a[k] = b[k];
       return;
