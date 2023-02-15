@@ -151,27 +151,20 @@ export interface SearchResult {
       };
 }
 
-export interface ApplicationSummary {
+interface ApplicationBaseFields {
   appId: string;
   state: State;
   submitterId: string;
   submittedAtUtc: Date;
   approvedAtUtc: Date;
   expiresAtUtc: Date;
-  lastUpdatedAtUtc: Date;
-  createdAtUtc: Date;
+  lastUpdatedAtUtc?: Date;
+  createdAtUtc?: Date;
   closedAtUtc: Date;
   closedBy: string;
-  ethics: {
-    declaredAsRequired: boolean | undefined;
-  };
-  applicant: {
-    info: PersonalInfo;
-    address: Address;
-  };
-  collaborators?: PersonalInfo[];
+  // calculated flag to indicate that revisions are being requested if any of the revisionRequest sections is true
+  // and this flag will be reset before each review since we do reset the revision request portion.
   revisionsRequested: boolean;
-  currentApprovedAppDoc: boolean;
   isRenewal: boolean;
   attestationByUtc?: Date;
   attestedAtUtc?: Date | null;
@@ -181,6 +174,18 @@ export interface ApplicationSummary {
   sourceAppId?: string | null;
   renewalAppId?: string | null;
   renewalPeriodEndDateUtc?: Date;
+}
+
+export interface ApplicationSummary extends ApplicationBaseFields {
+  currentApprovedAppDoc: boolean;
+  ethics: {
+    declaredAsRequired: boolean | undefined;
+  };
+  applicant: {
+    info: PersonalInfo;
+    address: Address;
+  };
+  collaborators?: PersonalInfo[];
 }
 
 export type ApplicationDto = Omit<Application, 'searchField'>;
@@ -250,26 +255,12 @@ export interface Sections {
   };
 }
 
-export interface Application {
-  appId: string;
+export interface Application extends ApplicationBaseFields {
   appNumber: number;
-  state: State;
-  submitterId: string;
   submitterEmail: string;
   submittedAtUtc: Date;
-  approvedAtUtc: Date;
-  expiresAtUtc: Date;
-  closedAtUtc: Date;
-  closedBy: string;
   denialReason: string;
-  lastUpdatedAtUtc?: Date;
-  createdAtUtc?: Date;
   searchValues: string[];
-  isRenewal: boolean;
-  ableToRenew: boolean; // calculated
-  // calculated flag to indicate that revisions are being requested if any of the revisionRequest sections is true
-  // and this flag will be reset before each review since we do reset the revision request portion.
-  revisionsRequested: boolean;
   revisionRequest: {
     applicant: RevisionRequest;
     representative: RevisionRequest;
@@ -282,15 +273,8 @@ export interface Application {
   sections: Sections;
   updates: ApplicationUpdate[] | UserViewApplicationUpdate[];
   approvedAppDocs: ApprovedAppDocument[];
-  attestationByUtc?: Date; // calculated from approvedAtUtc
-  attestedAtUtc?: Date | null;
-  isAttestable: boolean; // calculated
   pauseReason?: PauseReason | null;
-  lastPausedAtUtc?: Date; // calculated
   emailNotifications?: NotificationSentFlags;
-  sourceAppId?: string | null; // appId of original application, added to a renewal application
-  renewalAppId?: string | null; // appId of renewal application, added to the original application
-  renewalPeriodEndDateUtc?: Date; // source app expiresAtUtc + daysPostExpiry
 }
 
 export type AppSections = keyof Application['sections'];
