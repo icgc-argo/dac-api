@@ -43,7 +43,7 @@ async function runCloseUnsubmittedRenewalsCheck(
   const jobStartTime = new Date();
   try {
     logger.info(`${JOB_NAME} - Initiating...`);
-    const details = await getClosedAppsReportDetails(user, currentDate);
+    const details = await closeAppsAndGetReportDetails(user, currentDate);
     details.errors.length
       ? logger.warn(`${JOB_NAME} - Completed with errors.`)
       : logger.info(`${JOB_NAME} - Completed.`);
@@ -95,7 +95,7 @@ const closeApplication = async (
   }
 };
 
-export const getAppsClosingQuery = (currentDate: Date): FilterQuery<ApplicationDocument> => {
+const getAppsClosingQuery = (currentDate: Date): FilterQuery<ApplicationDocument> => {
   const referenceDate = moment(currentDate).utc().startOf('day');
   const query: FilterQuery<ApplicationDocument> = {
     state: {
@@ -133,7 +133,7 @@ const doCloseApplication = async (
   }
 };
 
-const getClosedAppsReportDetails = async (
+const closeAppsAndGetReportDetails = async (
   user: Identity,
   currentDate: Date,
 ): Promise<BatchJobDetails> => {
