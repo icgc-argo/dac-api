@@ -52,8 +52,8 @@ const examples = {
     'emailNotifications.applicationExpiredNotificationSent': { $exists: false },
   },
   closing: {
-    state: { $in: ['APPROVED', 'PAUSED', 'EXPIRED'] },
-    expiresAtUtc: { $lt: '2022-10-09T00:00:00.000Z' },
-    'emailNotifications.applicationClosedNotificationSent': { $exists: false },
+    state: { $in: ['DRAFT', 'SIGN AND SUBMIT', 'REVISIONS REQUESTED'] },
+    renewalPeriodEndDateUtc: { $lt: '2023-01-07T00:00:00.000Z' },
+    isRenewal: true,
   },
 };

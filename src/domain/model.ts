@@ -114,7 +114,6 @@ const NotificationSentFlags = new mongoose.Schema(
     firstExpiryNotificationSent: { type: Date, required: false },
     secondExpiryNotificationSent: { type: Date, required: false },
     applicationExpiredNotificationSent: { type: Date, required: false },
-    applicationClosedNotificationSent: { type: Date, required: false },
   },
   { _id: false },
 );

@@ -691,7 +691,7 @@ describe('state manager', () => {
     const app = getApprovedApplication();
     const renewalApp = renewalApplication(mockApplicantToken as UserIdentity, app);
     verifyRenewedSectionsStatus(renewalApp, app);
-   });
+  });
 
   it('should expire an APPROVED app that has reached its expiry date', () => {
     const app = getApprovedApplication();

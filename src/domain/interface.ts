@@ -313,7 +313,6 @@ export interface NotificationSentFlags {
   firstExpiryNotificationSent?: Date;
   secondExpiryNotificationSent?: Date;
   applicationExpiredNotificationSent?: Date;
-  applicationClosedNotificationSent?: Date;
 }
 
 export interface UpdateApplication {
