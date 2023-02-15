@@ -73,7 +73,7 @@ import {
   isAttestable,
   isExpirable,
   isRenewable,
-  isInPreApprovalState,
+  isInPreSubmittedState,
 } from '../utils/calculations';
 import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
 import {
@@ -1032,7 +1032,7 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
   current,
   closedBy,
 ) => {
-  if (current.isRenewal && !renewalPeriodIsEnded(current) && isInPreApprovalState(current)) {
+  if (current.isRenewal && !renewalPeriodIsEnded(current) && isInPreSubmittedState(current)) {
     // unlink renewal from source application
     current.sourceAppId = undefined;
   }

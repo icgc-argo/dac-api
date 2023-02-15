@@ -51,7 +51,7 @@ import { isEthicsDocReferenced, findApplication, getById } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
 import { Forbidden, throwApplicationClosedError } from '../../../utils/errors';
 import {
-  isInPreApprovalState,
+  isInPreSubmittedState,
   isRenewable,
   renewalPeriodIsEnded,
 } from '../../../utils/calculations';
@@ -165,7 +165,7 @@ export async function updatePartial(
   }
   const stateManager = new ApplicationStateManager(appDocObj);
   const updatedApp = stateManager.updateApp(appPart, isReviewer, getUpdateAuthor(identity));
-  if (appDocObj.isRenewal && !renewalPeriodIsEnded(appDocObj) && isInPreApprovalState(appDocObj)) {
+  if (appDocObj.isRenewal && !renewalPeriodIsEnded(appDocObj) && isInPreSubmittedState(appDocObj)) {
     logger.info('Closing an unsubmitted renewal');
     const sourceAppId = appDocObj.sourceAppId;
     if (sourceAppId) {
