@@ -1,6 +1,6 @@
 import moment from 'moment';
 import { AppConfig, getAppConfig } from '../config';
-import { Application } from '../domain/interface';
+import { Application, State } from '../domain/interface';
 
 export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();
@@ -87,7 +87,10 @@ export const isRenewable = (currentApp: Application): boolean => {
 
 export const renewalPeriodIsEnded = (currentApp: Application): boolean => {
   const today = moment.utc().startOf('day');
-  return currentApp.isRenewal && moment(currentApp?.renewalPeriodEndDateUtc).isBefore(today);
+  return (
+    !!currentApp.renewalPeriodEndDateUtc &&
+    moment(currentApp?.renewalPeriodEndDateUtc).isBefore(today)
+  );
 };
 
 export const isExpirable: (currentApp: Application) => boolean = (currentApp) => {
@@ -96,4 +99,9 @@ export const isExpirable: (currentApp: Application) => boolean = (currentApp) =>
   }
   const today = moment.utc().endOf('day');
   return moment.utc(currentApp.expiresAtUtc).isBefore(today);
+};
+
+export const isInPreSubmittedState = (currentApp: Application): boolean => {
+  const preSubmittedStates: State[] = ['DRAFT', 'SIGN AND SUBMIT', 'REVISIONS REQUESTED'];
+  return preSubmittedStates.includes(currentApp.state);
 };

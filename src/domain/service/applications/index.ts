@@ -23,7 +23,7 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 
 import { AppConfig, getAppConfig } from '../../../config';
-import { ApplicationModel } from '../../model';
+import { ApplicationDocument, ApplicationModel } from '../../model';
 import {
   ApplicationStateManager,
   renewalApplication,
@@ -50,7 +50,12 @@ import {
 import { isEthicsDocReferenced, findApplication, getById } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
 import { Forbidden, throwApplicationClosedError } from '../../../utils/errors';
-import { isRenewable } from '../../../utils/calculations';
+import {
+  isInPreSubmittedState,
+  isRenewable,
+  renewalPeriodIsEnded,
+} from '../../../utils/calculations';
+import { FilterQuery } from 'mongoose';
 
 function createAppId(app: Application): string {
   return `DACO-${app.appNumber}`;
@@ -73,6 +78,75 @@ export async function create(identity: UserIdentity) {
   return viewableApp;
 }
 
+/**
+ * ```
+ * Function to remove id connection between an unsubmitted renewal application and its source application when a renewal is CLOSED
+ * This is only for renewals that are closed BEFORE the renewal period runs out.
+ * Uses a transaction to ensure the applications are unlinked, to allow a new renewal to be created from the source app if necessary
+ * ```
+ * ```
+ * Closing renewals AFTER the renewal period runs out is handled by the 'CLOSING UNSUBMITTED RENEWALS' batch job, and the
+ * applications remain linked in that scenario
+ * ```
+ * @param renewalApp Renewal Application that has already been updated in state
+ * @param sourceAppId
+ */
+async function unlinkRenewalFromSourceApp(
+  renewalApp: Application,
+  sourceAppId: string,
+  identity: Identity,
+): Promise<void> {
+  /**
+   * Steps:
+   * 1) Start session
+   * 2) Update renewal application in db - the app obj from the StateManager has already had its state changed to CLOSED, sourceAppId removed and searchValues updated
+   * 3) Fetch the source application by id
+   * 4) Set source app in new state manager
+   * 5) Remove renewalAppId and update searchValues with unlinkFromRenewal state call
+   * 6) Update source app in db
+   * 7) Close session
+   */
+  const session = await ApplicationModel.startSession();
+  try {
+    await session.withTransaction(async () => {
+      logger.info(`Removing sourceAppId ${sourceAppId} from ${renewalApp.appId}.`);
+      await ApplicationModel.findOneAndUpdate({ appId: renewalApp.appId }, renewalApp, {
+        session,
+      });
+      logger.info(`Fetching source application ${sourceAppId}.`);
+      const query: FilterQuery<ApplicationDocument> = {
+        appId: sourceAppId,
+      };
+      const isReviewer = hasReviewScope(identity);
+      if (!isReviewer) {
+        query.submitterId = identity.userId;
+      }
+      const sourceApp = await ApplicationModel.findOne(query, null, { session });
+      if (sourceApp) {
+        const sourceAppObj: Application = sourceApp.toObject();
+        const stateManager = new ApplicationStateManager(sourceAppObj);
+        logger.info(
+          `Removing renewalAppId ${sourceAppObj.renewalAppId} from ${sourceAppObj.appId}.`,
+        );
+        const updatedSourceApp = stateManager.unlinkFromRenewal();
+        logger.info(`Renewal id removed, saving in db.`);
+        await ApplicationModel.updateOne({ appId: updatedSourceApp.appId }, updatedSourceApp, {
+          session: session,
+        });
+        logger.info(`Source app ${updatedSourceApp.appId} successfully updated.`);
+      } else {
+        throw new Error(`Could not fetch source application [${sourceAppId}].`);
+      }
+    });
+  } catch (err) {
+    logger.error('There was an error, rolling back!');
+    logger.error(err);
+  } finally {
+    logger.info('Ending session');
+    session.endSession();
+  }
+}
+
 export async function updatePartial(
   appId: string,
   appPart: Partial<UpdateApplication>,
@@ -91,7 +165,20 @@ export async function updatePartial(
   }
   const stateManager = new ApplicationStateManager(appDocObj);
   const updatedApp = stateManager.updateApp(appPart, isReviewer, getUpdateAuthor(identity));
-  await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
+  if (appDocObj.isRenewal && !renewalPeriodIsEnded(appDocObj) && isInPreSubmittedState(appDocObj)) {
+    logger.info('Closing an unsubmitted renewal');
+    const sourceAppId = appDocObj.sourceAppId;
+    if (sourceAppId) {
+      await unlinkRenewalFromSourceApp(updatedApp, sourceAppId, identity);
+    } else {
+      throw new Error(
+        `Missing sourceAppId from application ${appDocObj.appId}, cannot close renewal.`,
+      );
+    }
+  } else {
+    await ApplicationModel.updateOne({ appId: updatedApp.appId }, updatedApp);
+  }
+
   const stateChanged = appDocObj.state != updatedApp.state;
   if (stateChanged) {
     await onStateChange(updatedApp, appDocObj, emailClient, config);

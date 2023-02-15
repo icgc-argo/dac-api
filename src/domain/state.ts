@@ -19,7 +19,7 @@
 
 import moment from 'moment';
 import 'moment-timezone';
-import { cloneDeep, get, last } from 'lodash';
+import { cloneDeep, last } from 'lodash';
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 
 import {
@@ -53,7 +53,6 @@ import {
   Sections,
   DacoRole,
   PauseReason,
-  SubmitterInfo,
   NotificationSentFlags,
 } from './interface';
 import {
@@ -74,9 +73,15 @@ import {
   isAttestable,
   isExpirable,
   isRenewable,
+  isInPreSubmittedState,
 } from '../utils/calculations';
 import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
-import { getUpdateAuthor, hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
+import {
+  getUpdateAuthor,
+  hasDacoSystemScope,
+  hasReviewScope,
+  requireSubmitterInfo,
+} from '../utils/permissions';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 
 const allSections: Array<keyof Application['sections']> = [
@@ -540,6 +545,13 @@ export class ApplicationStateManager {
     return current;
   }
 
+  unlinkFromRenewal(): Application {
+    const current = this.currentApplication;
+    current.renewalAppId = undefined;
+    onAppUpdate(current);
+    return current;
+  }
+
   updateEmailNotifications(notificationType: keyof NotificationSentFlags): Application {
     const current = this.currentApplication;
     if (!current.emailNotifications) {
@@ -617,16 +629,6 @@ export function getSearchFieldValues(appDoc: Application) {
   ].filter((x) => x && x.trim());
 }
 
-function getSubmitterInfo(identity: UserIdentity): SubmitterInfo {
-  const email = get(identity, 'tokenInfo.context.user.email');
-  if (email && typeof email === 'string') {
-    const info: SubmitterInfo = { userId: identity.userId, email };
-    return info;
-  } else {
-    throw new Forbidden('A submitter email is required to create a new application.');
-  }
-}
-
 function getPristineMeta(): Meta {
   return { status: 'PRISTINE', errorsList: [] };
 }
@@ -645,7 +647,7 @@ export function renewalApplication(
   identity: UserIdentity,
   originalApp: Application,
 ): Partial<Application> {
-  const submitter = getSubmitterInfo(identity);
+  const submitter = requireSubmitterInfo(identity);
   const newApplication: Partial<Application> = {
     submitterId: submitter.userId,
     submitterEmail: submitter.email,
@@ -688,7 +690,7 @@ export function renewalApplication(
 
 // new applications can only be created by user jwt identities
 export function newApplication(identity: UserIdentity): Partial<Application> {
-  const submitter = getSubmitterInfo(identity);
+  const submitter = requireSubmitterInfo(identity);
   const app: Partial<Application> = {
     state: 'DRAFT',
     submitterId: submitter.userId,
@@ -741,7 +743,6 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
         meta: getPristineMeta(),
       },
       ethicsLetter: {
-        // tslint:disable-next-line:no-null-keyword
         declaredAsRequired: null,
         approvalLetterDocs: [],
         meta: getPristineMeta(),
@@ -889,7 +890,7 @@ function updateAppStateForReviewApplication(
   }
 
   if (updatePart.state == 'REVISIONS REQUESTED') {
-    if (renewalPeriodIsEnded(current)) {
+    if (current.isRenewal && renewalPeriodIsEnded(current)) {
       throw new Error('An application past its renewal period can only be APPROVED or REJECTED.');
     }
     return transitionToRevisionsRequested(current, updatePart, updatedBy);
@@ -1031,6 +1032,10 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
   current,
   closedBy,
 ) => {
+  if (current.isRenewal && !renewalPeriodIsEnded(current) && isInPreSubmittedState(current)) {
+    // unlink renewal from source application
+    current.sourceAppId = undefined;
+  }
   current.state = 'CLOSED';
   current.closedBy = closedBy.id;
   const closedDate = moment().toDate();
@@ -1236,6 +1241,9 @@ function updateAppStateForPausedApplication(
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
 ) {
+  if (updatePart.state === 'CLOSED') {
+    return transitionToClosed(currentApplication, updatedBy);
+  }
   if (updatePart.state === 'APPROVED') {
     // Admins can directly APPROVE a PAUSED application, submitters must attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
