@@ -49,7 +49,7 @@ async function runExpiringAppsCheck(
   const jobStartTime = new Date();
   try {
     logger.info(`${JOB_NAME} - Initiating...`);
-    const details = await getExpiredAppsReportDetails(emailClient, user, currentDate);
+    const details = await expireAppsAndGetReportDetails(emailClient, user, currentDate);
     details.errors.length
       ? logger.warn(`${JOB_NAME} - Completed with errors.`)
       : logger.info(`${JOB_NAME} - Completed.`);
@@ -102,12 +102,53 @@ const expireApplication = async (
   }
 };
 
-const getExpiredAppsReportDetails = async (
+const doExpireApplication = async (
+  app: ApplicationDocument,
+  user: Identity,
+  emailClient: Transporter<SMTPTransport.SentMessageInfo>,
+): Promise<JobResultForApplication> => {
+  const config = getAppConfig();
+  try {
+    // check if already EXPIRED so operation is not repeated, as the query may catch already expired apps that are missing the email flag
+    const updatedAppObj = app.state === 'EXPIRED' ? app : await expireApplication(app, user);
+    if (updatedAppObj.state === 'EXPIRED') {
+      if (app.state === 'EXPIRED') {
+        logger.info(
+          `${JOB_NAME} - Application ${app.appId} is already in EXPIRED state, but email failed to send on previous run. Retrying.`,
+        );
+      }
+      // send required emails
+      await onStateChange(updatedAppObj, app, emailClient, config);
+      // setting email notification here, not in onStateChange, because this flag is set on batch jobs only
+      const appWithFlagSet = await setEmailSentFlag(
+        updatedAppObj,
+        'applicationExpiredNotificationSent',
+        JOB_NAME,
+      );
+      return { success: true, app: appWithFlagSet };
+    } else {
+      // State change failed
+      logger.error(
+        `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to EXPIRED state.`,
+      );
+      return {
+        success: false,
+        app: updatedAppObj,
+        message: `Failed to transition ${updatedAppObj.appId} from ${app.state} to EXPIRED state.`,
+      };
+    }
+  } catch (err: unknown) {
+    // Error thrown in one of our async operations
+    logger.error(`${JOB_NAME} - Error caught while expiring application ${app.appId} - ${err}`);
+    return { success: false, app, message: `${err}` };
+  }
+};
+
+const expireAppsAndGetReportDetails = async (
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
   user: Identity,
   currentDate: Date,
 ): Promise<BatchJobDetails> => {
-  const config = getAppConfig();
   const query = getAppExpiringQuery(currentDate);
   const expiringAppCount = await ApplicationModel.find(query).countDocuments();
   // if no applications fit the criteria, return empty report details
@@ -119,49 +160,12 @@ const getExpiredAppsReportDetails = async (
   logger.info(`${JOB_NAME} - There are ${expiringAppCount} apps that should be EXPIRED.`);
   const expiringApps = await ApplicationModel.find(query).exec();
 
-  const doExpireApplication = async (
-    app: ApplicationDocument,
-  ): Promise<JobResultForApplication> => {
-    try {
-      // check if already EXPIRED so operation is not repeated, as the query may catch already expired apps that are missing the email flag
-      const updatedAppObj = app.state === 'EXPIRED' ? app : await expireApplication(app, user);
-      if (updatedAppObj.state === 'EXPIRED') {
-        if (app.state === 'EXPIRED') {
-          logger.info(
-            `${JOB_NAME} - Application ${app.appId} is already in EXPIRED state, but email failed to send on previous run. Retrying.`,
-          );
-        }
-        // send required emails
-        await onStateChange(updatedAppObj, app, emailClient, config);
-        // setting email notification here, not in onStateChange, because this flag is set on batch jobs only
-        const appWithFlagSet = await setEmailSentFlag(
-          updatedAppObj,
-          'applicationExpiredNotificationSent',
-          JOB_NAME,
-        );
-        return { success: true, app: appWithFlagSet };
-      } else {
-        // State change failed
-        logger.error(
-          `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to EXPIRED state.`,
-        );
-        return {
-          success: false,
-          app: updatedAppObj,
-          message: `Failed to transition ${updatedAppObj.appId} from ${app.state} to EXPIRED state.`,
-        };
-      }
-    } catch (err: unknown) {
-      // Error thrown in one of our async operations
-      logger.error(`${JOB_NAME} - Error caught while expiring application ${app.appId} - ${err}`);
-      return { success: false, app, message: `${err}` };
-    }
-  };
-
   const results: JobResultForApplication[][] = [];
   const chunks = chunk(expiringApps, REQUEST_CHUNK_SIZE);
   for (const chunk of chunks) {
-    const result = await Promise.all(chunk.map(doExpireApplication));
+    const result = await Promise.all(
+      chunk.map((app) => doExpireApplication(app, user, emailClient)),
+    );
     results.push(result);
   }
 

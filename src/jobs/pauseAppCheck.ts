@@ -28,7 +28,7 @@ async function runPauseAppsCheck(
   const jobStartTime = new Date();
   try {
     logger.info(`${JOB_NAME} - Initiating...`);
-    const details = await getPausedAppsReportDetails(emailClient, user, currentDate);
+    const details = await pauseAppsAndGetReportDetails(emailClient, user, currentDate);
     details.errors.length
       ? logger.warn(`${JOB_NAME} - Completed with errors.`)
       : logger.info(`${JOB_NAME} - Completed.`);
@@ -132,7 +132,52 @@ const getPauseableQuery = (
   return query;
 };
 
-const getPausedAppsReportDetails = async (
+const doPauseApplication = async (
+  app: ApplicationDocument,
+  user: Identity,
+  emailClient: Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+): Promise<JobResultForApplication> => {
+  try {
+    // check if already PAUSED so operation is not repeated, as the query may catch already paused apps that are missing the email flag
+    const updatedAppObj =
+      app.state === 'PAUSED'
+        ? app
+        : await pauseApplication(app, user, PauseReason.PENDING_ATTESTATION);
+    if (updatedAppObj.state === 'PAUSED') {
+      if (app.state === 'PAUSED') {
+        logger.info(
+          `${JOB_NAME} - Application ${app.appId} is already in paused state, but email failed to send on previous run. Retrying.`,
+        );
+      }
+      // send required emails
+      await onStateChange(updatedAppObj, app, emailClient, config);
+      // setting email notification here, not in onStateChange, because this flag is set on batch jobs only (not custom cases like an admin pause)
+      const appWithFlagSet = await setEmailSentFlag(
+        updatedAppObj,
+        'applicationPausedNotificationSent',
+        JOB_NAME,
+      );
+      return { success: true, app: appWithFlagSet };
+    } else {
+      // State change failed
+      logger.error(
+        `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to PAUSED state.`,
+      );
+      return {
+        success: false,
+        app: updatedAppObj,
+        message: `Failed to transition ${updatedAppObj.appId} from ${app.state} to PAUSED state.`,
+      };
+    }
+  } catch (err: unknown) {
+    // Error thrown in one of our async operations
+    logger.error(`${JOB_NAME} - Error caught while pausing application ${app.appId} - ${err}`);
+    return { success: false, app, message: `${err}` };
+  }
+};
+
+const pauseAppsAndGetReportDetails = async (
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
   user: Identity,
   currentDate: Date,
@@ -149,50 +194,12 @@ const getPausedAppsReportDetails = async (
   logger.info(`${JOB_NAME} - There are ${pauseableAppCount} apps that should be PAUSED.`);
   const pauseableApps = await searchPauseableApplications(query);
 
-  const doPauseApplication = async (app: ApplicationDocument): Promise<JobResultForApplication> => {
-    try {
-      // check if already PAUSED so operation is not repeated, as the query may catch already paused apps that are missing the email flag
-      const updatedAppObj =
-        app.state === 'PAUSED'
-          ? app
-          : await pauseApplication(app, user, PauseReason.PENDING_ATTESTATION);
-      if (updatedAppObj.state === 'PAUSED') {
-        if (app.state === 'PAUSED') {
-          logger.info(
-            `${JOB_NAME} - Application ${app.appId} is already in paused state, but email failed to send on previous run. Retrying.`,
-          );
-        }
-        // send required emails
-        await onStateChange(updatedAppObj, app, emailClient, config);
-        // setting email notification here, not in onStateChange, because this flag is set on batch jobs only (not custom cases like an admin pause)
-        const appWithFlagSet = await setEmailSentFlag(
-          updatedAppObj,
-          'applicationPausedNotificationSent',
-          JOB_NAME,
-        );
-        return { success: true, app: appWithFlagSet };
-      } else {
-        // State change failed
-        logger.error(
-          `${JOB_NAME} - Failed to transition ${updatedAppObj.appId} from ${app.state} to PAUSED state.`,
-        );
-        return {
-          success: false,
-          app: updatedAppObj,
-          message: `Failed to transition ${updatedAppObj.appId} from ${app.state} to PAUSED state.`,
-        };
-      }
-    } catch (err: unknown) {
-      // Error thrown in one of our async operations
-      logger.error(`${JOB_NAME} - Error caught while pausing application ${app.appId} - ${err}`);
-      return { success: false, app, message: `${err}` };
-    }
-  };
-
   const results: JobResultForApplication[][] = [];
   const chunks = chunk(pauseableApps, REQUEST_CHUNK_SIZE);
   for (const chunk of chunks) {
-    const result = await Promise.all(chunk.map(doPauseApplication));
+    const result = await Promise.all(
+      chunk.map((app) => doPauseApplication(app, user, emailClient, config)),
+    );
     results.push(result);
   }
 
