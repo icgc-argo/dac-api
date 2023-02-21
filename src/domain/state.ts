@@ -1066,6 +1066,9 @@ const transitionToExpired: (current: Application, expiredBy: UpdateAuthor) => Ap
   expiredBy,
 ) => {
   current.state = 'EXPIRED';
+  // reset expiry to moment transition occurred
+  // this is to account for the expiry job running after the original expiresAtUtc date
+  current.expiresAtUtc = moment.utc().toDate();
   current.updates.push(createUpdateEvent(current, expiredBy, UpdateEvent.EXPIRED));
   return current;
 };
