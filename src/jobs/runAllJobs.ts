@@ -17,8 +17,8 @@ import { getAppConfig } from '../config';
 const JOB_NAME = 'ALL BATCH JOBS';
 
 // TODO: remove once expiry reports are implemented, just making ts happy
-const getReportToBeImplemented: (jobName: string) => JobReport<any> = (jobName) => {
-  logger.warn(`${jobName} job is not implemented.`);
+const getReportFeatureDisabled: (jobName: string) => JobReport<any> = (jobName) => {
+  logger.warn(`${JOB_NAME} - ${jobName} job is not enabled.`);
   return { jobName, startedAt: new Date(), finishedAt: new Date(), success: false };
 };
 
@@ -41,16 +41,16 @@ export default async function (
     const pausedAppReport = await runPauseAppsCheck(currentDate, emailClient, user);
     const firstExpiryNotificationReport = renewalEnabled
       ? await firstExpiryNotificationCheck(currentDate, emailClient)
-      : getReportToBeImplemented('FIRST EXPIRY NOTIFICATIONS');
+      : getReportFeatureDisabled('FIRST EXPIRY NOTIFICATIONS');
     const secondExpiryNotificationReport = renewalEnabled
       ? await secondExpiryNotificationCheck(currentDate, emailClient)
-      : getReportToBeImplemented('SECOND EXPIRY NOTIFICATIONS');
+      : getReportFeatureDisabled('SECOND EXPIRY NOTIFICATIONS');
     const expiringAppsReport = renewalEnabled
       ? await runExpiringAppsCheck(currentDate, emailClient, user)
-      : getReportToBeImplemented('EXPIRING APPLICATIONS');
+      : getReportFeatureDisabled('EXPIRING APPLICATIONS');
     const closedRenewalsReport = renewalEnabled
       ? await runCloseUnsubmittedRenewalsCheck(currentDate, user)
-      : getReportToBeImplemented('CLOSING UNSUBMITTED RENEWALS');
+      : getReportFeatureDisabled('CLOSING UNSUBMITTED RENEWALS');
     const approvedUsersEmailReport = await approvedUsersEmail(emailClient);
     // define report to collect all affected appIds
     // each job will return its own report

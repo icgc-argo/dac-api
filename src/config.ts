@@ -194,7 +194,7 @@ const buildAppContext = (): AppConfig => {
     },
     adminPause: process.env.ADMIN_PAUSE === 'true' || false,
     featureFlags: {
-      renewalEnabled: process.env.RENEWAL_FEATURE_ENABLED === 'true',
+      renewalEnabled: process.env.FEATURE_RENEWAL_ENABLED === 'true',
     },
   };
   return config;
