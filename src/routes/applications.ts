@@ -350,31 +350,32 @@ const createApplicationsRouter = (
     }),
   );
 
-  router.post(
-    '/applications/:id/renew',
-    authFilter([]),
-    wrapAsync(async (req: Request, res: Response, next: NextFunction) => {
-      const id = req.params.id;
-      const validatedId = validateId(id);
-      const identity = (req as IRequest).identity;
-      try {
-        const isValidUser = isUserJwt(identity);
-        if (isValidUser) {
-          logger.info(`Trying to create renewal application for ${id}.`);
-          const updatedApp = await handleRenewalRequest(id, identity as UserIdentity);
-          if (updatedApp) {
-            return res.status(201).send(updatedApp);
+  config.featureFlags.renewalEnabled &&
+    router.post(
+      '/applications/:id/renew',
+      authFilter([]),
+      wrapAsync(async (req: Request, res: Response, next: NextFunction) => {
+        const id = req.params.id;
+        const validatedId = validateId(id);
+        const identity = (req as IRequest).identity;
+        try {
+          const isValidUser = isUserJwt(identity);
+          if (isValidUser) {
+            logger.info(`Trying to create renewal application for ${id}.`);
+            const updatedApp = await handleRenewalRequest(id, identity as UserIdentity);
+            if (updatedApp) {
+              return res.status(201).send(updatedApp);
+            } else {
+              throw new Error('Renewal failed!');
+            }
           } else {
-            throw new Error('Renewal failed!');
+            throw new Forbidden('Invalid user!');
           }
-        } else {
-          throw new Forbidden('Invalid user!');
+        } catch (err) {
+          next(err);
         }
-      } catch (err) {
-        next(err);
-      }
-    }),
-  );
+      }),
+    );
 
   // for TESTING ONLY
   config.adminPause &&

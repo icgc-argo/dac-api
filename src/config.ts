@@ -85,6 +85,9 @@ export interface AppConfig {
     };
   };
   adminPause: boolean;
+  featureFlags: {
+    renewalEnabled: boolean;
+  };
 }
 
 // Mongo
@@ -190,6 +193,9 @@ const buildAppContext = (): AppConfig => {
       },
     },
     adminPause: process.env.ADMIN_PAUSE === 'true' || false,
+    featureFlags: {
+      renewalEnabled: process.env.FEATURE_RENEWAL_ENABLED === 'true',
+    },
   };
   return config;
 };
