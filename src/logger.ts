@@ -36,7 +36,7 @@ const options: LoggerOptions = {
     timestamp(),
     printf((info) => `${info.timestamp} ${info.level}: ${info.message}`),
   ),
-  transports: config.isProduction ? [consoleTransport] : [consoleTransport, fileTransport],
+  transports: config.isDevelopment ? [consoleTransport, fileTransport] : [consoleTransport],
 };
 
 const logger = createLogger(options);

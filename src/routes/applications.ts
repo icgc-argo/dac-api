@@ -316,7 +316,7 @@ const createApplicationsRouter = (
   );
 
   // for TESTING only
-  !config.isProduction &&
+  config.isDevelopment &&
     router.delete(
       '/applications/:id',
       authFilter([config.auth.reviewScope]),

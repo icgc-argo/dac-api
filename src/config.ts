@@ -31,7 +31,7 @@ export interface AppConfig {
   kafkaProperties: KafkaConfigurations;
   mongoProperties: MongoProps;
   logLevel: string;
-  isProduction: boolean;
+  isDevelopment: boolean;
   email: {
     host: string;
     dacoAddress: string;
@@ -110,7 +110,7 @@ const buildAppContext = (): AppConfig => {
     serverPort: process.env.PORT || '3000',
     basePath: process.env.BASE_PATH || '/',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
-    isProduction: String(process.env.NODE_ENV).toLowerCase() === 'production',
+    isDevelopment: String(process.env.NODE_ENV).toLowerCase() === 'development',
     mongoProperties: {
       writeConcern: process.env.DEFAULT_WRITE_CONCERN || 'majority',
       writeAckTimeout: Number(process.env.DEFAULT_WRITE_ACK_TIMEOUT) || 5000,
