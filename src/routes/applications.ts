@@ -315,19 +315,21 @@ const createApplicationsRouter = (
     }),
   );
 
-  router.delete(
-    '/applications/:id',
-    authFilter([config.auth.reviewScope]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const id = req.params.id;
-      const validatedId = validateId(id);
-      logger.info(
-        `deleting application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
-      );
-      await deleteApp(validatedId, (req as IRequest).identity);
-      return res.status(200).end();
-    }),
-  );
+  // for TESTING only
+  config.isDevelopment &&
+    router.delete(
+      '/applications/:id',
+      authFilter([config.auth.reviewScope]),
+      wrapAsync(async (req: Request, res: Response) => {
+        const id = req.params.id;
+        const validatedId = validateId(id);
+        logger.info(
+          `deleting application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+        );
+        await deleteApp(validatedId, (req as IRequest).identity);
+        return res.status(200).end();
+      }),
+    );
 
   router.patch(
     '/applications/:id',
@@ -378,7 +380,7 @@ const createApplicationsRouter = (
     );
 
   // for TESTING ONLY
-  config.adminPause &&
+  config.featureFlags.adminPauseEnabled &&
     router.patch(
       '/applications/:id/admin-pause',
       authFilter([config.auth.reviewScope]),

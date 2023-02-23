@@ -31,6 +31,7 @@ export interface AppConfig {
   kafkaProperties: KafkaConfigurations;
   mongoProperties: MongoProps;
   logLevel: string;
+  isDevelopment: boolean;
   email: {
     host: string;
     dacoAddress: string;
@@ -84,9 +85,9 @@ export interface AppConfig {
       daysToAttestation: number;
     };
   };
-  adminPause: boolean;
   featureFlags: {
     renewalEnabled: boolean;
+    adminPauseEnabled: boolean;
   };
 }
 
@@ -109,6 +110,7 @@ const buildAppContext = (): AppConfig => {
     serverPort: process.env.PORT || '3000',
     basePath: process.env.BASE_PATH || '/',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
+    isDevelopment: String(process.env.NODE_ENV).toLowerCase() === 'development',
     mongoProperties: {
       writeConcern: process.env.DEFAULT_WRITE_CONCERN || 'majority',
       writeAckTimeout: Number(process.env.DEFAULT_WRITE_ACK_TIMEOUT) || 5000,
@@ -192,9 +194,9 @@ const buildAppContext = (): AppConfig => {
         daysToAttestation: Number(process.env.DAYS_TO_ATTESTATION) || 45,
       },
     },
-    adminPause: process.env.ADMIN_PAUSE === 'true' || false,
     featureFlags: {
       renewalEnabled: process.env.FEATURE_RENEWAL_ENABLED === 'true',
+      adminPauseEnabled: process.env.FEATURE_ADMIN_PAUSE_ENABLED === 'true',
     },
   };
   return config;
