@@ -25,7 +25,6 @@ const { combine, timestamp, colorize, printf } = format;
 
 const config = getAppConfig();
 const logLevel = config.logLevel;
-const isProduction = String(process.env.NODE_ENV).toLowerCase() === 'production';
 
 const fileTransport = new transports.File({ filename: 'debug.log', level: 'debug' });
 const consoleTransport = new transports.Console({
@@ -37,7 +36,7 @@ const options: LoggerOptions = {
     timestamp(),
     printf((info) => `${info.timestamp} ${info.level}: ${info.message}`),
   ),
-  transports: isProduction ? [consoleTransport] : [consoleTransport, fileTransport],
+  transports: config.isProduction ? [consoleTransport] : [consoleTransport, fileTransport],
 };
 
 const logger = createLogger(options);

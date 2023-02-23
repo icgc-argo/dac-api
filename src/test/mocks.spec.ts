@@ -71,7 +71,10 @@ const mockConfig = {
       daysToAttestation: 45,
     },
   },
-  adminPause: false,
+  featureFlags: {
+    adminPauseEnabled: false,
+    renewalEnabled: true,
+  },
 };
 
 export const mockedConfig = sinon.replace(config, 'getAppConfig', sinon.fake.returns(mockConfig));

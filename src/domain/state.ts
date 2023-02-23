@@ -1176,12 +1176,16 @@ function updateAppStateForApprovedApplication(
   if (updatePart.state === 'CLOSED') {
     return transitionToClosed(currentApplication, updatedBy);
   }
+
   if (updatePart.state === 'PAUSED') {
     switch (updatedBy.role) {
       case DacoRole.ADMIN:
         // admin pause configurable for testing. In general only SYSTEM role will be pausing applications
         // reason must be ADMIN_PAUSE
-        if (updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
+        const {
+          featureFlags: { adminPauseEnabled },
+        } = getAppConfig();
+        if (adminPauseEnabled && updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
           return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
         } else {
           throw new BadRequest('Invalid pause reason.');
