@@ -307,6 +307,25 @@ paths:
         '204':
           description: deleted successfully
 
+  /applications/{id}/renew:
+    parameters:
+      - name: id
+        required: true
+        in: path
+        schema:
+          type: string
+    post:
+      tags:
+        - Application
+      summary: Create a renewal application by application ID
+      responses:
+        '201':
+          description: application updated and returned in the response body, renewal application created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+
   /applications/{id}/collaborators/:
     parameters:
       - name: id
@@ -730,6 +749,16 @@ components:
         attestedAtUtc:
           type: string
           format: data-time
+        renewalAppId:
+          readOnly: true
+          type: string
+        sourceAppId:
+          readOnly: true
+          type: string
+        renewalPeriodEndDateUtc:
+          readOnly: true
+          type: string
+          format: data-time
 
     Application:
       type: object
@@ -796,6 +825,16 @@ components:
           type: string
           format: data-time
         attestedAtUtc:
+          type: string
+          format: data-time
+        renewalAppId:
+          readOnly: true
+          type: string
+        sourceAppId:
+          readOnly: true
+          type: string
+        renewalPeriodEndDateUtc:
+          readOnly: true
           type: string
           format: data-time
         revisionRequests:

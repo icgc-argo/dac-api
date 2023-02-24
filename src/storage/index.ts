@@ -93,7 +93,7 @@ export class Storage {
       Key: objectId,
       Expires: 300,
     });
-
+    logger.info(`Deleting file with id: ${objectId}`);
     const response = await fetch(url, {
       method: 'DELETE',
     });

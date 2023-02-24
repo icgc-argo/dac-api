@@ -19,7 +19,7 @@
 
 import moment from 'moment';
 import 'moment-timezone';
-import { cloneDeep, get, last } from 'lodash';
+import { cloneDeep, last } from 'lodash';
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
 
 import {
@@ -53,7 +53,6 @@ import {
   Sections,
   DacoRole,
   PauseReason,
-  SubmitterInfo,
   NotificationSentFlags,
 } from './interface';
 import {
@@ -68,13 +67,22 @@ import {
 import { BadRequest, ConflictError, Forbidden, NotFound } from '../utils/errors';
 import { getAppConfig } from '../config';
 import {
+  renewalPeriodIsEnded,
   getAttestationByDate,
   getDaysElapsed,
   isAttestable,
+  isExpirable,
   isRenewable,
+  isInPreSubmittedState,
 } from '../utils/calculations';
 import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
-import { getUpdateAuthor, hasDacoSystemScope, hasReviewScope } from '../utils/permissions';
+import {
+  getUpdateAuthor,
+  hasDacoSystemScope,
+  hasReviewScope,
+  requireSubmitterInfo,
+} from '../utils/permissions';
+import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 
 const allSections: Array<keyof Application['sections']> = [
   'appendices',
@@ -91,7 +99,7 @@ const allSections: Array<keyof Application['sections']> = [
  * Array contains mapping that will govern which sections should be marked as locked
  * depending on which state we are and the role the viewer has.
  *
- * for example applicaions in review are completely locked for applicants but partially locked for admins.
+ * for example, applications in review are completely locked for applicants but partially locked for admins.
  */
 const stateToLockedSectionsMap: Record<
   State,
@@ -517,11 +525,29 @@ export class ApplicationStateManager {
         updateAppStateForPausedApplication(current, updatePart, updatedBy);
         break;
 
+      case 'EXPIRED':
+        updateAppStateForExpiredApplication(current, updatePart, updatedBy);
+        break;
+
       default:
         throw new Error(`Invalid app state: ${current.state}`);
     }
 
     // save / error
+    onAppUpdate(current);
+    return current;
+  }
+
+  updateAsRenewed(renewalId: string): Application {
+    const current = this.currentApplication;
+    current.renewalAppId = renewalId;
+    onAppUpdate(current);
+    return current;
+  }
+
+  unlinkFromRenewal(): Application {
+    const current = this.currentApplication;
+    current.renewalAppId = undefined;
     onAppUpdate(current);
     return current;
   }
@@ -598,26 +624,73 @@ export function getSearchFieldValues(appDoc: Application) {
     appDoc.sections.applicant.info.primaryAffiliation,
     appDoc.sections.applicant.address.country,
     appDoc.isRenewal ? AppType.RENEWAL : AppType.NEW,
-  ].filter((x) => !(x === null || x === undefined || x.trim() === ''));
+    appDoc.renewalAppId ? appDoc.renewalAppId : '', // empty string will be filtered
+    appDoc.sourceAppId ? appDoc.sourceAppId : '', // empty string will be filtered
+  ].filter((x) => x && x.trim());
 }
 
-function getSubmitterInfo(identity: UserIdentity): SubmitterInfo {
-  const email = get(identity, 'tokenInfo.context.user.email');
-  if (email && typeof email === 'string') {
-    const info: SubmitterInfo = { userId: identity.userId, email };
-    return info;
-  } else {
-    throw new Forbidden('A submitter email is required to create a new application.');
-  }
+function getPristineMeta(): Meta {
+  return { status: 'PRISTINE', errorsList: [] };
 }
+
+export function getRenewalPeriodEndDate(expiry: Date): Date {
+  const {
+    durations: {
+      expiry: { daysPostExpiry },
+    },
+  } = getAppConfig();
+  const endDate = moment.utc(expiry).add(daysPostExpiry, NOTIFICATION_UNIT_OF_TIME).endOf('day');
+  return endDate.toDate();
+}
+
+export function renewalApplication(
+  identity: UserIdentity,
+  originalApp: Application,
+): Partial<Application> {
+  const submitter = requireSubmitterInfo(identity);
+  const newApplication: Partial<Application> = {
+    submitterId: submitter.userId,
+    submitterEmail: submitter.email,
+    state: 'DRAFT',
+    revisionRequest: emptyRevisionRequest(),
+    sections: {
+      ...originalApp.sections,
+      appendices: {
+        meta: getPristineMeta(),
+        agreements: getAppendixAgreements(),
+      },
+      dataAccessAgreement: {
+        meta: getPristineMeta(),
+        agreements: getDataAccessAgreement(),
+      },
+      signature: {
+        meta: {
+          status: 'DISABLED',
+          errorsList: [],
+        },
+        signedAppDocObjId: '',
+        signedDocName: '',
+      },
+    },
+    updates: [],
+    isRenewal: true,
+    sourceAppId: originalApp.appId,
+    renewalPeriodEndDateUtc: getRenewalPeriodEndDate(originalApp.expiresAtUtc),
+  };
+
+  const author = getUpdateAuthor(identity);
+  const createdEvent = createUpdateEvent(
+    newApplication as Application,
+    author,
+    UpdateEvent.CREATED,
+  );
+  newApplication.updates?.push(createdEvent);
+  return newApplication;
+}
+
 // new applications can only be created by user jwt identities
 export function newApplication(identity: UserIdentity): Partial<Application> {
-  const submitter = getSubmitterInfo(identity);
-  const pristineMeta = {
-    status: 'PRISTINE' as SectionStatus,
-    errorsList: [],
-  } as Meta;
-
+  const submitter = requireSubmitterInfo(identity);
   const app: Partial<Application> = {
     state: 'DRAFT',
     submitterId: submitter.userId,
@@ -625,19 +698,19 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
     revisionRequest: emptyRevisionRequest(),
     sections: {
       collaborators: {
-        meta: pristineMeta,
+        meta: getPristineMeta(),
         list: [],
       },
       appendices: {
-        meta: pristineMeta,
+        meta: getPristineMeta(),
         agreements: getAppendixAgreements(),
       },
       dataAccessAgreement: {
-        meta: pristineMeta,
+        meta: getPristineMeta(),
         agreements: getDataAccessAgreement(),
       },
       applicant: {
-        meta: pristineMeta,
+        meta: getPristineMeta(),
         address: {
           building: '',
           cityAndProvince: '',
@@ -667,13 +740,12 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
         title: '',
         summary: '',
         publicationsURLs: [],
-        meta: pristineMeta,
+        meta: getPristineMeta(),
       },
       ethicsLetter: {
-        // tslint:disable-next-line:no-null-keyword
         declaredAsRequired: null,
         approvalLetterDocs: [],
-        meta: pristineMeta,
+        meta: getPristineMeta(),
       },
       representative: {
         address: {
@@ -697,7 +769,7 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
           suffix: '',
           title: '',
         },
-        meta: pristineMeta,
+        meta: getPristineMeta(),
       },
       signature: {
         meta: {
@@ -710,7 +782,6 @@ export function newApplication(identity: UserIdentity): Partial<Application> {
     },
     updates: [],
     isRenewal: false,
-    ableToRenew: false,
   };
 
   const author = getUpdateAuthor(identity);
@@ -819,6 +890,9 @@ function updateAppStateForReviewApplication(
   }
 
   if (updatePart.state == 'REVISIONS REQUESTED') {
+    if (current.isRenewal && renewalPeriodIsEnded(current)) {
+      throw new Error('An application past its renewal period can only be APPROVED or REJECTED.');
+    }
     return transitionToRevisionsRequested(current, updatePart, updatedBy);
   }
 
@@ -930,7 +1004,6 @@ function transitionFromPausedToApproved(
   // this transition does not equal an APPROVED update event
   current.state = 'APPROVED';
   // reset pauseReason if no longer in PAUSED state
-  // TODO: right now there is no other transition for a PAUSED app, but may need to revisit this for a possible PAUSED -> EXPIRED transition
   current.pauseReason = undefined;
   if (updatePart?.isAttesting === true) {
     updateAttestedAtUtc(current, updatedBy);
@@ -959,6 +1032,10 @@ const transitionToClosed: (current: Application, closedBy: UpdateAuthor) => Appl
   current,
   closedBy,
 ) => {
+  if (current.isRenewal && !renewalPeriodIsEnded(current) && isInPreSubmittedState(current)) {
+    // unlink renewal from source application
+    current.sourceAppId = undefined;
+  }
   current.state = 'CLOSED';
   current.closedBy = closedBy.id;
   const closedDate = moment().toDate();
@@ -981,6 +1058,15 @@ const transitionToPaused: (
     current.pauseReason = reason;
   }
   current.updates.push(createUpdateEvent(current, pausedBy, UpdateEvent.PAUSED));
+  return current;
+};
+
+const transitionToExpired: (current: Application, expiredBy: UpdateAuthor) => Application = (
+  current,
+  expiredBy,
+) => {
+  current.state = 'EXPIRED';
+  current.updates.push(createUpdateEvent(current, expiredBy, UpdateEvent.EXPIRED));
   return current;
 };
 
@@ -1090,12 +1176,16 @@ function updateAppStateForApprovedApplication(
   if (updatePart.state === 'CLOSED') {
     return transitionToClosed(currentApplication, updatedBy);
   }
+
   if (updatePart.state === 'PAUSED') {
     switch (updatedBy.role) {
       case DacoRole.ADMIN:
         // admin pause configurable for testing. In general only SYSTEM role will be pausing applications
         // reason must be ADMIN_PAUSE
-        if (updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
+        const {
+          featureFlags: { adminPauseEnabled },
+        } = getAppConfig();
+        if (adminPauseEnabled && updatePart.pauseReason === PauseReason.ADMIN_PAUSE) {
           return transitionToPaused(currentApplication, updatedBy, updatePart.pauseReason);
         } else {
           throw new BadRequest('Invalid pause reason.');
@@ -1115,12 +1205,23 @@ function updateAppStateForApprovedApplication(
     }
   }
 
+  if (updatePart.state === 'EXPIRED') {
+    // only SYSTEM can expire an application
+    if (updatedBy.role !== DacoRole.SYSTEM) {
+      throw new Forbidden('Users cannot expire an application.');
+    }
+    if (!isExpirable(currentApplication)) {
+      throw new Error('Application has not reached expiry date.');
+    }
+    return transitionToExpired(currentApplication, updatedBy);
+  }
+
   if (updatePart.isAttesting === true) {
     if (!isAttestable(currentApplication)) {
-      throw new Error('Application is not attestable');
+      throw new Error('Application is not attestable.');
     }
     if (updatedBy.role !== DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
+      throw new Error('Only submitters can attest an application.');
     }
     return updateAttestedAtUtc(currentApplication, updatedBy);
   }
@@ -1144,12 +1245,26 @@ function updateAppStateForPausedApplication(
   updatePart: Partial<UpdateApplication>,
   updatedBy: UpdateAuthor,
 ) {
+  if (updatePart.state === 'CLOSED') {
+    return transitionToClosed(currentApplication, updatedBy);
+  }
   if (updatePart.state === 'APPROVED') {
-    // Submitters cannot directly APPROVE a PAUSED application, only transition via attestation
+    // Admins can directly APPROVE a PAUSED application, submitters must attest
     if (updatedBy.role === DacoRole.SUBMITTER) {
-      throw new Error('Not allowed');
+      throw new Error('Submitters cannot approve an application.');
     }
     return transitionFromPausedToApproved(currentApplication, updatedBy);
+  }
+
+  if (updatePart.state === 'EXPIRED') {
+    // only SYSTEM can expire an application
+    if (updatedBy.role !== DacoRole.SYSTEM) {
+      throw new Forbidden('Users cannot expire an application.');
+    }
+    if (!isExpirable(currentApplication)) {
+      throw new Error('Application has not reached expiry date.');
+    }
+    return transitionToExpired(currentApplication, updatedBy);
   }
 
   // can only attest if it is the configured # of days to attestationByUtc date or later
@@ -1222,6 +1337,16 @@ function updateAppStateForDraftApplication(
   // check if it's ready to move to the next state [DRAFT => SIGN & SUBMIT]
   // OR should move back to draft from SIGN & SUBMIT
   transitionToSignAndSubmitOrRollBack(current, 'PRISTINE', 'DISABLED', 'DRAFT');
+}
+
+function updateAppStateForExpiredApplication(
+  currentApplication: Application,
+  updatePart: Partial<UpdateApplication>,
+  updatedBy: UpdateAuthor,
+): void {
+  if (updatePart.state === 'CLOSED') {
+    transitionToClosed(currentApplication, updatedBy);
+  }
 }
 
 function transitionToSignAndSubmitOrRollBack(

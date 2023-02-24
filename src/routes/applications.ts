@@ -7,7 +7,7 @@ import JSZip from 'jszip';
 import { isArray } from 'lodash';
 
 import wrapAsync from '../utils/wrapAsync';
-import { create, updatePartial } from '../domain/service/applications';
+import { create, handleRenewalRequest, updatePartial } from '../domain/service/applications';
 import {
   createCollaborator,
   deleteCollaborator,
@@ -315,19 +315,21 @@ const createApplicationsRouter = (
     }),
   );
 
-  router.delete(
-    '/applications/:id',
-    authFilter([config.auth.reviewScope]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const id = req.params.id;
-      const validatedId = validateId(id);
-      logger.info(
-        `deleting application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
-      );
-      await deleteApp(validatedId, (req as IRequest).identity);
-      return res.status(200).end();
-    }),
-  );
+  // for TESTING only
+  config.isDevelopment &&
+    router.delete(
+      '/applications/:id',
+      authFilter([config.auth.reviewScope]),
+      wrapAsync(async (req: Request, res: Response) => {
+        const id = req.params.id;
+        const validatedId = validateId(id);
+        logger.info(
+          `deleting application [app: ${id}, user Id:${(req as IRequest).identity.userId}]`,
+        );
+        await deleteApp(validatedId, (req as IRequest).identity);
+        return res.status(200).end();
+      }),
+    );
 
   router.patch(
     '/applications/:id',
@@ -350,8 +352,35 @@ const createApplicationsRouter = (
     }),
   );
 
+  config.featureFlags.renewalEnabled &&
+    router.post(
+      '/applications/:id/renew',
+      authFilter([]),
+      wrapAsync(async (req: Request, res: Response, next: NextFunction) => {
+        const id = req.params.id;
+        const validatedId = validateId(id);
+        const identity = (req as IRequest).identity;
+        try {
+          const isValidUser = isUserJwt(identity);
+          if (isValidUser) {
+            logger.info(`Trying to create renewal application for ${id}.`);
+            const updatedApp = await handleRenewalRequest(id, identity as UserIdentity);
+            if (updatedApp) {
+              return res.status(201).send(updatedApp);
+            } else {
+              throw new Error('Renewal failed!');
+            }
+          } else {
+            throw new Forbidden('Invalid user!');
+          }
+        } catch (err) {
+          next(err);
+        }
+      }),
+    );
+
   // for TESTING ONLY
-  config.adminPause &&
+  config.featureFlags.adminPauseEnabled &&
     router.patch(
       '/applications/:id/admin-pause',
       authFilter([config.auth.reviewScope]),

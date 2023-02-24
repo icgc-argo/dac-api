@@ -12,11 +12,9 @@ describe('zip', () => {
     // build streams to zip later
     const ivStream = new Readable();
     ivStream.push(encrypted.iv);
-    // tslint:disable-next-line:no-null-keyword
     ivStream.push(null);
     const contentStream = new Readable();
     contentStream.push(encrypted.content);
-    // tslint:disable-next-line:no-null-keyword
     contentStream.push(null);
 
     // build the zip package

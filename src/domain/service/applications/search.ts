@@ -174,7 +174,6 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         expiresAtUtc: app.expiresAtUtc,
         state: app.state,
         ethics: {
-          // tslint:disable-next-line:no-null-keyword
           declaredAsRequired: app.sections.ethicsLetter.declaredAsRequired,
         },
         submittedAtUtc: app.submittedAtUtc,
@@ -192,6 +191,9 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         }),
         lastPausedAtUtc: getLastPausedAtDate(app),
         isRenewal: app.isRenewal,
+        sourceAppId: app.sourceAppId,
+        renewalAppId: app.renewalAppId,
+        renewalPeriodEndDateUtc: app.renewalPeriodEndDateUtc,
       } as ApplicationSummary),
   );
 
@@ -261,10 +263,10 @@ export async function getById(id: string, identity: Identity) {
   }
   const app = apps[0];
   const copy = app.toObject();
-  const viewAbleApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
+  const viewableApplication = new ApplicationStateManager(copy).prepareApplicationForUser(
     isAdminOrReviewerResult,
   );
-  return viewAbleApplication;
+  return viewableApplication;
 }
 
 export async function findApplication(appId: string, identity: Identity) {
@@ -348,3 +350,14 @@ export const getUsersFromApprovedApps = async (): Promise<
     return approvedUsersInfo;
   });
 };
+
+/**
+ * For an ethics document objectId, find if the number of references in the applications collection is greater than zero
+ */
+export async function isEthicsDocReferenced(objectId: string): Promise<boolean> {
+  const query: FilterQuery<ApplicationDocument> = {
+    'sections.ethicsLetter.approvalLetterDocs': { $elemMatch: { objectId: objectId } },
+  };
+  const result = await ApplicationModel.countDocuments(query).exec();
+  return result > 0;
+}

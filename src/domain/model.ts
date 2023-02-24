@@ -114,7 +114,6 @@ const NotificationSentFlags = new mongoose.Schema(
     firstExpiryNotificationSent: { type: Date, required: false },
     secondExpiryNotificationSent: { type: Date, required: false },
     applicationExpiredNotificationSent: { type: Date, required: false },
-    applicationClosedNotificationSent: { type: Date, required: false },
   },
   { _id: false },
 );
@@ -194,6 +193,9 @@ const ApplicationSchema = new mongoose.Schema(
     updates: [ApplicationUpdate],
     approvedAppDocs: [ApprovedAppDocument],
     emailNotifications: NotificationSentFlags,
+    sourceAppId: { type: String, required: false },
+    renewalAppId: { type: String, required: false },
+    renewalPeriodEndDateUtc: { type: Date, required: false },
   },
   {
     timestamps: {

@@ -1,6 +1,6 @@
 import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
-import { isDate, pick, cloneDeep, omit, get, every, set } from 'lodash';
+import { isDate, pick, cloneDeep, omit, get, every, set, isEqual } from 'lodash';
 import moment, { unitOfTime } from 'moment';
 
 import {
@@ -12,7 +12,7 @@ import {
   PauseReason,
   UpdateApplication,
 } from '../domain/interface';
-import { ApplicationStateManager, newApplication } from '../domain/state';
+import { ApplicationStateManager, newApplication, renewalApplication } from '../domain/state';
 import { BadRequest, ConflictError, Forbidden } from '../utils/errors';
 import { checkIsDefined } from '../utils/misc';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
@@ -65,7 +65,7 @@ describe('state manager', () => {
     expect(get(userWithNoEmail, 'tokenInfo.context.user.email')).to.be.undefined;
     expect(() => newApplication(userWithNoEmail as UserIdentity)).to.throw(
       Forbidden,
-      'A submitter email is required to create a new application.',
+      'A submitter email is required.',
     );
   });
 
@@ -647,54 +647,158 @@ describe('state manager', () => {
         false,
         user,
       ),
-    ).to.throw(Error, 'Not allowed');
+    ).to.throw(Error, 'Only submitters can attest an application.');
     const userApp = state.prepareApplicationForUser(false);
     expect(userApp.attestedAtUtc).to.eq(undefined);
   });
 
-  function verifyRenewedSectionsStatus(app: Application): void {
+  function verifyRenewedSectionsStatus(
+    renewalApp: Partial<Application>,
+    sourceApp: Application,
+  ): void {
+    expect(isEqual(renewalApp?.sections?.applicant, sourceApp.sections?.applicant)).to.be.true;
+    expect(isEqual(renewalApp?.sections?.representative, sourceApp.sections?.representative)).to.be
+      .true;
+    expect(isEqual(renewalApp?.sections?.collaborators, sourceApp.sections?.collaborators)).to.be
+      .true;
+    expect(isEqual(renewalApp?.sections?.projectInfo, sourceApp.sections?.projectInfo)).to.be.true;
+    expect(isEqual(renewalApp?.sections?.ethicsLetter, sourceApp.sections?.ethicsLetter)).to.be
+      .true;
+
+    expect(get(renewalApp, 'sections.appendices.meta.status')).to.eq('PRISTINE');
+    expect(
+      every(get(renewalApp, 'sections.appendices.agreements'), (ag: AgreementItem) => !ag.accepted),
+    ).to.be.true;
+    expect(get(renewalApp, 'sections.appendices.meta.lastUpdatedAtUtc')).to.be.undefined;
+    expect(get(renewalApp, 'sections.dataAccessAgreement.meta.status')).to.eq('PRISTINE');
     expect(
       every(
-        pick(app.sections, [
-          'applicant',
-          'representative',
-          'projectInfo',
-          'ethicsLetter',
-          'collaborators',
-        ]),
-        (section) => section.meta.status === 'COMPLETE',
-      ),
-    ).is.true;
-    expect(get(app, 'sections.appendices.meta.status')).to.eq('PRISTINE');
-    expect(every(get(app, 'sections.appendices.agreements'), (ag: AgreementItem) => !ag.accepted))
-      .to.be.true;
-    expect(get(app, 'sections.appendices.meta.lastUpdatedAtUtc')).to.not.be.undefined;
-    expect(get(app, 'sections.dataAccessAgreement.meta.status')).to.eq('PRISTINE');
-    expect(
-      every(
-        get(app, 'sections.dataAccessAgreement.agreements'),
+        get(renewalApp, 'sections.dataAccessAgreement.agreements'),
         (ag: AgreementItem) => !ag.accepted,
       ),
     ).to.be.true;
-    expect(get(app, 'sections.dataAccessAgreement.meta.lastUpdatedAtUtc')).to.not.be.undefined;
-    expect(get(app, 'sections.signature.meta.status')).to.eq('DISABLED');
-    expect(get(app, 'sections.signature.meta.lastUpdatedAtUtc')).to.not.be.undefined;
+    expect(get(renewalApp, 'sections.dataAccessAgreement.meta.lastUpdatedAtUtc')).to.be.undefined;
+    expect(get(renewalApp, 'sections.signature.meta.status')).to.eq('DISABLED');
+    expect(get(renewalApp, 'sections.signature.meta.lastUpdatedAtUtc')).to.be.undefined;
+    expect(renewalApp.sourceAppId).to.eq(sourceApp.appId);
+    expect(sourceApp.renewalAppId).to.eq(renewalApp.appId);
+    expect(renewalApp.isRenewal).to.be.true;
+    expect(renewalApp.renewalPeriodEndDateUtc).to.not.be.undefined;
+    expect(renewalApp.state).to.eq('DRAFT');
   }
 
-  it('should renew a renewable APPROVED application', () => {
-    // TODO: implement
+  it('should create a renewal app from an existing application', () => {
+    const app = getApprovedApplication();
+    const renewalApp = renewalApplication(mockApplicantToken as UserIdentity, app);
+    verifyRenewedSectionsStatus(renewalApp, app);
   });
 
-  it('should renew an EXPIRED application', () => {
-    // TODO: EXPIRED state to be implemented
+  it('should expire an APPROVED app that has reached its expiry date', () => {
+    const app = getApprovedApplication();
+    app.expiresAtUtc = new Date();
+    const stateManager = new ApplicationStateManager(app);
+    const user = { id: 'System User', role: DacoRole.SYSTEM };
+    stateManager.updateApp({ state: 'EXPIRED' }, false, user);
+    const viewableApp = stateManager.prepareApplicationForUser(false);
+
+    expect(viewableApp.state).to.eq('EXPIRED');
   });
 
-  it('should not renew a non-renewable application', () => {
-    // TODO: implement
+  it('should expire a PAUSED app that has reached its expiry date', () => {
+    const app = getPausedApplication();
+    app.expiresAtUtc = new Date();
+    const stateManager = new ApplicationStateManager(app);
+    const user = { id: 'System User', role: DacoRole.SYSTEM };
+    stateManager.updateApp({ state: 'EXPIRED' }, false, user);
+    const viewableApp = stateManager.prepareApplicationForUser(false);
+
+    expect(viewableApp.state).to.eq('EXPIRED');
   });
 
-  it('should renew an application that has been previously renewed', () => {
-    // TODO: implement
+  it('should not allow a non-SYSTEM actor to expire an app', () => {
+    const app = getPausedApplication();
+    app.expiresAtUtc = new Date();
+    const stateManager = new ApplicationStateManager(app);
+    const user = { id: 'Admin User', role: DacoRole.ADMIN };
+
+    expect(() => stateManager.updateApp({ state: 'EXPIRED' }, true, user)).to.throw(
+      Forbidden,
+      'Users cannot expire an application.',
+    );
+  });
+
+  it('should not expire an app that has not reached its expiry date', () => {
+    const app = getPausedApplication();
+    const stateManager = new ApplicationStateManager(app);
+    const user = { id: 'System User', role: DacoRole.SYSTEM };
+
+    expect(() => stateManager.updateApp({ state: 'EXPIRED' }, true, user)).to.throw(
+      Error,
+      'Application has not reached expiry date.',
+    );
+  });
+
+  it('should not allow revisions after renewal period ends', () => {
+    const app = getAppInReview();
+    app.isRenewal = true;
+    app.renewalPeriodEndDateUtc = moment.utc().subtract(1, 'day').toDate();
+    const stateManager = new ApplicationStateManager(app);
+    const update: Partial<UpdateApplication> = {
+      revisionRequest: {
+        ethicsLetter: {
+          details: 'Better letter plz',
+          requested: true,
+        },
+      },
+      state: 'REVISIONS REQUESTED',
+    };
+    const reviewer = { id: 'Mme Reviewer', role: DacoRole.ADMIN };
+    expect(() => stateManager.updateApp(update, true, reviewer)).to.throw(
+      Error,
+      'An application past its renewal period can only be APPROVED or REJECTED.',
+    );
+  });
+
+  it('should allow revisions before renewal period ends', () => {
+    const app = getAppInReview();
+    app.isRenewal = true;
+    app.renewalPeriodEndDateUtc = moment.utc().add(5, 'days').toDate();
+    expect(app.state).to.eq('REVIEW');
+    const stateManager = new ApplicationStateManager(app);
+    const update: Partial<UpdateApplication> = {
+      revisionRequest: {
+        applicant: {
+          details: 'More info plz',
+          requested: true,
+        },
+      },
+      state: 'REVISIONS REQUESTED',
+    };
+    const reviewer = { id: 'Mme Reviewer', role: DacoRole.ADMIN };
+    stateManager.updateApp(update, true, reviewer);
+    const updatedApp = stateManager.prepareApplicationForUser(true);
+    expect(updatedApp.state).to.eq('REVISIONS REQUESTED');
+  });
+
+  it('should allow revisions on last day of renewal period', () => {
+    const app = getAppInReview();
+    app.isRenewal = true;
+    app.renewalPeriodEndDateUtc = moment.utc().toDate();
+    expect(app.state).to.eq('REVIEW');
+    const stateManager = new ApplicationStateManager(app);
+    const update: Partial<UpdateApplication> = {
+      revisionRequest: {
+        applicant: {
+          details: 'More info plz',
+          requested: true,
+        },
+      },
+      state: 'REVISIONS REQUESTED',
+    };
+    const reviewer = { id: 'Mme Reviewer', role: DacoRole.ADMIN };
+    stateManager.updateApp(update, true, reviewer);
+    const updatedApp = stateManager.prepareApplicationForUser(true);
+    expect(updatedApp.state).to.eq('REVISIONS REQUESTED');
   });
 });
 

@@ -1,15 +1,18 @@
+import { getAppConfig } from '../config';
 import { Application } from '../domain/interface';
 import { actionGetStarted, appInfoBox, compose, textParagraphSection, UILinksInfo } from './common';
 import { compileMjmlInPromise } from './mjml';
 
-export default async function (
-  app: Application,
-  reviewerInfo: {
-    firstName: string;
-    lastName: string;
-  },
-  uiLinksInfo: UILinksInfo,
-) {
+export default async function (app: Application) {
+  const config = getAppConfig();
+  const reviewerInfo = {
+    firstName: config.email.reviewerFirstName,
+    lastName: config.email.reviewerLastName,
+  };
+  const uiLinksInfo = {
+    baseUrl: config.ui.baseUrl,
+    pathTemplate: config.ui.sectionPath,
+  };
   const emailMjml = compose(
     {
       message: messageBody(app, uiLinksInfo),

@@ -4,7 +4,7 @@ import moment from 'moment';
 
 import { cloneDeep } from 'lodash';
 import { newApplication } from '../domain/state';
-import { getDaysElapsed, isAttestable, isRenewable } from '../utils/calculations';
+import { getDaysElapsed, isAttestable, isExpirable, isRenewable } from '../utils/calculations';
 import {
   getAppInReview,
   getAppInRevisionRequested,
@@ -16,7 +16,7 @@ import {
   getRejectedApplication,
 } from './state.spec';
 import { Application } from '../domain/interface';
-import { mockApplicantToken } from './mocks.spec';
+import { mockApplicantToken, mockedConfig } from './mocks.spec';
 
 const newApplication1: Partial<Application> = newApplication(mockApplicantToken as UserIdentity);
 
@@ -207,6 +207,62 @@ describe('utils', () => {
       app.expiresAtUtc = mockExpiresAtUtc.toDate();
       const canRenew = isRenewable(app);
       expect(canRenew).to.be.true;
+    });
+
+    it('should be renewable in PAUSED state', () => {
+      const app = getPausedApplication();
+      expect(app.expiresAtUtc).to.not.eq(undefined);
+      const mockExpiresAtUtc = moment.utc().add(75, 'days');
+      app.expiresAtUtc = mockExpiresAtUtc.toDate();
+      const canRenew = isRenewable(app);
+      expect(canRenew).to.be.true;
+    });
+
+    // TODO: implement
+    it('should not be renewable if a renewal app has already been created', () => {});
+    // TODO: implement
+    it('should be renewable in EXPIRED state', () => {});
+  });
+
+  describe('isExpirable', () => {
+    it('should be expirable on the day of expiry', () => {
+      const app = getApprovedApplication();
+      expect(app.expiresAtUtc).to.not.eq(undefined);
+      // set expiry to today
+      app.expiresAtUtc = moment.utc().toDate();
+      const canExpire = isExpirable(app);
+      expect(canExpire).to.be.true;
+    });
+
+    it('should not be expirable before the day of expiry', () => {
+      const {
+        durations: {
+          expiry: { count, unitOfTime },
+        },
+      } = mockedConfig();
+      const app = getApprovedApplication();
+      expect(app.expiresAtUtc).to.not.eq(undefined);
+      // set expiry 1 year in the future
+      const mockExpiresAtUtc = moment.utc().add(count - 1, unitOfTime);
+      app.expiresAtUtc = mockExpiresAtUtc.toDate();
+      const canExpire = isExpirable(app);
+      expect(canExpire).to.be.false;
+    });
+
+    it('should be expirable after the day of expiry', () => {
+      const app = getApprovedApplication();
+      expect(app.expiresAtUtc).to.not.eq(undefined);
+      // set expiry 5 days before today
+      app.expiresAtUtc = moment.utc().subtract(5, 'days').toDate();
+      const canExpire = isExpirable(app);
+      expect(canExpire).to.be.true;
+    });
+
+    it('should not be expirable if it is has never been approved', () => {
+      const app = getReadyToSignApp();
+      expect(app.expiresAtUtc).to.eq(undefined);
+      const canExpire = isExpirable(app);
+      expect(canExpire).to.be.false;
     });
   });
 });
