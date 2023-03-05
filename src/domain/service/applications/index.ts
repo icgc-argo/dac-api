@@ -270,6 +270,12 @@ export async function onStateChange(
       await sendAccessHasExpiredEmail(updatedApp, config, emailClient);
       break;
 
+    case 'DRAFT':
+    case 'SIGN AND SUBMIT':
+      // this scenario occurs when an application transitions between DRAFT and SIGN AND SUBMIT, due to sections becoming complete/incomplete while editing
+      // no emails are sent in this scenario, but need to account for this to prevent throwing error in default case, which breaks validation in the UI
+      break;
+
     default:
       throw new Error(`Invalid app state: ${updatedApp.state}`);
   }

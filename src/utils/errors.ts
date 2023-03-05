@@ -1,6 +1,7 @@
 export class BadRequest extends Error {
   constructor(public readonly info: any) {
     super(JSON.stringify(info));
+    this.name = 'Bad Request';
   }
 }
 
