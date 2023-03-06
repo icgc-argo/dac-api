@@ -1133,7 +1133,7 @@ function updateAppStateForSignAndSubmit(
   }
 
   if (!updatePart.sections) {
-    throw new Error();
+    throw new BadRequest('Invalid request body for this application state.');
   }
 
   // applicant went back and updated completed sections (we treat that as an update in draft state)

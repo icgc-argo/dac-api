@@ -17,7 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { difference, filter, isEmpty } from 'lodash';
+import { difference, isDate } from 'lodash';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
@@ -113,6 +113,7 @@ async function unlinkRenewalFromSourceApp(
       await ApplicationModel.findOneAndUpdate({ appId: renewalApp.appId }, renewalApp, {
         session,
       });
+      // TODO: add a check that sourceAppId has been removed before proceeding: https://github.com/icgc-argo/dac-api/issues/395
       logger.info(`Fetching source application ${sourceAppId}.`);
       const query: FilterQuery<ApplicationDocument> = {
         appId: sourceAppId,
@@ -165,7 +166,12 @@ export async function updatePartial(
   }
   const stateManager = new ApplicationStateManager(appDocObj);
   const updatedApp = stateManager.updateApp(appPart, isReviewer, getUpdateAuthor(identity));
-  if (appDocObj.isRenewal && !renewalPeriodIsEnded(appDocObj) && isInPreSubmittedState(appDocObj)) {
+  if (
+    appDocObj.isRenewal &&
+    !renewalPeriodIsEnded(appDocObj) &&
+    isInPreSubmittedState(appDocObj) &&
+    appPart.state === 'CLOSED'
+  ) {
     logger.info('Closing an unsubmitted renewal');
     const sourceAppId = appDocObj.sourceAppId;
     if (sourceAppId) {
@@ -186,7 +192,7 @@ export async function updatePartial(
   // triggering this here to ensure attestedAtUtc value has been properly updated in the db before sending email
   // cannot rely on stateChanged result because attestation does not imply a state change has occurred
   // i.e. an approved app can be attested and stay in approved state
-  const wasAttested = isEmpty(appDocObj.attestedAtUtc) && !!updatedApp.attestedAtUtc;
+  const wasAttested = !isDate(appDocObj.attestedAtUtc) && isDate(updatedApp.attestedAtUtc);
   if (wasAttested) {
     await sendAttestationReceivedEmail(updatedApp, config, emailClient);
   }
@@ -250,7 +256,7 @@ export async function onStateChange(
 
     case 'CLOSED':
       // only applications that have been previously approved get a CLOSED notification
-      if (oldApplication.state === 'APPROVED') {
+      if (['APPROVED', 'PAUSED'].includes(oldApplication.state)) {
         await sendApplicationClosedEmail(updatedApp, config, emailClient);
         Promise.all(
           updatedApp.sections.collaborators.list.map((collab) => {
@@ -268,6 +274,13 @@ export async function onStateChange(
 
     case 'EXPIRED':
       await sendAccessHasExpiredEmail(updatedApp, config, emailClient);
+      break;
+
+    case 'DRAFT':
+    case 'SIGN AND SUBMIT':
+      // this scenario occurs when the application transitions from DRAFT to SIGN AND SUBMIT, due to sections becoming complete while editing
+      // OR when an application transitions back to DRAFT from SIGN AND SUBMIT, due to a section becoming incomplete again
+      // no emails are sent in this scenario, but need to account for this to prevent throwing error in default case, which breaks validation in the UI
       break;
 
     default:
@@ -300,8 +313,8 @@ async function checkDeletedDocuments(originalApp: Application, updatedApp: Appli
   // we check that objectIds are unique, to ensure they are not deleted from object storage if associated with another application
   const uniqueEthicsIds: string[] = [];
   for await (const id of ethicsDiff) {
-    const isUnique = await !isEthicsDocReferenced(id);
-    if (isUnique) {
+    const isReferenced = await isEthicsDocReferenced(id);
+    if (!isReferenced) {
       uniqueEthicsIds.push(id);
     }
     break;
