@@ -17,7 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { difference } from 'lodash';
+import { difference, isDate } from 'lodash';
 import nodemail from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { Identity, UserIdentity } from '@overture-stack/ego-token-middleware';
@@ -186,7 +186,7 @@ export async function updatePartial(
   // triggering this here to ensure attestedAtUtc value has been properly updated in the db before sending email
   // cannot rely on stateChanged result because attestation does not imply a state change has occurred
   // i.e. an approved app can be attested and stay in approved state
-  const wasAttested = !appDocObj.attestedAtUtc && !!updatedApp.attestedAtUtc;
+  const wasAttested = !isDate(appDocObj.attestedAtUtc) && isDate(updatedApp.attestedAtUtc);
   if (wasAttested) {
     await sendAttestationReceivedEmail(updatedApp, config, emailClient);
   }
