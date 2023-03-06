@@ -113,6 +113,7 @@ async function unlinkRenewalFromSourceApp(
       await ApplicationModel.findOneAndUpdate({ appId: renewalApp.appId }, renewalApp, {
         session,
       });
+      // TODO: add a check that sourceAppId has been removed before proceeding: https://github.com/icgc-argo/dac-api/issues/395
       logger.info(`Fetching source application ${sourceAppId}.`);
       const query: FilterQuery<ApplicationDocument> = {
         appId: sourceAppId,
@@ -165,7 +166,12 @@ export async function updatePartial(
   }
   const stateManager = new ApplicationStateManager(appDocObj);
   const updatedApp = stateManager.updateApp(appPart, isReviewer, getUpdateAuthor(identity));
-  if (appDocObj.isRenewal && !renewalPeriodIsEnded(appDocObj) && isInPreSubmittedState(appDocObj)) {
+  if (
+    appDocObj.isRenewal &&
+    !renewalPeriodIsEnded(appDocObj) &&
+    isInPreSubmittedState(appDocObj) &&
+    appPart.state === 'CLOSED'
+  ) {
     logger.info('Closing an unsubmitted renewal');
     const sourceAppId = appDocObj.sourceAppId;
     if (sourceAppId) {
@@ -307,8 +313,8 @@ async function checkDeletedDocuments(originalApp: Application, updatedApp: Appli
   // we check that objectIds are unique, to ensure they are not deleted from object storage if associated with another application
   const uniqueEthicsIds: string[] = [];
   for await (const id of ethicsDiff) {
-    const isUnique = await !isEthicsDocReferenced(id);
-    if (isUnique) {
+    const isReferenced = await isEthicsDocReferenced(id);
+    if (!isReferenced) {
       uniqueEthicsIds.push(id);
     }
     break;
