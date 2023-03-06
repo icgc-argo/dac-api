@@ -256,7 +256,7 @@ export async function onStateChange(
 
     case 'CLOSED':
       // only applications that have been previously approved get a CLOSED notification
-      if (oldApplication.state === 'APPROVED') {
+      if (['APPROVED', 'PAUSED'].includes(oldApplication.state)) {
         await sendApplicationClosedEmail(updatedApp, config, emailClient);
         Promise.all(
           updatedApp.sections.collaborators.list.map((collab) => {
