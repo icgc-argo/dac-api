@@ -901,6 +901,18 @@ function updateAppStateForReviewApplication(
   }
 }
 
+export function signatureOnlySectionRequiringRevisions(application: Application) {
+  const sectionsWithRevisions = Object.keys(application.revisionRequest)
+    .filter((sec) => sec !== 'general')
+    .filter(
+      (section) => application.revisionRequest[section as keyof RevisionRequestUpdate].requested,
+    );
+  const revisionsOnSignatureSectionOnly =
+    sectionsWithRevisions.length === 1 && sectionsWithRevisions[0] === 'signature';
+
+  return revisionsOnSignatureSectionOnly;
+}
+
 function transitionToRevisionsRequested(
   current: Application,
   updatePart: Partial<UpdateApplication>,
@@ -920,14 +932,10 @@ function transitionToRevisionsRequested(
   // empty the signature (need to delete the document too.)
   resetSignedDocument(current);
 
-  const sectionsWithRevisions = Object.keys(current.revisionRequest).filter(
-    (section) => current.revisionRequest[section as keyof RevisionRequestUpdate].requested,
-  );
-  const revisionsOnSignatureSectionOnly =
-    sectionsWithRevisions.length === 1 && sectionsWithRevisions[0] === 'signature';
-
   // put into SIGN AND SUBMIT state when just the signature section has revisions requested to allow user to upload a new signed doc
-  current.state = revisionsOnSignatureSectionOnly ? 'SIGN AND SUBMIT' : 'REVISIONS REQUESTED';
+  current.state = signatureOnlySectionRequiringRevisions(current)
+    ? 'SIGN AND SUBMIT'
+    : 'REVISIONS REQUESTED';
   current.updates.push(createUpdateEvent(current, updateAuthor, UpdateEvent.REVISIONS_REQUESTED));
   return current;
 }
