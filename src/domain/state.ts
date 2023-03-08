@@ -54,6 +54,7 @@ import {
   DacoRole,
   PauseReason,
   NotificationSentFlags,
+  RevisionSections,
 } from './interface';
 import {
   validateAppendices,
@@ -902,11 +903,13 @@ function updateAppStateForReviewApplication(
 }
 
 export function signatureOnlySectionRequiringRevisions(application: Application) {
-  const sectionsWithRevisions = Object.keys(application.revisionRequest)
+  const revisionRequestKeys = Object.keys(application.revisionRequest);
+  const isRevisionType = (k: any): k is RevisionSections => revisionRequestKeys.includes(k);
+
+  const sectionsWithRevisions = revisionRequestKeys
+    .filter(isRevisionType)
     .filter((sec) => sec !== 'general')
-    .filter(
-      (section) => application.revisionRequest[section as keyof RevisionRequestUpdate].requested,
-    );
+    .filter((section) => application.revisionRequest[section].requested);
   const revisionsOnSignatureSectionOnly =
     sectionsWithRevisions.length === 1 && sectionsWithRevisions[0] === 'signature';
 
