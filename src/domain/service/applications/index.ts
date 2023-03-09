@@ -29,6 +29,7 @@ import {
   renewalApplication,
   getSearchFieldValues,
   newApplication,
+  signatureOnlySectionRequiringRevisions,
 } from '../../state';
 import { Application, UpdateApplication } from '../../interface';
 import { Storage } from '../../../storage';
@@ -277,12 +278,18 @@ export async function onStateChange(
       break;
 
     case 'DRAFT':
-    case 'SIGN AND SUBMIT':
-      // this scenario occurs when the application transitions from DRAFT to SIGN AND SUBMIT, due to sections becoming complete while editing
-      // OR when an application transitions back to DRAFT from SIGN AND SUBMIT, due to a section becoming incomplete again
+      // this scenario occurs when an application transitions back to DRAFT from SIGN AND SUBMIT, due to a section becoming incomplete again
       // no emails are sent in this scenario, but need to account for this to prevent throwing error in default case, which breaks validation in the UI
       break;
 
+    case 'SIGN AND SUBMIT':
+      // when revisions are requested on the signature section only (incl. signature + general comments), the app transitions to SIGN AND SUBMIT
+      // this is necessary to allow the applicant to upload a new signed pdf, which is only allowed in this state
+      // the revisions email notification should still be sent to the applicant
+      if (signatureOnlySectionRequiringRevisions(updatedApp)) {
+        sendRevisionsRequestEmail(updatedApp, emailClient, config);
+      }
+      break;
     default:
       throw new Error(`Invalid app state: ${updatedApp.state}`);
   }
