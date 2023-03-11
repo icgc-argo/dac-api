@@ -76,7 +76,7 @@ import {
   isRenewable,
   isInPreSubmittedState,
 } from '../utils/calculations';
-import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
+import { getExpiredEventDate, getLastPausedAtDate, mergeKnown } from '../utils/misc';
 import {
   getUpdateAuthor,
   hasDacoSystemScope,
@@ -216,6 +216,7 @@ export class ApplicationStateManager {
 
     // adding to response for convenience in FE, so it doesn't need to parse value from updates array
     this.currentApplication.lastPausedAtUtc = getLastPausedAtDate(this.currentApplication);
+    this.currentApplication.expiredEventDateUtc = getExpiredEventDate(this.currentApplication);
 
     return this.currentApplication;
   }

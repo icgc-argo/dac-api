@@ -174,6 +174,7 @@ interface ApplicationBaseFields {
   sourceAppId?: string | null;
   renewalAppId?: string | null;
   renewalPeriodEndDateUtc?: Date;
+  expiredEventDateUtc?: Date;
 }
 
 export interface ApplicationSummary extends ApplicationBaseFields {
