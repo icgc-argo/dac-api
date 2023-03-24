@@ -49,9 +49,9 @@ logger.info('in server.ts');
   try {
     connection = await database.connect();
     const migrated = await up(connection.db);
-    migrated.forEach((fileName: string) => logger.info('Migrated:', fileName));
+    migrated.forEach((fileName: string) => logger.info(`Migrated: ${fileName}`));
   } catch (err) {
-    logger.error('failed to do migration', err);
+    logger.error(`Failed to do migration: ${err}`);
     process.exit(-10);
     return;
   }

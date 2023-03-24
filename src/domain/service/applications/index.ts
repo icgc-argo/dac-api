@@ -90,7 +90,7 @@ export async function create(identity: UserIdentity) {
  * applications remain linked in that scenario
  * ```
  * @param renewalApp Renewal Application that has already been updated in state
- * @param sourceAppId
+ * @param sourceAppId sourceAppId from original renewal app object
  */
 async function unlinkRenewalFromSourceApp(
   renewalApp: Application,
@@ -101,20 +101,31 @@ async function unlinkRenewalFromSourceApp(
    * Steps:
    * 1) Start session
    * 2) Update renewal application in db - the app obj from the StateManager has already had its state changed to CLOSED, sourceAppId removed and searchValues updated
-   * 3) Fetch the source application by id
-   * 4) Set source app in new state manager
-   * 5) Remove renewalAppId and update searchValues with unlinkFromRenewal state call
-   * 6) Update source app in db
-   * 7) Close session
+   * 3) Verify sourceAppId was removed from renewal app doc. If not, throw error and rollback
+   * 4) Fetch the source application by sourceAppId
+   * 5) Set source app in new state manager
+   * 6) Remove renewalAppId and update searchValues with unlinkFromRenewal state call
+   * 7) Update source app in db
+   * 8) Verify renewalAppId was removed from source app doc. If not, throw error and rollback
+   * 9) Close session
    */
   const session = await ApplicationModel.startSession();
   try {
     await session.withTransaction(async () => {
       logger.info(`Removing sourceAppId ${sourceAppId} from ${renewalApp.appId}.`);
-      await ApplicationModel.findOneAndUpdate({ appId: renewalApp.appId }, renewalApp, {
-        session,
-      });
-      // TODO: add a check that sourceAppId has been removed before proceeding: https://github.com/icgc-argo/dac-api/issues/395
+      const updatedRenewalAppDoc = await ApplicationModel.findOneAndUpdate(
+        { appId: renewalApp.appId },
+        renewalApp,
+        {
+          session,
+          new: true,
+        },
+      );
+
+      if (!!updatedRenewalAppDoc?.sourceAppId) {
+        throw new Error(`Failed to remove sourceAppId ${sourceAppId} from ${renewalApp.appId}!`);
+      }
+
       logger.info(`Fetching source application ${sourceAppId}.`);
       const query: FilterQuery<ApplicationDocument> = {
         appId: sourceAppId,
@@ -132,9 +143,21 @@ async function unlinkRenewalFromSourceApp(
         );
         const updatedSourceApp = stateManager.unlinkFromRenewal();
         logger.info(`Renewal id removed, saving in db.`);
-        await ApplicationModel.updateOne({ appId: updatedSourceApp.appId }, updatedSourceApp, {
-          session: session,
-        });
+        const updatedSourceAppDoc = await ApplicationModel.findOneAndUpdate(
+          { appId: updatedSourceApp.appId },
+          updatedSourceApp,
+          {
+            session: session,
+            new: true,
+          },
+        );
+
+        if (!!updatedSourceAppDoc?.renewalAppId) {
+          throw new Error(
+            `Failed to remove renewalAppId ${sourceAppObj.renewalAppId} from ${sourceApp.appId}!`,
+          );
+        }
+
         logger.info(`Source app ${updatedSourceApp.appId} successfully updated.`);
       } else {
         throw new Error(`Could not fetch source application [${sourceAppId}].`);
