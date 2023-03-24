@@ -33,7 +33,7 @@ import {
 } from '../../interface';
 
 import { getAttestationByDate, isAttestable, isRenewable } from '../../../utils/calculations';
-import { checkIsDefined, getLastPausedAtDate } from '../../../utils/misc';
+import { checkIsDefined, getExpiredEventDate, getLastPausedAtDate } from '../../../utils/misc';
 import { hasReviewScope } from '../../../utils/permissions';
 
 export type SearchParams = {
@@ -194,6 +194,7 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         sourceAppId: app.sourceAppId,
         renewalAppId: app.renewalAppId,
         renewalPeriodEndDateUtc: app.renewalPeriodEndDateUtc,
+        expiredEventDateUtc: getExpiredEventDate(app),
       } as ApplicationSummary),
   );
 
