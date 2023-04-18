@@ -136,12 +136,11 @@ export async function getApplicationAssetsAsStream(
   const appDoc = await findApplication(appId, identity);
   const appDocObj = appDoc.toObject() as Application;
 
+  // can download assets if app is CLOSED but was APPROVED.
+  // the UI will generate a PDF client-side in pre-submission states
   if (
-    appDocObj.state !== 'REVIEW' &&
-    appDocObj.state !== 'APPROVED' &&
-    // can download assets if app is CLOSED but was APPROVED.
-    !(appDocObj.state === 'CLOSED' && appDocObj.approvedAtUtc) &&
-    appDocObj.state !== 'REJECTED'
+    ['DRAFT', 'SIGN AND SUBMIT', 'REVISIONS REQUESTED'].includes(appDocObj.state) ||
+    (appDocObj.state === 'CLOSED' && !appDocObj.approvedAtUtc)
   ) {
     throw new Error('Cannot download package in this state');
   }
