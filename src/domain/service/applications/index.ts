@@ -347,7 +347,6 @@ async function checkDeletedDocuments(originalApp: Application, updatedApp: Appli
     if (!isReferenced) {
       uniqueEthicsIds.push(id);
     }
-    break;
   }
   uniqueEthicsIds.forEach((o) => removedIds.push(o));
 
