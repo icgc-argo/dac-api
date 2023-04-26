@@ -304,7 +304,9 @@ export class ApplicationStateManager {
   deleteCollaborator(collaboratorId: string, identity: Identity) {
     const current = this.currentApplication;
     checkAppIsApprovedAndUserCanAmend(current, identity);
-
+    if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
+      throw new BadRequest(`Operation not allowed on ${current.state} application.`);
+    }
     current.sections.collaborators.list = current.sections.collaborators.list.filter(
       (c) => c.id?.toString() !== collaboratorId,
     );
@@ -432,7 +434,7 @@ export class ApplicationStateManager {
     }
 
     if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
-      throw new Error('Operation not allowed');
+      throw new BadRequest(`Operation not allowed on ${current.state} application.`);
     }
 
     createdCollaborator.id = new Date().getTime().toString();
