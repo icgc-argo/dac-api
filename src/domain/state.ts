@@ -304,7 +304,7 @@ export class ApplicationStateManager {
   deleteCollaborator(collaboratorId: string, identity: Identity) {
     const current = this.currentApplication;
     checkAppIsApprovedAndUserCanAmend(current, identity);
-    if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
+    if (shouldBeLockedByAtThisState(current.state, 'collaborators', hasReviewScope(identity))) {
       throw new BadRequest(`Operation not allowed on ${current.state} application.`);
     }
     current.sections.collaborators.list = current.sections.collaborators.list.filter(
@@ -433,7 +433,7 @@ export class ApplicationStateManager {
       });
     }
 
-    if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
+    if (shouldBeLockedByAtThisState(current.state, 'collaborators', hasReviewScope(identity))) {
       throw new BadRequest(`Operation not allowed on ${current.state} application.`);
     }
 
