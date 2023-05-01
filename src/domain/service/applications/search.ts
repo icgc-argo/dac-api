@@ -32,7 +32,12 @@ import {
   UserDataFromApprovedApplicationsResult,
 } from '../../interface';
 
-import { getAttestationByDate, isAttestable, isRenewable } from '../../../utils/calculations';
+import {
+  getAttestationByDate,
+  getRenewalPeriodEndDate,
+  isAttestable,
+  isRenewable,
+} from '../../../utils/calculations';
 import { checkIsDefined, getExpiredEventDate, getLastPausedAtDate } from '../../../utils/misc';
 import { hasReviewScope } from '../../../utils/permissions';
 
@@ -195,6 +200,9 @@ export async function search(params: SearchParams, identity: Identity): Promise<
         renewalAppId: app.renewalAppId,
         renewalPeriodEndDateUtc: app.renewalPeriodEndDateUtc,
         expiredEventDateUtc: getExpiredEventDate(app),
+        sourceRenewalPeriodEndDateUtc: app.expiresAtUtc
+          ? getRenewalPeriodEndDate(app.expiresAtUtc)
+          : undefined,
       } as ApplicationSummary),
   );
 

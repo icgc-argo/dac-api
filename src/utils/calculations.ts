@@ -1,6 +1,7 @@
 import moment from 'moment';
 import { AppConfig, getAppConfig } from '../config';
 import { Application, State } from '../domain/interface';
+import { NOTIFICATION_UNIT_OF_TIME } from './constants';
 
 export const sortByDate = (a: any, b: any) => {
   return b.date.getTime() - a.date.getTime();
@@ -52,6 +53,32 @@ export const isAttestable: (currentApp: Application) => boolean = (currentApp) =
   return elapsed >= -config.durations.attestation.daysToAttestation;
 };
 
+/**
+ * ```
+ * Calculates end of renewal period for a source application.
+ * Set to 23:59:59 of the day DAYS_POST_EXPIRY days after the source app's expiresAtUtc date (*not* expiredEventDateUtc)
+ * DAYS_POST_EXPIRY default is 90
+ * ```
+ * @param expiresAtUtc
+ * @returns Date
+ * @example
+ * // getRenewalPeriodEndDate(2023-05-05T12:54:52.075Z) returns 2023-08-03T23:59:59.999Z (default DAYS_POST_EXPIRY)
+ *
+ */
+export function getRenewalPeriodEndDate(expiresAtUtc: Date): Date {
+  const {
+    durations: {
+      expiry: { daysPostExpiry },
+    },
+  } = getAppConfig();
+
+  const endDate = moment
+    .utc(expiresAtUtc)
+    .endOf('day')
+    .add(daysPostExpiry, NOTIFICATION_UNIT_OF_TIME);
+  return endDate.toDate();
+}
+
 export const isRenewable = (currentApp: Application): boolean => {
   // can only renew an app in these states
   if (!['APPROVED', 'EXPIRED', 'PAUSED'].includes(currentApp.state)) {
@@ -76,11 +103,7 @@ export const isRenewable = (currentApp: Application): boolean => {
     .subtract(config.durations.expiry.daysToExpiry1, 'days');
 
   // expiry + DAYS_POST_EXPIRY
-  const expiryPeriodEnd = moment
-    .utc(currentApp.expiresAtUtc)
-    .endOf('day')
-    .add(config.durations.expiry.daysPostExpiry, 'days');
-
+  const expiryPeriodEnd = getRenewalPeriodEndDate(currentApp.expiresAtUtc);
   // can only renew if the expiry falls between DAYS_TO_EXPIRY_1 days prior to today and DAYS_POST_EXPIRY after
   return now.isBetween(expiryPeriodStart, expiryPeriodEnd);
 };
