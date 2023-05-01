@@ -75,6 +75,7 @@ import {
   isExpirable,
   isRenewable,
   isInPreSubmittedState,
+  getRenewalPeriodEndDate,
 } from '../utils/calculations';
 import { getExpiredEventDate, getLastPausedAtDate, mergeKnown } from '../utils/misc';
 import {
@@ -217,6 +218,9 @@ export class ApplicationStateManager {
     // adding to response for convenience in FE, so it doesn't need to parse value from updates array
     this.currentApplication.lastPausedAtUtc = getLastPausedAtDate(this.currentApplication);
     this.currentApplication.expiredEventDateUtc = getExpiredEventDate(this.currentApplication);
+    this.currentApplication.sourceRenewalPeriodEndDateUtc = this.currentApplication.expiresAtUtc
+      ? getRenewalPeriodEndDate(this.currentApplication.expiresAtUtc)
+      : undefined;
 
     return this.currentApplication;
   }
@@ -635,16 +639,6 @@ export function getSearchFieldValues(appDoc: Application) {
 
 function getPristineMeta(): Meta {
   return { status: 'PRISTINE', errorsList: [] };
-}
-
-export function getRenewalPeriodEndDate(expiry: Date): Date {
-  const {
-    durations: {
-      expiry: { daysPostExpiry },
-    },
-  } = getAppConfig();
-  const endDate = moment.utc(expiry).add(daysPostExpiry, NOTIFICATION_UNIT_OF_TIME).endOf('day');
-  return endDate.toDate();
 }
 
 export function renewalApplication(
