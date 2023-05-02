@@ -27,10 +27,10 @@ The batch jobs are executed sequentially, in this order:
 ### Attestation Required Notifications
 
 - file: `src/jobs/attestationRequiredNotification.ts`
-- Sends an email notification to the applicant and submitter that attestation is required in 45 days
+- Sends an email notification to the applicant and submitter that attestation is required in 45 (`DAYS_TO_ATTESTATION`) days.
 - query will retrieve all applications that are:
   - `APPROVED`
-  - `approvedAtUtc` value is between 1 year ago to 1 year less 45 days ago
+  - `approvedAtUtc` value is between 1 year ago to 1 year (`ATTESTATION_UNIT_COUNT` + `ATTESTATION_UNIT_OF_TIME`) less 45 (`DAYS_TO_ATTESTATION`) days ago
   - `attestedAtUtc` value is undefined
   - `emailNotifications.attestationRequiredNotificationSent` is undefined
 - no state change occurs on the application
@@ -54,7 +54,7 @@ attestationNotifications: {
 - Transitions applications that meet the criteria to `PAUSED` state, and sends an email to the applicant and submitter regarding the change
 - query will retrieve all applications that are:
   - `APPROVED` or `PAUSED`
-  - `approvedAtUtc` value is 1 year ago or more
+  - `approvedAtUtc` value is 1 year (`ATTESTATION_UNIT_COUNT` + `ATTESTATION_UNIT_OF_TIME`) ago or more
   - `expiresAtUtc` is later than the current date
   - `attestedAtUtc` is undefined
   - `emailNotifications.applicationPausedNotificationSent` is undefined
@@ -77,10 +77,10 @@ pausedApps: {
 ### First Notification of Application Expiry
 
 - file: `src/jobs/firstExpiryNotification.ts`
-- Sends an email notification to the applicant and submitter that their application will expire in 90 days, and they now have the option to renew this existing application to continue their access, and this option will be available up to 90 days past their expiry.
+- Sends an email notification to the applicant and submitter that their application will expire in 90 (`DAYS_TO_EXPIRY_1`) days, and they now have the option to renew this existing application to continue their access, and this option will be available up to 90 (`DAYS_POST_EXPIRY`) days past their expiry.
 - query will retrieve all applications that are:
   - `APPROVED` or `PAUSED`
-  - `expiresAtUtc` is between 90 to 45 days in the future
+  - `expiresAtUtc` is between 90 (`DAYS_TO_EXPIRY_1`) to 45 (`DAYS_TO_EXPIRY_2`) days in the future
   - `emailNotifications.firstExpiryNotificationSent` is undefined
 - no state change occurs on the application
 - sets the `emailNotifications.firstExpiryNotificationSent` to the current date. This flag is to track whether an email has been sent, in the case where a job run is missed or an error occurs in the job run that prevents the email from being sent.
@@ -100,10 +100,10 @@ expiryNotifications1: {
 ### Second Notification of Application Expiry
 
 - file: `src/jobs/secondExpiryNotification.ts`
-- Sends an email notification to the applicant and submitter that their application will expire in 45 days, and they still have the option to renew this existing application to continue their access up to 90 days past their expiry. This notification trigger is not affected by whether the applicant has already opened a renewal.
+- Sends an email notification to the applicant and submitter that their application will expire in 45 (`DAYS_TO_EXPIRY_2`) days, and they still have the option to renew this existing application to continue their access up to 90 (`DAYS_POST_EXPIRY`) days past their expiry. This notification trigger is not affected by whether the applicant has already opened a renewal.
 - query will retrieve all applications that are:
   - `APPROVED` or `PAUSED`
-  - `expiresAtUtc` is between 45 days in the future and today
+  - `expiresAtUtc` is between 45 (`DAYS_TO_EXPIRY_2`) days in the future and today
   - `emailNotifications.secondExpiryNotificationSent` is undefined
 - no state change occurs on the application
 - sets the `emailNotifications.secondExpiryNotificationSent` to the current date. This flag is to track whether an email has been sent, in the case where a job run is missed or an error occurs in the job run that prevents the email from being sent.
@@ -147,7 +147,7 @@ expiredApps: {
 ### Close Unsubmitted Renewal Applications
 
 - file: `src/jobs/closeUnsubmittedRenewalsCheck.ts`
-- Closes any renewal applications that have not been submitted for `REVIEW` before the renewal period has ended, 90 days after a source application's expiry date. Once this occurs, the renewal cycle for an application is finished and an applicant would have to submit an entirely new application to regain controlled access. There is no email notification for this scenario.
+- Closes any renewal applications that have not been submitted for `REVIEW` before the renewal period has ended, 90 (`DAYS_POST_EXPIRY`) days after a source application's expiry date. Once this occurs, the renewal cycle for an application is finished and an applicant would have to submit an entirely new application to regain controlled access. There is no email notification for this scenario.
 - query will retrieve all applications that are:
   - `DRAFT`, `SIGN AND SUBMIT` or `REVISIONS REQUESTED`
   - `renewalPeriodEndDateUtc` is before today
