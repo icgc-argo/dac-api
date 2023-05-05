@@ -46,3 +46,8 @@ export const getLastPausedAtDate = (app: Application): Date | undefined => {
     (update) => update.eventType === UpdateEvent.PAUSED,
   )?.date;
 };
+
+export const getExpiredEventDate = (app: Application): Date | undefined => {
+  const expiryEvent = app.updates.find((update) => update.eventType === UpdateEvent.EXPIRED);
+  return expiryEvent?.date;
+};

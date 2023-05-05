@@ -75,8 +75,9 @@ import {
   isExpirable,
   isRenewable,
   isInPreSubmittedState,
+  getRenewalPeriodEndDate,
 } from '../utils/calculations';
-import { getLastPausedAtDate, mergeKnown } from '../utils/misc';
+import { getExpiredEventDate, getLastPausedAtDate, mergeKnown } from '../utils/misc';
 import {
   getUpdateAuthor,
   hasDacoSystemScope,
@@ -216,6 +217,10 @@ export class ApplicationStateManager {
 
     // adding to response for convenience in FE, so it doesn't need to parse value from updates array
     this.currentApplication.lastPausedAtUtc = getLastPausedAtDate(this.currentApplication);
+    this.currentApplication.expiredEventDateUtc = getExpiredEventDate(this.currentApplication);
+    this.currentApplication.sourceRenewalPeriodEndDateUtc = this.currentApplication.expiresAtUtc
+      ? getRenewalPeriodEndDate(this.currentApplication.expiresAtUtc)
+      : undefined;
 
     return this.currentApplication;
   }
@@ -303,7 +308,9 @@ export class ApplicationStateManager {
   deleteCollaborator(collaboratorId: string, identity: Identity) {
     const current = this.currentApplication;
     checkAppIsApprovedAndUserCanAmend(current, identity);
-
+    if (shouldBeLockedByAtThisState(current.state, 'collaborators', hasReviewScope(identity))) {
+      throw new BadRequest(`Operation not allowed on ${current.state} application.`);
+    }
     current.sections.collaborators.list = current.sections.collaborators.list.filter(
       (c) => c.id?.toString() !== collaboratorId,
     );
@@ -430,8 +437,8 @@ export class ApplicationStateManager {
       });
     }
 
-    if (shouldBeLockedByAtThisState(current.state, 'collaborators', false)) {
-      throw new Error('Operation not allowed');
+    if (shouldBeLockedByAtThisState(current.state, 'collaborators', hasReviewScope(identity))) {
+      throw new BadRequest(`Operation not allowed on ${current.state} application.`);
     }
 
     createdCollaborator.id = new Date().getTime().toString();
@@ -632,16 +639,6 @@ export function getSearchFieldValues(appDoc: Application) {
 
 function getPristineMeta(): Meta {
   return { status: 'PRISTINE', errorsList: [] };
-}
-
-export function getRenewalPeriodEndDate(expiry: Date): Date {
-  const {
-    durations: {
-      expiry: { daysPostExpiry },
-    },
-  } = getAppConfig();
-  const endDate = moment.utc(expiry).add(daysPostExpiry, NOTIFICATION_UNIT_OF_TIME).endOf('day');
-  return endDate.toDate();
 }
 
 export function renewalApplication(
