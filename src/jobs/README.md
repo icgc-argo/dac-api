@@ -2,6 +2,8 @@
 
 DACO requires several events be triggered throughout the lifecycle of an approved application:
 
+> **Note**: The time values referenced in the descriptions below are DACO defaults; however, these are configurable, see [Environment Variables](#environment-variables)
+
 - Applicants must attest to the Data Access Agreements 1 year after approval
 - Applicants who fail to attest after 1 year will have their controlled access paused
 - Access expires 2 years after approval, and applicants must renew their original application in order to continue their access to controlled data
@@ -26,7 +28,7 @@ The batch jobs are executed sequentially, in this order:
 
 ### Attestation Required Notifications
 
-- file: `src/jobs/attestationRequiredNotification.ts`
+- file: [src/jobs/attestationRequiredNotification.ts](./attestationRequiredNotification.ts)
 - Sends an email notification to the applicant and submitter that attestation is required in 45 (`DAYS_TO_ATTESTATION`) days.
 - query will retrieve all applications that are:
   - `APPROVED`
@@ -50,7 +52,7 @@ attestationNotifications: {
 
 ### Pause Applications
 
-- file: `src/jobs/pauseAppCheck.ts`
+- file: [src/jobs/pauseAppCheck.ts](./pauseAppCheck.ts)
 - Transitions applications that meet the criteria to `PAUSED` state, and sends an email to the applicant and submitter regarding the change
 - query will retrieve all applications that are:
   - `APPROVED` or `PAUSED`
@@ -76,7 +78,7 @@ pausedApps: {
 
 ### First Notification of Application Expiry
 
-- file: `src/jobs/firstExpiryNotification.ts`
+- file: [src/jobs/firstExpiryNotification.ts](./firstExpiryNotification.ts)
 - Sends an email notification to the applicant and submitter that their application will expire in 90 (`DAYS_TO_EXPIRY_1`) days, and they now have the option to renew this existing application to continue their access, and this option will be available up to 90 (`DAYS_POST_EXPIRY`) days past their expiry.
 - query will retrieve all applications that are:
   - `APPROVED` or `PAUSED`
@@ -99,7 +101,7 @@ expiryNotifications1: {
 
 ### Second Notification of Application Expiry
 
-- file: `src/jobs/secondExpiryNotification.ts`
+- file: [src/jobs/secondExpiryNotification.ts](./secondExpiryNotification.ts)
 - Sends an email notification to the applicant and submitter that their application will expire in 45 (`DAYS_TO_EXPIRY_2`) days, and they still have the option to renew this existing application to continue their access up to 90 (`DAYS_POST_EXPIRY`) days past their expiry. This notification trigger is not affected by whether the applicant has already opened a renewal.
 - query will retrieve all applications that are:
   - `APPROVED` or `PAUSED`
@@ -122,7 +124,7 @@ expiryNotifications2: {
 
 ### Expire Applications
 
-- file: `src/jobs/expireAppCheck.ts`
+- file: [src/jobs/expireAppCheck.ts](./expireAppCheck.ts)
 - Sends an email notification to the applicant and submitter that their application has expired and they will have lost access if they have not yet renewed. This notification trigger is not affected by whether the applicant has already opened a renewal.
 - query will retrieve all applications that are:
   - `APPROVED`, `PAUSED` or `EXPIRED`
@@ -146,7 +148,7 @@ expiredApps: {
 
 ### Close Unsubmitted Renewal Applications
 
-- file: `src/jobs/closeUnsubmittedRenewalsCheck.ts`
+- file: [src/jobs/closeUnsubmittedRenewalsCheck.ts](./closeUnsubmittedRenewalsCheck.ts)
 - Closes any renewal applications that have not been submitted for `REVIEW` before the renewal period has ended, 90 (`DAYS_POST_EXPIRY`) days after a source application's expiry date. Once this occurs, the renewal cycle for an application is finished and an applicant would have to submit an entirely new application to regain controlled access. There is no email notification for this scenario.
 - query will retrieve all applications that are:
   - `DRAFT`, `SIGN AND SUBMIT` or `REVISIONS REQUESTED`
@@ -170,7 +172,7 @@ closedApps: {
 
 ### Approved Users List
 
-- file: `src/jobs/approvedUsersEmail.ts`
+- file: [src/jobs/approvedUsersEmail.ts](./approvedUsersEmail.ts)
 - Retrieves a list of unique applicants and collaborators from all `APPROVED` applications in the system
 - Creates a CSV file with headers `USER NAME` (`displayName`), `OPENID` (`googleEmail`), `EMAIL` (`institutionEmail`), `CHANGED` (`lastUpdatedAtUtc`), `AFFILIATION` (`primaryAffiliation`)
 - encrypts the file
@@ -191,16 +193,19 @@ approvedUsers: {
 
 These are the expected default values for DACO requirements, however they have been made configurable for testing convenience. They can be configured in your `.env` file.
 
-```
-# EXPIRY
-DAYS_TO_EXPIRY_1=90
-DAYS_TO_EXPIRY_2=45
-DAYS_POST_EXPIRY=90
-EXPIRY_UNIT_COUNT=years
-EXPIRY_UNIT_OF_TIME=2
+The [src/config.ts](../config.ts) file contains default values so the application will run if these values are not provided in the environment. However, all date calculations are done via [moment.js](https://momentjs.com/), so there is a validation for any configured "unit of time" (`ATTESTATION_UNIT_OF_TIME`, `EXPIRY_UNIT_OF_TIME`) values to ensure they align with Moment's expected [Duration types](https://github.com/moment/moment/blob/develop/ts3.1-typings/moment.d.ts#L314). If an unexpected value is provided, the application will fail to start.\*
 
-# ATTESTATION
-ATTESTATION_UNIT_COUNT=1
-ATTESTATION_UNIT_OF_TIME=years
-DAYS_TO_ATTESTATION=45
-```
+> **\*Note**: For our purposes, this validation excludes values smaller than `"days"` as shorter timespans are not feasible.
+
+> **Important Note**: The `expiresAtUtc` value is saved in the DB application document, so it is important to be aware that changing the `EXPIRY_UNIT_OF_TIME` and/or `EXPIRY_UNIT_COUNT` after there are approved applications in the system would result in differing approval periods for applications. **This also means the value should not be changed in production.** The other values listed here are used to calculate fields that are not stored in the DB; however it is also not recommended to change them in a production environment, if there are existing approved applications.
+
+| Variable Name              | Required | Type                                  |   Default | Description                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | :------: | ------------------------------------- | --------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ATTESTATION_UNIT_COUNT`   | Optional | number                                |       `1` | The number of units of time used to calculate an approved application's `attestationByUtc` value. Used in conjunction with `ATTESTATION_UNIT_COUNT`. An unattested application would be transitioned to `PAUSED` after this date.                                                                                               |
+| `ATTESTATION_UNIT_OF_TIME` | Optional | moment.unitOfTime.DurationConstructor | `"years"` | The unit of time used to calculate an approved application's `attestationByUtc` value. Used in conjunction with `ATTESTATION_UNIT_COUNT`. An unattested application would be transitioned to `PAUSED` after this date.                                                                                                          |
+| `DAYS_TO_ATTESTATION`      | Optional | number                                |      `45` | the number of days before an application's `attestationByUtc` value, used in conjunction with the `ATTESTATION_UNIT_COUNT` and `ATTESTATION_UNIT_OF_TIME` to calculate the date when the attestation notification email should be sent.                                                                                         |
+| `DAYS_TO_EXPIRY_1`         | Optional | number                                |      `90` | the number of days before an application's `expiresAtUtc` value, used to calculate when the renewal period begins, and the first expiry notification email should be sent.                                                                                                                                                      |
+| `DAYS_TO_EXPIRY_2`         | Optional | number                                |      `45` | the number of days before an application's `expiresAtUtc` value, used to calculate when the second expiry notification email should be sent.                                                                                                                                                                                    |
+| `DAYS_POST_EXPIRY`         | Optional | number                                |      `90` | the number of days after an application's `expiresAtUtc` value, used to calculate when the renewal period ends. The calculated date is used by the source application to indicate whether it is still renewable, and whether any linked renewal application should be closed, if the renewal has not been submitted for review. |
+| `EXPIRY_UNIT_COUNT`        | Optional | number                                |       `2` | The number of units of time used to calculate an approved application's `expiresAtUtc`, and so the length of time an application grants access to controlled data. Used in conjunction with `EXPIRY_UNIT_OF_TIME`.                                                                                                              |
+| `EXPIRY_UNIT_OF_TIME`      | Optional | moment.unitOfTime.DurationConstructor | `"years"` | The unit of time used to calculate expiry. Used in conjunction with `EXPIRY_UNIT_COUNT` to calculate an approved application's `expiresAtUtc`, and so the length of time an application grants access to controlled data.                                                                                                       |
