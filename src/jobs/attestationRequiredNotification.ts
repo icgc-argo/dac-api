@@ -52,6 +52,24 @@ async function attestationRequiredNotificationCheck(
   }
 }
 
+const sendNotification = async (
+  app: Application,
+  emailClient: Transporter<SMTPTransport.SentMessageInfo>,
+  config: AppConfig,
+): Promise<JobResultForApplication> => {
+  try {
+    await sendAttestationRequiredEmail(app, config, emailClient);
+    const updatedApp = await setEmailSentFlag(app, 'attestationRequiredNotificationSent', JOB_NAME);
+    return { success: true, app: updatedApp };
+  } catch (err: unknown) {
+    // Error thrown in one of our async operations
+    logger.error(
+      `${JOB_NAME} - Error caught while sending attestation required email for ${app.appId} - ${err}`,
+    );
+    return { success: false, app, message: `${err}` };
+  }
+};
+
 const getAttestableNotificationReportDetails = async (
   currentDate: Date,
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
@@ -71,27 +89,12 @@ const getAttestableNotificationReportDetails = async (
   });
 
   logger.info(`${JOB_NAME} - Initiating email requests.`);
-  const sendNotification = async (app: Application): Promise<JobResultForApplication> => {
-    try {
-      await sendAttestationRequiredEmail(app, config, emailClient);
-      const updatedApp = await setEmailSentFlag(
-        app,
-        'attestationRequiredNotificationSent',
-        JOB_NAME,
-      );
-      return { success: true, app: updatedApp };
-    } catch (err: unknown) {
-      // Error thrown in one of our async operations
-      logger.error(
-        `${JOB_NAME} - Error caught while sending attestation required email for ${app.appId} - ${err}`,
-      );
-      return { success: false, app, message: `${err}` };
-    }
-  };
   const chunkedEmails = chunk(apps, REQUEST_CHUNK_SIZE);
   const results: JobResultForApplication[][] = [];
   for (const email of chunkedEmails) {
-    const result = await Promise.all(email.map(sendNotification));
+    const result = await Promise.all(
+      email.map((app) => sendNotification(app, emailClient, config)),
+    );
     results.push(result);
   }
   const allResults = results.flat();

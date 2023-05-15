@@ -2,6 +2,12 @@
 
 Development of the Data Access Control API
 
+## Development Mode
+
+| Name       | Config Path   | Description                                                                               | Trigger                           | Default |
+| ---------- | ------------- | ----------------------------------------------------------------------------------------- | --------------------------------- | ------- |
+| `NODE_ENV` | isDevelopment | Enables `'/applications/:id'` DELETE endpoint. Enables `debug.log` file in Logger options | set `NODE_ENV` to `"development"` | `false` |
+
 ## Feature Flags
 
 | Name                        | Config Path                      | Description                                                                                                                                                                                                                                                                                                               | Trigger                   | Default |
