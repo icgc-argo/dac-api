@@ -47,6 +47,7 @@ import {
   sendApplicationClosedEmail,
   sendApplicationPausedEmail,
   sendAccessHasExpiredEmail,
+  sendCollaboratorEmails,
 } from '../emails';
 import { isEthicsDocReferenced, findApplication, getById } from './search';
 import { hasReviewScope, getUpdateAuthor } from '../../../utils/permissions';
@@ -268,13 +269,12 @@ export async function onStateChange(
       // prevent usual approval emails going out when state changes from PAUSED to APPROVED, as this is not a new approval event
       if (oldApplication.state !== 'PAUSED') {
         await sendApplicationApprovedEmail(updatedApp, config, emailClient);
-        Promise.all(
-          updatedApp.sections.collaborators.list.map((collab) => {
-            sendCollaboratorApprovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
-              logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
-            );
-          }),
-        ).catch((err) => logger.error(err));
+        await sendCollaboratorEmails(
+          sendCollaboratorApprovedEmail,
+          updatedApp,
+          config,
+          emailClient,
+        );
       }
       break;
 
@@ -282,22 +282,33 @@ export async function onStateChange(
       // only applications that have been previously approved get a CLOSED notification
       if (['APPROVED', 'PAUSED'].includes(oldApplication.state)) {
         await sendApplicationClosedEmail(updatedApp, config, emailClient);
-        Promise.all(
-          updatedApp.sections.collaborators.list.map((collab) => {
-            sendCollaboratorRemovedEmail(updatedApp, collab, config, emailClient).catch((err) =>
-              logger.error(`failed to send email to collaborator ${collab.id}: ${err}`),
-            );
-          }),
-        ).catch((err) => logger.error(err));
+        // only notify collaborators that their access has been removed if application transitioned from APPROVED -> CLOSED
+        if (oldApplication.state === 'APPROVED') {
+          await sendCollaboratorEmails(
+            sendCollaboratorRemovedEmail,
+            updatedApp,
+            config,
+            emailClient,
+          );
+        }
       }
       break;
 
     case 'PAUSED':
       await sendApplicationPausedEmail(updatedApp, config, emailClient);
+      // only notify collaborators that their access has been removed if application transitioned from APPROVED -> PAUSED
+      if (oldApplication.state === 'APPROVED') {
+        await sendCollaboratorEmails(sendCollaboratorRemovedEmail, updatedApp, config, emailClient);
+      }
       break;
 
     case 'EXPIRED':
       await sendAccessHasExpiredEmail(updatedApp, config, emailClient);
+      // only notify collaborators that their access has been removed if application transitioned from APPROVED -> EXPIRED
+      // disregards PAUSED -> EXPIRED transition, the collaborators would already have been notified of access removal
+      if (oldApplication.state === 'APPROVED') {
+        await sendCollaboratorEmails(sendCollaboratorRemovedEmail, updatedApp, config, emailClient);
+      }
       break;
 
     case 'DRAFT':
