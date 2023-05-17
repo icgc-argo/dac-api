@@ -28,7 +28,6 @@ import renderReviewEmail from '../../emails/review-new';
 import renderReviewRevisedEmail from '../../emails/review-revised';
 import renderEthicsLetterEmail from '../../emails/ethics-letter';
 import renderCollaboratorAdded from '../../emails/collaborator-added';
-
 import renderSubmittedEmail from '../../emails/submitted';
 import renderRevisionsEmail from '../../emails/revisions-requested';
 import renderApprovedEmail from '../../emails/application-approved';
@@ -42,6 +41,14 @@ import renderAttestationRequiredEmail from '../../emails/attestation-required';
 import renderApplicationPausedEmail from '../../emails/application-paused';
 import renderAttestationReceivedEmail from '../../emails/attestation-received';
 import renderReviewRenewalEmail from '../../emails/review-renewal';
+import logger from '../../logger';
+
+type CollaboratorNotification = (
+  updatedApp: Application,
+  collaborator: Collaborator,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) => Promise<void>;
 
 function getApplicantEmails(app: Application) {
   return new Set([
@@ -441,4 +448,21 @@ export async function sendApplicationClosedEmail(
     email.html,
     new Set([config.email.dacoAddress]),
   );
+}
+
+export async function sendCollaboratorEmails(
+  collabEmailFunc: CollaboratorNotification,
+  updatedApp: Application,
+  config: AppConfig,
+  emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
+) {
+  Promise.allSettled(
+    updatedApp.sections.collaborators.list.map((collab) => {
+      collabEmailFunc(updatedApp, collab, config, emailClient).catch((err) =>
+        logger.error(
+          `Failed to send ${collabEmailFunc.name} email to collaborator ${collab.id}: ${err}.`,
+        ),
+      );
+    }),
+  ).catch((err) => logger.error(err));
 }
