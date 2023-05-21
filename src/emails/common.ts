@@ -22,6 +22,9 @@ export const defaultTextStyle = {
   padding: '0',
 };
 
+const FULL_DISPLAY_DATE = 'MMM D, YYYY [at] LT';
+export const TEXT_DISPLAY_DATE = 'MMM D, YYYY';
+
 export function compose(cardData: ComposeArgs, subject: string) {
   return `
     <mjml>
@@ -222,8 +225,8 @@ export function appInfoBox(
   );
 }
 
-export function formatDate(d: Date) {
-  return moment(d).utc().format('MMM D, YYYY [at] LT');
+export function formatDate(d: Date, format: string = FULL_DISPLAY_DATE) {
+  return moment(d).utc().format(format);
 }
 
 export function getApplicantName(info: PersonalInfo) {
@@ -344,6 +347,7 @@ export const approvalDetailsContent = (
       </mj-column>
     </mj-section>`;
 };
+
 function closure(props: { guideLink: string; guideText: string }) {
   const { guideLink, guideText } = props;
   return `

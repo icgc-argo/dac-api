@@ -378,20 +378,13 @@ export async function sendAttestationReceivedEmail(
 export async function sendAccessExpiringEmail(
   updatedApp: Application,
   config: AppConfig,
-  daysToExpiry: number, // this will come from the cronjob that is executing, i.e. first (90 days) or second (45 days) warning
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
-  const title = `Your Access is Expiring in ${daysToExpiry} days`;
-  const notificationEmail = await renderAccessExpiringEmail(
-    updatedApp,
-    config.email.links,
-    {
-      baseUrl: config.ui.baseUrl,
-      pathTemplate: config.ui.sectionPath,
-    },
-    config.durations,
-    daysToExpiry,
-  );
+  const title = `Your Access is Expiring Soon`;
+  const notificationEmail = await renderAccessExpiringEmail(updatedApp, config.email.links, {
+    baseUrl: config.ui.baseUrl,
+    pathTemplate: config.ui.sectionPath,
+  });
   const emailContent = notificationEmail.html;
   const subject = `[${updatedApp.appId}] ${title}`;
 
@@ -411,15 +404,10 @@ export async function sendAccessHasExpiredEmail(
   emailClient: nodemail.Transporter<SMTPTransport.SentMessageInfo>,
 ) {
   const title = `Your Access to ICGC Controlled Data has Expired`;
-  const notificationEmail = await renderAccessHasExpiredEmail(
-    updatedApp,
-    config.email.links,
-    {
-      baseUrl: config.ui.baseUrl,
-      pathTemplate: config.ui.sectionPath,
-    },
-    config.durations,
-  );
+  const notificationEmail = await renderAccessHasExpiredEmail(updatedApp, config.email.links, {
+    baseUrl: config.ui.baseUrl,
+    pathTemplate: config.ui.sectionPath,
+  });
   const emailContent = notificationEmail.html;
   const subject = `[${updatedApp.appId}] ${title}`;
 
