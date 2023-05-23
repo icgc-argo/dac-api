@@ -40,7 +40,33 @@ export default async function (
   return { html: htmlOutput.html, emailMjml };
 }
 
+// access can be removed because an approved app is closed, paused, expired, or when a collaborator is manually deleted from an approved app
+function getRemovalDate(app: Application): Date {
+  const today = new Date();
+  switch (app.state) {
+    case 'CLOSED':
+      return app.closedAtUtc;
+      break;
+
+    case 'EXPIRED':
+      return app.expiredEventDateUtc || app.expiresAtUtc;
+      break;
+
+    case 'PAUSED':
+      return app.lastPausedAtUtc || app.lastUpdatedAtUtc || today;
+      break;
+
+    case 'APPROVED':
+      return app.lastUpdatedAtUtc || today;
+      break;
+
+    default:
+      return app.lastUpdatedAtUtc || today;
+  }
+}
+
 function messageBody(app: Application, recipient: PersonalInfo) {
+  const removalDate = getRemovalDate(app);
   const removalData = [
     {
       label: 'Title of Project',
@@ -52,7 +78,7 @@ function messageBody(app: Application, recipient: PersonalInfo) {
     },
     {
       label: 'Access Removed on',
-      value: formatDate(app.lastUpdatedAtUtc || new Date()), // what value would this be
+      value: formatDate(removalDate),
     },
   ];
   return `

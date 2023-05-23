@@ -8,6 +8,7 @@ import {
   UILinksInfo,
   approvalDetailsContent,
   formatDate,
+  TEXT_DISPLAY_DATE,
 } from './common';
 import { compileMjmlInPromise } from './mjml';
 import { getAttestationByDate } from '../utils/calculations';
@@ -16,7 +17,7 @@ export default async function (app: Application, uiLinksInfo: UILinksInfo, confi
   const info = app.sections.applicant.info;
   const emailMjml = compose(
     {
-      message: messageBody(app, uiLinksInfo, config),
+      message: messageBody(app, uiLinksInfo),
       receiver: {
         first: info.firstName,
         last: info.lastName,
@@ -39,7 +40,7 @@ export default async function (app: Application, uiLinksInfo: UILinksInfo, confi
   return { html: htmlOutput.html, emailMjml };
 }
 
-function messageBody(app: Application, uiLinksInfo: UILinksInfo, config: AppConfig) {
+function messageBody(app: Application, uiLinksInfo: UILinksInfo) {
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
   const attestationData = [
@@ -73,7 +74,10 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo, config: AppConf
     ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
     ${approvalDetailsContent(attestationData, 'Project access and attestation details:', 170)}
     ${textParagraphSection(
-      `You have <strong>${config.durations.attestation.daysToAttestation} days to log in and complete an attestation for this project</strong>. If you do not complete the attestation by the due date noted above, access to ICGC Controlled Data will be paused for your project team.`,
+      `You have <strong>until ${formatDate(
+        getAttestationByDate(app.approvedAtUtc),
+        TEXT_DISPLAY_DATE,
+      )} to log in and complete an attestation for this project</strong>. If you do not complete the attestation by the due date noted above, access to ICGC Controlled Data will be paused for your project team.`,
       { padding: '0px 0px 20px 0px' },
     )}
     ${actionGetStarted(`Get Started:`, `COMPLETE ATTESTATION`, link)}

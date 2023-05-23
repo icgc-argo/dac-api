@@ -131,36 +131,14 @@ describe('emails', () => {
       const email = await rejected(app, emailLinksStub);
     });
 
-    it('should render an access expiring in 45 days email', async () => {
+    it('should render an access expiring email', async () => {
       const app = getApprovedApplication();
-      const email = await renderAccessExpiringEmail(
-        app,
-        emailLinksStub,
-        uiLinksStub,
-        durationsStub,
-        emailTestConfig.durations.expiry.daysToExpiry2,
-      );
-    });
-
-    it('should render an access expiring in 90 days email', async () => {
-      const app = getApprovedApplication();
-      const email = await renderAccessExpiringEmail(
-        app,
-        emailLinksStub,
-        uiLinksStub,
-        durationsStub,
-        emailTestConfig.durations.expiry.daysToExpiry1,
-      );
+      const email = await renderAccessExpiringEmail(app, emailLinksStub, uiLinksStub);
     });
 
     it('should render an access has expired email', async () => {
       const app = getApprovedApplication();
-      const email = await renderAccessHasExpiredEmail(
-        app,
-        emailLinksStub,
-        uiLinksStub,
-        durationsStub,
-      );
+      const email = await renderAccessHasExpiredEmail(app, emailLinksStub, uiLinksStub);
     });
 
     it('should render an attestation required email', async () => {

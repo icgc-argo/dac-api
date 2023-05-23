@@ -1,3 +1,4 @@
+import { getRenewalPeriodEndDate } from '../utils/calculations';
 import { AppConfig } from '../config';
 import { Application } from '../domain/interface';
 import {
@@ -8,6 +9,7 @@ import {
   formatDate,
   textParagraphSection,
   UILinksInfo,
+  TEXT_DISPLAY_DATE,
 } from './common';
 import { compileMjmlInPromise } from './mjml';
 
@@ -15,12 +17,11 @@ export default async function (
   app: Application,
   linksConfigs: AppConfig['email']['links'],
   uiLinksInfo: UILinksInfo,
-  durationConfigs: AppConfig['durations'],
 ) {
   const info = app.sections.applicant.info;
   const emailMjml = compose(
     {
-      message: messageBody(app, uiLinksInfo, durationConfigs, linksConfigs.dacoSurvey),
+      message: messageBody(app, uiLinksInfo, linksConfigs.dacoSurvey),
       receiver: {
         first: info.firstName,
         last: info.lastName,
@@ -43,15 +44,10 @@ export default async function (
   return { html: htmlOutput.html, emailMjml };
 }
 
-function messageBody(
-  app: Application,
-  uiLinksInfo: UILinksInfo,
-  durationConfigs: AppConfig['durations'],
-  surveyUrl: string,
-) {
+function messageBody(app: Application, uiLinksInfo: UILinksInfo, surveyUrl: string) {
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
-  const daysLeftForRenewal = durationConfigs.expiry.daysPostExpiry;
+  const renewalPeriodEndDate = getRenewalPeriodEndDate(app.expiresAtUtc);
   const expiryData = [
     {
       label: 'Title of Project',
@@ -63,7 +59,7 @@ function messageBody(
     },
     {
       label: 'Access Expired on',
-      value: formatDate(app.expiresAtUtc),
+      value: formatDate(app.expiredEventDateUtc || app.expiresAtUtc),
     },
   ];
   return `
@@ -71,14 +67,18 @@ function messageBody(
       `Access to ICGC Controlled Data has expired for the following project team. Kindly note, it may take up to 24 hours for this status change to take effect.`,
       { padding: '0px 0px 20px 0px' },
     )}
-    ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
-    ${approvalDetailsContent(expiryData, 'Access has expired for:')}
     ${textParagraphSection(
-      `You have <strong>${daysLeftForRenewal} days to renew</strong> your project team’s access privileges for another two years.`,
+      `You have <strong>until ${formatDate(
+        renewalPeriodEndDate,
+        TEXT_DISPLAY_DATE,
+      )} to renew</strong> your project team's access privileges for another two years.`,
       { padding: '0px 0px 20px 0px' },
     )}
+    ${appInfoBox(app, 'Approved on', app.approvedAtUtc, false)}
+    ${approvalDetailsContent(expiryData, 'Access has expired for:')}
+
     ${textParagraphSection(
-      `Once you begin the renewal process, the application will be unlocked for edits. You will be required to review and agree to all Data Access policies again before signing and resubmitting.`,
+      `If you have not already initiated the renewal process, you can do so from your DACO application. You will be required to review and agree to all Data Access policies again before signing and resubmitting.`,
       { padding: '0px 0px 20px 0px' },
     )}
     ${actionGetStarted(`Get Started:`, `RENEW YOUR ACCESS`, link)}
