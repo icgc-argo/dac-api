@@ -79,13 +79,8 @@ const sendNotification = async (
   emailClient: Transporter<SMTPTransport.SentMessageInfo>,
   config: AppConfig,
 ): Promise<JobResultForApplication> => {
-  const {
-    durations: {
-      expiry: { daysToExpiry1 },
-    },
-  } = config;
   try {
-    await sendAccessExpiringEmail(app, config, daysToExpiry1, emailClient);
+    await sendAccessExpiringEmail(app, config, emailClient);
     const updatedApp = await setEmailSentFlag(app, 'firstExpiryNotificationSent', JOB_NAME);
     return { success: true, app: updatedApp };
   } catch (err: unknown) {
