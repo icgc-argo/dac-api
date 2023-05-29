@@ -250,7 +250,7 @@ const createApplicationsRouter = (
 
   router.get(
     '/export/approved-users/',
-    authFilter([config.auth.reviewScope]),
+    authFilter([config.auth.reviewScope, config.auth.readOnlyReviewScope]),
     wrapAsync(async (req: Request, res: Response) => {
       logger.info(`exporting approved users for all applications`);
 

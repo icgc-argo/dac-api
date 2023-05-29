@@ -63,6 +63,7 @@ export interface AppConfig {
     jwtKey: string;
     reviewScope: string;
     dacoSystemScope: string;
+    readOnlyReviewScope: string;
   };
   storage: {
     endpoint: string;
@@ -127,6 +128,7 @@ const buildAppContext = (): AppConfig => {
       jwtKey: process.env.JWT_KEY || '',
       reviewScope: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
       dacoSystemScope: process.env.DACO_SYSTEM_SCOPE || 'DACO-SYSTEM.WRITE',
+      readOnlyReviewScope: process.env.READ_ONLY_REVIEW_SCOPE || 'DACO-REVIEW.READ',
     },
     ui: {
       baseUrl: checkIsDefined(process.env.DACO_UI_BASE_URL), // used for email links only
