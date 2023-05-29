@@ -126,9 +126,9 @@ const buildAppContext = (): AppConfig => {
       enabled: process.env.AUTH_ENABLED !== 'false',
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      reviewScope: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
+      reviewScope: `${process.env.DACO_REVIEW_POLICY_NAME || 'DACO-REVIEW'}.WRITE`,
+      readOnlyReviewScope: `${process.env.DACO_REVIEW_POLICY_NAME || 'DACO-REVIEW'}.READ`,
       dacoSystemScope: process.env.DACO_SYSTEM_SCOPE || 'DACO-SYSTEM.WRITE',
-      readOnlyReviewScope: process.env.READ_ONLY_REVIEW_SCOPE || 'DACO-REVIEW.READ',
     },
     ui: {
       baseUrl: checkIsDefined(process.env.DACO_UI_BASE_URL), // used for email links only
