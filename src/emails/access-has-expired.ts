@@ -12,6 +12,7 @@ import {
   TEXT_DISPLAY_DATE,
 } from './common';
 import { compileMjmlInPromise } from './mjml';
+import { getExpiredEventDate } from '../utils/misc';
 
 export default async function (
   app: Application,
@@ -48,6 +49,8 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo, surveyUrl: stri
   const linkTemplate = `${uiLinksInfo.baseUrl}${uiLinksInfo.pathTemplate}`;
   const link = linkTemplate.replace(`{id}`, app.appId).replace('{section}', 'terms');
   const renewalPeriodEndDate = getRenewalPeriodEndDate(app.expiresAtUtc);
+  const expiryEventDate = getExpiredEventDate(app);
+
   const expiryData = [
     {
       label: 'Title of Project',
@@ -59,9 +62,10 @@ function messageBody(app: Application, uiLinksInfo: UILinksInfo, surveyUrl: stri
     },
     {
       label: 'Access Expired on',
-      value: formatDate(app.expiredEventDateUtc || app.expiresAtUtc),
+      value: formatDate(expiryEventDate || app.expiresAtUtc),
     },
   ];
+
   return `
     ${textParagraphSection(
       `Access to ICGC Controlled Data has expired for the following project team. Kindly note, it may take up to 24 hours for this status change to take effect.`,
