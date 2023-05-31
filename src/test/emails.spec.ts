@@ -17,6 +17,7 @@ import {
   getAppInReview,
   getAppInRevisionRequested,
   getApprovedApplication,
+  getExpiredApplication,
   getPausedApplication,
   getRejectedApplication,
 } from './state.spec';
@@ -25,7 +26,6 @@ import { mockedConfig } from './mocks.spec';
 
 const emailTestConfig = mockedConfig();
 const emailLinksStub = emailTestConfig.email.links;
-const durationsStub = emailTestConfig.durations;
 const uiLinksStub = {
   baseUrl: emailTestConfig.ui.baseUrl,
   pathTemplate: emailTestConfig.ui.sectionPath,
@@ -137,7 +137,7 @@ describe('emails', () => {
     });
 
     it('should render an access has expired email', async () => {
-      const app = getApprovedApplication();
+      const app = getExpiredApplication();
       const email = await renderAccessHasExpiredEmail(app, emailLinksStub, uiLinksStub);
     });
 

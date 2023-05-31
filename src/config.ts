@@ -63,6 +63,7 @@ export interface AppConfig {
     jwtKey: string;
     reviewScope: string;
     dacoSystemScope: string;
+    readOnlyReviewScope: string;
   };
   storage: {
     endpoint: string;
@@ -125,7 +126,8 @@ const buildAppContext = (): AppConfig => {
       enabled: process.env.AUTH_ENABLED !== 'false',
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      reviewScope: process.env.REVIEW_SCOPE || 'DACO-REVIEW.WRITE',
+      reviewScope: `${process.env.DACO_REVIEW_POLICY_NAME || 'DACO-REVIEW'}.WRITE`,
+      readOnlyReviewScope: `${process.env.DACO_REVIEW_POLICY_NAME || 'DACO-REVIEW'}.READ`,
       dacoSystemScope: process.env.DACO_SYSTEM_SCOPE || 'DACO-SYSTEM.WRITE',
     },
     ui: {
