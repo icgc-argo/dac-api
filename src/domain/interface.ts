@@ -260,7 +260,6 @@ export interface Sections {
 export interface Application extends ApplicationBaseFields {
   appNumber: number;
   submitterEmail: string;
-  submittedAtUtc: Date;
   denialReason: string;
   searchValues: string[];
   revisionRequest: {
