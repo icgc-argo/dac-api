@@ -14,7 +14,7 @@ import {
 } from '../domain/interface';
 import { ApplicationStateManager, newApplication, renewalApplication } from '../domain/state';
 import { BadRequest, ConflictError, Forbidden } from '../utils/errors';
-import { checkIsDefined } from '../utils/misc';
+import { checkIsDefined, getExpiredEventDate } from '../utils/misc';
 import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
 import { mockApplicantToken, mockedConfig } from './mocks.spec';
 
@@ -883,6 +883,24 @@ export function getPausedApplication() {
   expect(result.approvedAtUtc).to.not.eq(undefined);
   expect(result.pauseReason).to.not.be.undefined;
   expect(result.pauseReason).to.eq(PauseReason.PENDING_ATTESTATION);
+  return result;
+}
+
+export function getExpiredApplication() {
+  const app = getApprovedApplication();
+  app.expiresAtUtc = moment
+    .utc(new Date())
+    .subtract(stateTestConfig.durations.expiry.count, stateTestConfig.durations.expiry.unitOfTime)
+    .toDate();
+
+  const state = new ApplicationStateManager(app);
+  const updatePart: Partial<UpdateApplication> = {
+    state: 'EXPIRED',
+  };
+  const result = state.updateApp(updatePart, false, { id: 'DACO-SYSTEM', role: DacoRole.SYSTEM });
+  expect(result.state).to.eq('EXPIRED');
+  const expiredEventDate = getExpiredEventDate(result);
+  expect(expiredEventDate).to.not.eq(undefined);
   return result;
 }
 
