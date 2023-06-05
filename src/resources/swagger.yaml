@@ -24,16 +24,6 @@ paths:
               schema:
                 type: object
 
-  # TODO change this to upload a file.
-  /admin/pdf-template/update:
-    post:
-      tags:
-        - Admin
-      summary: Update the pdf template by uploading it.
-      responses:
-        '201':
-          description: uploaded successfully
-
   /lookups/countries:
     get:
       tags:
@@ -48,7 +38,6 @@ paths:
                 type: array
                 items:
                   type: string
-
   /applications/:
     post:
       tags:
@@ -168,7 +157,7 @@ paths:
                   ttl:
                     type: number
 
-  /applications/{id}/assets/APP_PACKAGE:
+  /applications/{id}/assets/{type}:
     parameters:
       - name: type
         required: true
@@ -486,7 +475,6 @@ paths:
       responses:
         '200':
           description: OK
-
 tags:
   - name: Health
     description: Service status monitoring
@@ -496,6 +484,7 @@ tags:
     description: Lookup endpoints for data references
   - name: Admin
     description: Admin operations collected for convenience
+
 components:
   responses:
     ServiceUnavailableError:
@@ -675,92 +664,7 @@ components:
             ethicsLetterRequired:
               type: boolean
 
-    ApplicationSummary:
-      type: object
-      properties:
-        appId:
-          readOnly: true
-          type: string
-        state:
-          type: string
-          enum:
-            - DRAFT
-            - SIGN AND SUBMIT
-            - REVIEW
-            - REVISIONS REQUESTED
-            - REJECTED
-            - APPROVED
-            - CLOSED
-            - EXPIRED
-            - PAUSED
-        applicant:
-          type: object
-          properties:
-            info:
-              $ref: '#/components/schemas/PersonalInfo'
-            address:
-              $ref: '#/components/schemas/Address'
-        submitterId:
-          readOnly: true
-          type: string
-        createdAtUtc:
-          readOnly: true
-          type: string
-          format: data-time
-        lastUpdatedAtUtc:
-          readOnly: true
-          type: string
-          format: data-time
-        submittedAtUtc:
-          readOnly: true
-          type: string
-          format: data-time
-        approvedAtUtc:
-          readOnly: true
-          type: string
-          format: data-time
-        ethics:
-          type: object
-          properties:
-            declaredAsRequired:
-              type: boolean
-        approvedBy:
-          readOnly: true
-          type: string
-        expiresAtUtc:
-          type: string
-          format: data-time
-        closedAtUtc:
-          readOnly: true
-          type: string
-          format: data-time
-        closedBy:
-          readOnly: true
-          type: string
-        revisionsRequested:
-          type: boolean
-          readOnly: true
-        currentApprovedAppDoc:
-          type: boolean
-          readOnly: true
-        attestationByUtc:
-          type: string
-          format: data-time
-        attestedAtUtc:
-          type: string
-          format: data-time
-        renewalAppId:
-          readOnly: true
-          type: string
-        sourceAppId:
-          readOnly: true
-          type: string
-        renewalPeriodEndDateUtc:
-          readOnly: true
-          type: string
-          format: data-time
-
-    Application:
+    ApplicationBase:
       type: object
       properties:
         appId:
@@ -797,20 +701,16 @@ components:
           readOnly: true
           type: string
           format: data-time
-        approvedBy:
-          readOnly: true
-          type: string
         expiresAtUtc:
           type: string
           format: data-time
+          readOnly: true
         closedAtUtc:
           readOnly: true
           type: string
           format: data-time
         closedBy:
           readOnly: true
-          type: string
-        denialReason:
           type: string
         revisionsRequested:
           type: boolean
@@ -824,9 +724,18 @@ components:
         attestationByUtc:
           type: string
           format: data-time
+          readOnly: true
         attestedAtUtc:
           type: string
           format: data-time
+          readOnly: true
+        isAttestable:
+          type: boolean
+          readOnly: true
+        lastPausedAtUtc:
+          type: string
+          format: data-time
+          readOnly: true
         renewalAppId:
           readOnly: true
           type: string
@@ -837,168 +746,253 @@ components:
           readOnly: true
           type: string
           format: data-time
-        revisionRequests:
-          type: object
-          properties:
-            applicant:
-              $ref: '#/components/schemas/RevisionRequest'
-            representative:
-              $ref: '#/components/schemas/RevisionRequest'
-            projectInfo:
-              $ref: '#/components/schemas/RevisionRequest'
-            collaborators:
-              $ref: '#/components/schemas/RevisionRequest'
-            ethicsLetter:
-              $ref: '#/components/schemas/RevisionRequest'
-            signature:
-              $ref: '#/components/schemas/RevisionRequest'
-            general:
-              $ref: '#/components/schemas/RevisionRequest'
+        expiredEventDateUtc:
+          readOnly: true
+          type: string
+          format: data-time
+        sourceRenewalPeriodEndDateUtc:
+          readOnly: true
+          type: string
+          format: data-time
 
-        updates:
-          type: array
-          items:
-            $ref: '#/components/schemas/UpdateEvent'
-        sections:
-          type: object
+    ApplicationSummary:
+      allOf:
+        - $ref: '#/components/schemas/ApplicationBase'
+        - type: object
           properties:
-            terms:
-              type: object
-              properties:
-                meta:
-                  $ref: '#/components/schemas/Meta'
-                agreement:
-                  $ref: '#/components/schemas/AgreementItem'
-
             applicant:
               type: object
               properties:
-                meta:
-                  $ref: '#/components/schemas/Meta'
                 info:
                   $ref: '#/components/schemas/PersonalInfo'
                 address:
                   $ref: '#/components/schemas/Address'
-
-            representative:
+            ethics:
               type: object
               properties:
-                meta:
-                  $ref: '#/components/schemas/Meta'
-                info:
-                  $ref: '#/components/schemas/PersonalInfo'
-                address:
-                  $ref: '#/components/schemas/Address'
-                addressSameAsApplicant:
-                  type: boolean
-
-            collaborators:
-              type: object
-              properties:
-                list:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/Collaborator'
-
-            projectInfo:
-              type: object
-              properties:
-                meta:
-                  $ref: '#/components/schemas/Meta'
-                background:
-                  type: string
-                summary:
-                  type: string
-                methodology:
-                  type: string
-                aims:
-                  type: string
-                title:
-                  type: string
-                website:
-                  type: string
-                publicationsURLs:
-                  type: array
-                  items:
-                    type: string
-
-            ethicsLetter:
-              type: object
-              properties:
-                meta:
-                  $ref: '#/components/schemas/Meta'
                 declaredAsRequired:
                   type: boolean
-                approvalLetterDocs:
+            currentApprovedAppDoc:
+              type: boolean
+              readOnly: true
+            collaborators:
+              type: array
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/PersonalInfo'
+                  - type: object
+
+    Application:
+      allOf:
+        - $ref: '#/components/schemas/ApplicationBase'
+        - type: object
+          properties:
+            appNumber:
+              type: number
+              readOnly: true
+            submitterEmail:
+              type: string
+              readOnly: true
+            searchValues:
+              type: array
+              readOnly: true
+              items:
+                type: string
+            denialReason:
+              type: string
+            pauseReason:
+              type: string
+              enum:
+                - 'PENDING ATTESTATION'
+                - 'ADMIN PAUSE'
+            emailNotifications:
+              type: object
+              properties:
+                attestationRequiredNotificationSent:
+                  readOnly: true
+                  type: string
+                  format: data-time
+                applicationPausedNotificationSent:
+                  readOnly: true
+                  type: string
+                  format: data-time
+                firstExpiryNotificationSent:
+                  readOnly: true
+                  type: string
+                  format: data-time
+                secondExpiryNotificationSent:
+                  readOnly: true
+                  type: string
+                  format: data-time
+                applicationExpiredNotificationSent:
+                  readOnly: true
+                  type: string
+                  format: data-time
+            revisionRequests:
+              type: object
+              properties:
+                applicant:
+                  $ref: '#/components/schemas/RevisionRequest'
+                representative:
+                  $ref: '#/components/schemas/RevisionRequest'
+                projectInfo:
+                  $ref: '#/components/schemas/RevisionRequest'
+                collaborators:
+                  $ref: '#/components/schemas/RevisionRequest'
+                ethicsLetter:
+                  $ref: '#/components/schemas/RevisionRequest'
+                signature:
+                  $ref: '#/components/schemas/RevisionRequest'
+                general:
+                  $ref: '#/components/schemas/RevisionRequest'
+            isAttesting:
+              type: boolean
+              writeOnly: true
+            updates:
+              type: array
+              readOnly: true
+              items:
+                $ref: '#/components/schemas/UpdateEvent'
+            sections:
+              type: object
+              properties:
+                terms:
+                  type: object
+                  properties:
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+                    agreement:
+                      $ref: '#/components/schemas/AgreementItem'
+
+                applicant:
+                  type: object
+                  properties:
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+                    info:
+                      $ref: '#/components/schemas/PersonalInfo'
+                    address:
+                      $ref: '#/components/schemas/Address'
+
+                representative:
+                  type: object
+                  properties:
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+                    info:
+                      $ref: '#/components/schemas/PersonalInfo'
+                    address:
+                      $ref: '#/components/schemas/Address'
+                    addressSameAsApplicant:
+                      type: boolean
+
+                collaborators:
+                  type: object
+                  properties:
+                    list:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Collaborator'
+
+                projectInfo:
+                  type: object
+                  properties:
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+                    background:
+                      type: string
+                    summary:
+                      type: string
+                    methodology:
+                      type: string
+                    aims:
+                      type: string
+                    title:
+                      type: string
+                    website:
+                      type: string
+                    publicationsURLs:
+                      type: array
+                      items:
+                        type: string
+
+                ethicsLetter:
+                  type: object
+                  properties:
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+                    declaredAsRequired:
+                      type: boolean
+                    approvalLetterDocs:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          objectId:
+                            type: string
+                          uploadedAtUtc:
+                            type: string
+                            format: data-time
+
+                ITAgreements:
+                  type: object
+                  properties:
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+                    agreements:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AgreementItem'
+
+                dataAccessAgreements:
+                  type: object
+                  properties:
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+                    agreements:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AgreementItem'
+
+                appendices:
+                  type: object
+                  properties:
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+                    agreements:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AgreementItem'
+
+                signature:
+                  type: object
+                  properties:
+                    signedAppDocObjId:
+                      type: string
+                    signedDocName:
+                      type: string
+                    uploadedAtUtc:
+                      type: string
+                      format: date
+                    meta:
+                      $ref: '#/components/schemas/Meta'
+
+                approvedAppDocs:
                   type: array
                   items:
                     type: object
                     properties:
-                      name:
+                      approvedAppDocObjId:
                         type: string
-                      objectId:
+                      approvedAppDocName:
                         type: string
                       uploadedAtUtc:
                         type: string
-                        format: data-time
-
-            ITAgreements:
-              type: object
-              properties:
-                meta:
-                  $ref: '#/components/schemas/Meta'
-                agreements:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/AgreementItem'
-
-            dataAccessAgreements:
-              type: object
-              properties:
-                meta:
-                  $ref: '#/components/schemas/Meta'
-                agreements:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/AgreementItem'
-
-            appendices:
-              type: object
-              properties:
-                meta:
-                  $ref: '#/components/schemas/Meta'
-                agreements:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/AgreementItem'
-
-            signature:
-              type: object
-              properties:
-                signedAppDocObjId:
-                  type: string
-                signedDocName:
-                  type: string
-                uploadedAtUtc:
-                  type: string
-                  format: date
-                meta:
-                  $ref: '#/components/schemas/Meta'
-
-            approvedAppDocs:
-              type: array
-              items:
-                type: object
-                properties:
-                  approvedAppDocObjId:
-                    type: string
-                  approvedAppDocName:
-                    type: string
-                  uploadedAtUtc:
-                    type: string
-                    format: date
-                  approvedAtUtc:
-                    type: string
-                    format: date
-                  isCurrent:
-                    type: boolean
+                        format: date
+                      approvedAtUtc:
+                        type: string
+                        format: date
+                      isCurrent:
+                        type: boolean
