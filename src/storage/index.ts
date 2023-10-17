@@ -14,7 +14,7 @@ export class Storage {
     this.bucket = config.storage.bucket;
     this.s3Client = new AWS.S3({
       apiVersion: '2006-03-01',
-      region: 'nova',
+      region: config.storage.region,
       endpoint: config.storage.endpoint,
       signatureVersion: 'v4',
       s3ForcePathStyle: true,
