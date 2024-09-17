@@ -271,3 +271,8 @@ export const ICGC_ARGO_CONTACT_URL = urlJoin(ICGC_ARGO_PLATFORM_URL, 'contact');
 // batch job
 export const NOTIFICATION_UNIT_OF_TIME: unitOfTime.DurationConstructor = 'days';
 export const REQUEST_CHUNK_SIZE = 5;
+
+// ega
+export const EGA_REALMS_PATH = 'realms';
+export const EGA_TOKEN_ENDPOINT = 'protocol/openid-connect/token';
+export const EGA_GRANT_TYPE = 'password';
