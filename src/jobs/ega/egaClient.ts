@@ -23,6 +23,17 @@ import { getAppConfig } from '../../config';
 import getAppSecrets from '../../secrets';
 import { EGA_GRANT_TYPE, EGA_REALMS_PATH, EGA_TOKEN_ENDPOINT } from '../../utils/constants';
 
+type IdpToken = {
+  access_token: string;
+  scope: string;
+  session_state: string;
+  token_type: 'Bearer';
+  refresh_token: string;
+  refresh_expires_in: number;
+  expires_in: number;
+  'not-before-policy': 0;
+};
+
 // initialize idp client
 const initIdpClient = () => {
   const {
@@ -41,6 +52,9 @@ const initApiAxiosClient = () => {
   } = getAppConfig();
   return axios.create({
     baseURL: apiUrl,
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
 };
 const apiAxiosClient = initApiAxiosClient();
@@ -49,7 +63,7 @@ const apiAxiosClient = initApiAxiosClient();
  * POST request to retrieve an accessToken for the EGA API client
  * @returns Promise<any>
  */
-const getAccessToken = async (): Promise<any> => {
+const getAccessToken = async (): Promise<IdpToken> => {
   const {
     ega: { authRealmName, clientId },
   } = getAppConfig();
@@ -77,10 +91,65 @@ const getAccessToken = async (): Promise<any> => {
   return token;
 };
 
+const refreshAccessToken = async (token: IdpToken): Promise<IdpToken> => {
+  const {
+    ega: { authRealmName, clientId },
+  } = getAppConfig();
+
+  const response = await idpClient.post(
+    urlJoin(EGA_REALMS_PATH, authRealmName, EGA_TOKEN_ENDPOINT),
+    {
+      grant_type: 'refresh_token',
+      client_id: clientId,
+      refresh_token: token.refresh_token,
+    },
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    },
+  );
+  console.log('Refresh response: ', response.status);
+  return response.data;
+};
+
 /**
  * Fetches access token and attaches to Axios instance headers for apiClient
  * @returns API functions that use authenticated Axios instance
  */
 export const egaApiClient = async () => {
   const token = await getAccessToken();
+
+  apiAxiosClient.defaults.headers.common['Authorization'] = `Bearer ${token.access_token}`;
+
+  apiAxiosClient.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      console.log('Got here, error is ', error);
+      if (error.response && error.response.status === 401) {
+        console.log('Access expired, attempting refresh');
+        // Access token has expired, refresh it
+        try {
+          const newAccessToken = await refreshAccessToken(token);
+          // Update the request headers with the new access token
+          error.config.headers['Authorization'] = `Bearer ${newAccessToken.access_token}`;
+          // Retry the original request
+          return apiAxiosClient(error.config);
+        } catch (refreshError) {
+          console.log('Refresh error: ', refreshError);
+          // Handle token refresh error
+          throw refreshError;
+        }
+      }
+      console.log('General error: ', error);
+      return Promise.reject(error);
+    },
+  );
+
+  const getDacs = async () => {
+    const response = await apiAxiosClient.get('/dacs');
+    return response.data;
+  };
+
+  return { getDacs };
 };
