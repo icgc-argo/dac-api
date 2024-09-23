@@ -8,6 +8,17 @@ Development of the Data Access Control API
 | ---------- | ------------- | ----------------------------------------------------------------------------------------- | --------------------------------- | ------- |
 | `NODE_ENV` | isDevelopment | Enables `'/applications/:id'` DELETE endpoint. Enables `debug.log` file in Logger options | set `NODE_ENV` to `"development"` | `false` |
 
+## Environment Variables
+
+| Name                | Description                                                                   | Type     | Required | Default |
+| ------------------- | ----------------------------------------------------------------------------- | -------- | -------- | ------- |
+| EGA_CLIENT_ID       | Client ID for EGA API                                                         | `string` | true     |         |
+| EGA_AUTH_HOST       | Root URL for EGA authentication server                                        | `string` | true     |         |
+| EGA_AUTH_REALM_NAME | Realm name for EGA authentication server                                      | `string` | true     |         |
+| EGA_API_URL         | Root URL for EGA API                                                          | `string` | true     |         |
+| EGA_USERNAME        | Username for account used to gain access token from EGA authentication server | `string` | true     |         |
+| EGA_PASSWORD        | Password for account used to gain access token from EGA authentication server | `string` | true     |         |
+
 ## Feature Flags
 
 | Name                        | Config Path                      | Description                                                                                                                                                                                                                                                                                                               | Trigger                   | Default |
