@@ -2,7 +2,6 @@ import * as dotenv from 'dotenv';
 
 import logger from './logger';
 import * as vault from './vault';
-import { fetchPublicKeyFromRealm } from './jobs/ega/publicKey';
 
 export interface MongoSecrets {
   dbUser: string;
@@ -22,7 +21,6 @@ export interface AppSecrets {
     dacoEncryptionKey: string;
     egaUsername: string;
     egaPassword: string;
-    egaPublicKey: string;
   };
   storage: {
     key: string;
@@ -52,7 +50,6 @@ const loadVaultSecrets = async () => {
 const buildSecrets = async (vaultSecrets: Record<string, any> = {}): Promise<AppSecrets> => {
   logger.info('Building app secrets...');
 
-  const publicKey = await fetchPublicKeyFromRealm();
   secrets = {
     email: {
       auth: {
@@ -64,7 +61,6 @@ const buildSecrets = async (vaultSecrets: Record<string, any> = {}): Promise<App
       dacoEncryptionKey: vaultSecrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY || '',
       egaUsername: vaultSecrets.EGA_USERNAME || process.env.EGA_USERNAME || '',
       egaPassword: vaultSecrets.EGA_PASSWORD || process.env.EGA_PASSWORD || '',
-      egaPublicKey: publicKey || process.env.EGA_PUBLIC_KEY || '',
     },
     storage: {
       key: vaultSecrets.OBJECT_STORAGE_KEY || process.env.OBJECT_STORAGE_KEY || '',
