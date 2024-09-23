@@ -22,6 +22,7 @@ import urlJoin from 'url-join';
 import { getAppConfig } from '../../config';
 import getAppSecrets from '../../secrets';
 import { EGA_GRANT_TYPE, EGA_REALMS_PATH, EGA_TOKEN_ENDPOINT } from '../../utils/constants';
+import logger from '../../logger';
 
 type IdpToken = {
   access_token: string;
@@ -109,7 +110,7 @@ const refreshAccessToken = async (token: IdpToken): Promise<IdpToken> => {
       },
     },
   );
-  console.log('Refresh response: ', response.status);
+
   return response.data;
 };
 
@@ -125,9 +126,8 @@ export const egaApiClient = async () => {
   apiAxiosClient.interceptors.response.use(
     (response) => response,
     async (error) => {
-      console.log('Got here, error is ', error);
       if (error.response && error.response.status === 401) {
-        console.log('Access expired, attempting refresh');
+        logger.info('Access expired, attempting refresh');
         // Access token has expired, refresh it
         try {
           const newAccessToken = await refreshAccessToken(token);
@@ -136,12 +136,10 @@ export const egaApiClient = async () => {
           // Retry the original request
           return apiAxiosClient(error.config);
         } catch (refreshError) {
-          console.log('Refresh error: ', refreshError);
           // Handle token refresh error
           throw refreshError;
         }
       }
-      console.log('General error: ', error);
       return Promise.reject(error);
     },
   );
