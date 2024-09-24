@@ -368,12 +368,13 @@ export interface IRequest extends Request {
   identity: Identity;
 }
 
-export interface UserDataFromApprovedApplicationsResult {
+export type UserDataFromApprovedApplicationsResult = {
   applicant: Sections['applicant'];
   collaborators: Sections['collaborators'];
   lastUpdatedAtUtc?: Date;
   appId: string;
-}
+  expiresAtUtc: Date;
+};
 
 export interface ApprovedUserRowData {
   userName: string;

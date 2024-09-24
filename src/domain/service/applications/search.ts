@@ -347,6 +347,7 @@ export const getUsersFromApprovedApps = async (): Promise<
     'sections.applicant': 1,
     'sections.collaborators': 1,
     lastUpdatedAtUtc: 1,
+    expiresAtUtc: 1,
   }).exec();
 
   return results.map((result) => {
@@ -355,6 +356,7 @@ export const getUsersFromApprovedApps = async (): Promise<
       collaborators: result.sections.collaborators,
       appId: result.appId,
       lastUpdatedAtUtc: result.lastUpdatedAtUtc,
+      expiresAtUtc: result.expiresAtUtc,
     };
     return approvedUsersInfo;
   });
