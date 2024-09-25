@@ -20,7 +20,8 @@
 import { uniqBy } from 'lodash';
 import { UserDataFromApprovedApplicationsResult } from '../../domain/interface';
 import { getUsersFromApprovedApps } from '../../domain/service/applications/search';
-import { DatasetAccessionId, PermissionRequest } from './types';
+import { DatasetAccessionId } from './types/common';
+import { PermissionRequest, RevokePermission } from './types/requests';
 
 export type ApprovedUser = {
   username: string;
@@ -84,3 +85,25 @@ const createPermissionRequest = (
     },
   };
 };
+
+/**
+ * Create revoke permission request object for DELETE /requests
+ * @param permissionId
+ * @returns RevokePermissionRequest
+ */
+const createRevokePermissionRequest = (permissionId: number): RevokePermission => {
+  return {
+    id: permissionId,
+    reason: 'ICGC DAC access has expired.',
+  };
+};
+
+/**
+ * Checks if error arg is of type Error, and returns err.message if so; otherwise returns defaultMessage arg
+ * Used in catch block of try/catch, where type of error in catch is unknown
+ * @param error unknown
+ * @param defaultMessage string
+ * @returns string
+ */
+export const getErrorMessage = (error: unknown, defaultMessage: string): string =>
+  error instanceof Error ? error.message : defaultMessage;

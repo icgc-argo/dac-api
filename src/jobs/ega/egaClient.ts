@@ -30,27 +30,31 @@ import {
   EGA_TOKEN_ENDPOINT,
 } from '../../utils/constants';
 import { NotFoundError, TooManyRequestsError } from './errors';
+import { DacAccessionId, DatasetAccessionId } from './types/common';
+import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from './types/requests';
 import {
-  ApprovePermissionRequest,
   ApprovePermissionResponse,
-  DacAccessionId,
   Dataset,
-  DatasetAccessionId,
   EgaPermission,
   EgaPermissionRequest,
   EgaUser,
   IdpToken,
-  PermissionRequest,
-  RevokePermission,
   RevokePermissionResponse,
+} from './types/responses';
+import {
+  Failure,
+  failure,
+  Result,
   safeParseArray,
+  success,
   ZodResultAccumulator,
-} from './types';
-import { ApprovedUser } from './utils';
+} from './types/results';
+import { ApprovedUser, getErrorMessage } from './utils';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
+type ServerError = 'SERVER_ERROR';
 
-// initialize idp client
+// initialize IDP client
 const initIdpClient = () => {
   const {
     ega: { authHost },
@@ -188,6 +192,7 @@ export const egaApiClient = async () => {
     },
   );
 
+  type GetDatasetsForDacFailure = ServerError;
   /**
    * GET request to retrieve all currently release datasets released for a DAC
    * @param dacId DacAccessionId
@@ -195,61 +200,59 @@ export const egaApiClient = async () => {
    */
   const getDatasetsForDac = async (
     dacId: DacAccessionId,
-  ): Promise<ZodResultAccumulator<Dataset> | []> => {
+  ): Promise<ZodResultAccumulator<Dataset> | Failure<GetDatasetsForDacFailure>> => {
     const url = urlJoin(DACS, dacId, DATASETS);
     try {
       const { data } = await apiAxiosClient.get(url);
       const result = safeParseArray(Dataset, data);
       return result;
     } catch (err) {
+      const errMessage = getErrorMessage(err, `Error retrieving datasets for DAC ${dacId}.`);
       logger.error(`Error retrieving datasets for DAC ${dacId}.`);
-      return [];
+      return failure('SERVER_ERROR', errMessage);
     }
   };
 
+  type GetUserFailure = 'SERVER_ERROR' | 'NOT_FOUND' | 'INVALID_USER';
   /**
-   * Retrieve EGA user data for each user on DACO approved list
-   * @param dacoUsers ApprovedUser[]
-   * @returns EGAUser[]
+   * Retrieve EGA user data for a DACO ApprovedUser
+   * @returns EGAUser
    * @example
-   * // returns [
+   * // returns
    *   {
    *    id: 123,
    *    username: boysue@example.com,
    *    email: boysue@example.com,
    *    accession_id: EGAW00000009999
    *   }
-   * ]
    * getUser('boysue@example.com')
    */
-  const getUsers = async (dacoUsers: ApprovedUser[]): Promise<EgaUser[]> => {
-    let egaUsers: EgaUser[] = [];
-    for await (const user of dacoUsers) {
-      try {
-        const { data } = await apiAxiosClient.get(urlJoin(USERS, user.email));
-        const egaUser = EgaUser.safeParse(data);
-        if (egaUser.success) {
-          logger.info('Successfully parsed ', user.email, '. Adding to list.');
-          egaUsers.push(egaUser.data);
+  const getUser = async (user: ApprovedUser): Promise<Result<EgaUser, GetUserFailure>> => {
+    const url = urlJoin(USERS, user.email);
+    try {
+      const { data } = await apiAxiosClient.get(url);
+      const egaUser = EgaUser.safeParse(data);
+      if (egaUser.success) {
+        return success(egaUser.data);
+      }
+      return failure('INVALID_USER', 'Failed to parse user response');
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        switch (err.code) {
+          case 'NOT_FOUND':
+            return failure('NOT_FOUND', 'User not found');
+          default:
+            return failure('SERVER_ERROR', 'Axios error');
         }
-      } catch (err) {
-        if (err instanceof AxiosError) {
-          switch (err.code) {
-            case 'NOT_FOUND':
-              // TODO: add user to error report?
-              logger.error('User not found');
-              break;
-            default:
-              logger.error('Axios error');
-          }
-        } else {
-          logger.error('System error');
-        }
+      } else {
+        const errMessage = getErrorMessage(err, 'Get user request failed');
+        logger.error('Get user request failed');
+        return failure('SERVER_ERROR', errMessage);
       }
     }
-    return egaUsers;
   };
 
+  type GetPermissionsForDatasetFailure = ServerError;
   /**
    * GET request for list of existing permissions for a dataset
    * Endpoint is paginated.
@@ -266,7 +269,7 @@ export const egaApiClient = async () => {
     datasetAccessionId: DatasetAccessionId;
     limit: number;
     offset: number;
-  }): Promise<ZodResultAccumulator<EgaPermission> | undefined> => {
+  }): Promise<ZodResultAccumulator<EgaPermission> | Failure<GetPermissionsForDatasetFailure>> => {
     const url = urlJoin(DACS, dacId, PERMISSIONS);
     try {
       const { data } = await apiAxiosClient.get(url, {
@@ -280,11 +283,13 @@ export const egaApiClient = async () => {
       const result = safeParseArray(EgaPermission, data);
       return result;
     } catch (err) {
-      logger.error(err);
-      return undefined;
+      const errMessage = getErrorMessage(err, 'Get permissions for dataset request failed.');
+      logger.error('Get permissions for dataset request failed.');
+      return failure('SERVER_ERROR', errMessage);
     }
   };
 
+  type GetPermissionsByDatasetAndUserIdFailure = ServerError;
   /**
    * GET request to retrieve existing dataset permissions for a user.
    * One permission result is expected with userId and datasetId params, but response from EGA API comes as an array
@@ -295,7 +300,9 @@ export const egaApiClient = async () => {
   const getPermissionByDatasetAndUserId = async (
     userId: string,
     datasetId: DatasetAccessionId,
-  ): Promise<ZodResultAccumulator<EgaPermission> | undefined> => {
+  ): Promise<
+    ZodResultAccumulator<EgaPermission> | Failure<GetPermissionsByDatasetAndUserIdFailure>
+  > => {
     try {
       const url = urlJoin(DACS, dacId, PERMISSIONS);
       const { data } = await apiAxiosClient.get(url, {
@@ -304,17 +311,16 @@ export const egaApiClient = async () => {
           user_id: userId,
         },
       });
-      if (!data.length) {
-        return undefined;
-      }
       const result = safeParseArray(EgaPermission, data);
       return result;
     } catch (err) {
+      const errMessage = getErrorMessage(err, 'Error retrieving permission for user');
       logger.error('Error retrieving permission for user');
-      return undefined;
+      return failure('SERVER_ERROR', errMessage);
     }
   };
 
+  type CreatePermissionRequestsFailure = ServerError;
   /**
    * POST request to create PermissionRequests for a user
    * @param requests PermissionRequest[]
@@ -349,7 +355,9 @@ export const egaApiClient = async () => {
    */
   const createPermissionRequests = async (
     requests: PermissionRequest[],
-  ): Promise<ZodResultAccumulator<EgaPermissionRequest> | undefined> => {
+  ): Promise<
+    ZodResultAccumulator<EgaPermissionRequest> | Failure<CreatePermissionRequestsFailure>
+  > => {
     try {
       const { data } = await apiAxiosClient.post(REQUESTS, {
         requests,
@@ -357,11 +365,15 @@ export const egaApiClient = async () => {
       const result = safeParseArray(EgaPermissionRequest, data);
       return result;
     } catch (err) {
+      const errMessage = getErrorMessage(err, 'Create permissions request failed.');
       logger.error('Create permissions request failed');
-      return undefined;
+      return failure('SERVER_ERROR', errMessage);
     }
   };
 
+  type ApprovedPermissionRequestsFailure =
+    | ServerError
+    | 'INVALID_APPROVE_PERMISSION_REQUESTS_RESPONSE';
   /**
    * Approves permissions by permission id.
    * Endpoint accepts an array so multiple permissions can be approved in one request.
@@ -378,17 +390,26 @@ export const egaApiClient = async () => {
    */
   const approvePermissionRequests = async (
     requests: ApprovePermissionRequest[],
-  ): Promise<ApprovePermissionResponse | undefined> => {
+  ): Promise<Result<ApprovePermissionResponse, ApprovedPermissionRequestsFailure>> => {
     try {
       const { data } = await apiAxiosClient.put(REQUESTS, {
         requests,
       });
-      return data;
+      const result = ApprovePermissionResponse.safeParse(data);
+      if (result.success) {
+        return success(result.data);
+      }
+      return failure(
+        'INVALID_APPROVE_PERMISSION_REQUESTS_RESPONSE',
+        'Invalid response for approve permission requests.',
+      );
     } catch (err) {
+      const errMessage = getErrorMessage(err, 'Approve permissions requests failed.');
       logger.error('Create permissions request failed');
-      return undefined;
+      return failure('SERVER_ERROR', errMessage);
     }
   };
+  type RevokePermissionsFailure = ServerError | 'INVALID_REVOKE_PERMISSIONS_RESPONSE';
 
   /**
    * Revokes permissions by permission id.
@@ -406,13 +427,21 @@ export const egaApiClient = async () => {
    */
   const revokePermissions = async (
     requests: RevokePermission[],
-  ): Promise<RevokePermissionResponse | undefined> => {
+  ): Promise<Result<RevokePermissionResponse, RevokePermissionsFailure>> => {
     try {
       const { data } = await apiAxiosClient.delete(PERMISSIONS, { data: requests });
-      return data;
+      const result = RevokePermissionResponse.safeParse(data);
+      if (result.success) {
+        return success(result.data);
+      }
+      return failure(
+        'INVALID_REVOKE_PERMISSIONS_RESPONSE',
+        'Invalid response from revoke permissions request.',
+      );
     } catch (err) {
-      logger.error('Create permissions request failed');
-      return undefined;
+      const errMessage = getErrorMessage(err, 'Revoke permissions request failed');
+      logger.error('Revoke permissions request failed');
+      return failure('SERVER_ERROR', errMessage);
     }
   };
 
@@ -422,7 +451,7 @@ export const egaApiClient = async () => {
     getDatasetsForDac,
     getPermissionByDatasetAndUserId,
     getPermissionsForDataset,
-    getUsers,
+    getUser,
     revokePermissions,
   };
 };
