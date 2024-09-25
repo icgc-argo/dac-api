@@ -19,6 +19,24 @@
 
 import { BadRequest } from '../utils/errors';
 
+/**
+ * Validates an id string is present and matches the expected `DACO-<number>` format.
+ * Will throw a BadRequest error if either condition is not met.
+ * Intended for validating the :id path param for a Request
+ * @param id string
+ * @returns id string
+ * @example
+ * // returns "DACO-20"
+ * validateId("DACO-20")
+ *
+ * @example
+ * // throws BadRequest
+ * validateId("BAZ-2")
+ *
+ * @example
+ * // throws BadRequest
+ * validateId(undefined)
+ */
 export function validateId(id: string) {
   if (!id) {
     throw new BadRequest('id is required');
@@ -29,6 +47,25 @@ export function validateId(id: string) {
   return id;
 }
 
+/**
+ * Validates a file type request parameter against allowable types, and converts the string to uppercase if validated
+ * Will throw a BadRequest error if provided arg does not match any of the allow list.
+ * Intended for validating the "type" parameter on a Request
+ * @param type string
+ * @returns type string
+ *
+ * @example
+ * // returns 'ETHICS'
+ * validateType('ethics')
+ *
+ * @example
+ * // returns 'SIGNED_APP'
+ * validateType('SIGNED_APP')
+ *
+ * @example
+ * // throws BadRequest
+ * validateType('wrong_pdf')
+ */
 export function validateType(type: string) {
   if (
     !['ETHICS', 'SIGNED_APP', 'APPROVED_PDF', 'ethics', 'signed_app', 'approved_pdf'].includes(type)
