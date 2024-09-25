@@ -29,7 +29,7 @@ import {
   EGA_REALMS_PATH,
   EGA_TOKEN_ENDPOINT,
 } from '../../utils/constants';
-import { NotFoundError } from './errors';
+import { NotFoundError, TooManyRequestsError } from './errors';
 import {
   ApprovePermissionRequest,
   ApprovePermissionResponse,
@@ -39,24 +39,16 @@ import {
   EgaPermission,
   EgaPermissionRequest,
   EgaUser,
+  IdpToken,
   PermissionRequest,
   RevokePermission,
   RevokePermissionResponse,
+  safeParseArray,
+  ZodResultAccumulator,
 } from './types';
-import { getApprovedUsers, safeParseArray, ZodResultAccumulator } from './utils';
+import { ApprovedUser } from './utils';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
-
-type IdpToken = {
-  access_token: string;
-  scope: string;
-  session_state: string;
-  token_type: 'Bearer';
-  refresh_token: string;
-  refresh_expires_in: number;
-  expires_in: number;
-  'not-before-policy': 0;
-};
 
 // initialize idp client
 const initIdpClient = () => {
@@ -85,7 +77,7 @@ const apiAxiosClient = initApiAxiosClient();
 
 /**
  * POST request to retrieve an accessToken for the EGA API client
- * @returns Promise<any>
+ * @returns Promise<IdpToken>
  */
 const getAccessToken = async (): Promise<IdpToken> => {
   const {
@@ -111,10 +103,19 @@ const getAccessToken = async (): Promise<IdpToken> => {
     },
   );
 
-  const token = response.data;
-  return token;
+  const token = IdpToken.safeParse(response.data);
+  if (token.success) {
+    return token.data;
+  }
+  logger.error('Authentication with EGA failed.');
+  throw new Error('Failed to retrieve access token');
 };
 
+/**
+ * POST request to retrieve a new access token via refresh token flow
+ * @param token IdpToken
+ * @returns IdpToken
+ */
 const refreshAccessToken = async (token: IdpToken): Promise<IdpToken> => {
   const {
     ega: { authRealmName, clientId },
@@ -133,7 +134,12 @@ const refreshAccessToken = async (token: IdpToken): Promise<IdpToken> => {
     },
   );
 
-  return response.data;
+  const result = IdpToken.safeParse(response.data);
+  if (result.success) {
+    return result.data;
+  }
+  logger.error('Refresh access token request failed.');
+  throw new Error('Failed to refresh access token');
 };
 
 /**
@@ -153,7 +159,7 @@ export const egaApiClient = async () => {
     async (error) => {
       if (error instanceof AxiosError) {
         if (error.response && error.response.status === 401) {
-          console.log('Access expired, attempting refresh');
+          logger.info('Access expired, attempting refresh');
           // Access token has expired, refresh it
           try {
             const newAccessToken = await refreshAccessToken(token);
@@ -167,7 +173,6 @@ export const egaApiClient = async () => {
             // Retry the original request
             return apiAxiosClient(error.config);
           } catch (refreshError) {
-            console.log('Refresh error: ', refreshError);
             // Handle token refresh error
             throw refreshError;
           }
@@ -175,21 +180,27 @@ export const egaApiClient = async () => {
         if (error.status === 404) {
           throw new NotFoundError(error.message);
         }
+        if (error.status === 429) {
+          throw new TooManyRequestsError(error.message);
+        }
       }
-      return Promise.reject(error);
+      return new Response('Server error', { status: 500 });
     },
   );
 
   /**
    * GET request to retrieve all currently release datasets released for a DAC
    * @param dacId DacAccessionId
-   * @returns Dataset[]
+   * @returns ZodResultAccumulator<Dataset>
    */
-  const getDatasetsForDac = async (dacId: DacAccessionId): Promise<Dataset[]> => {
+  const getDatasetsForDac = async (
+    dacId: DacAccessionId,
+  ): Promise<ZodResultAccumulator<Dataset> | []> => {
     const url = urlJoin(DACS, dacId, DATASETS);
     try {
       const { data } = await apiAxiosClient.get(url);
-      return data;
+      const result = safeParseArray(Dataset, data);
+      return result;
     } catch (err) {
       logger.error(`Error retrieving datasets for DAC ${dacId}.`);
       return [];
@@ -198,6 +209,7 @@ export const egaApiClient = async () => {
 
   /**
    * Retrieve EGA user data for each user on DACO approved list
+   * @param dacoUsers ApprovedUser[]
    * @returns EGAUser[]
    * @example
    * // returns [
@@ -210,8 +222,7 @@ export const egaApiClient = async () => {
    * ]
    * getUser('boysue@example.com')
    */
-  const getUsers = async (): Promise<EgaUser[]> => {
-    const dacoUsers = await getApprovedUsers();
+  const getUsers = async (dacoUsers: ApprovedUser[]): Promise<EgaUser[]> => {
     let egaUsers: EgaUser[] = [];
     for await (const user of dacoUsers) {
       try {
@@ -245,7 +256,7 @@ export const egaApiClient = async () => {
    * @param datasetAccessionId: DatasetAccessionId
    * @param limit number
    * @param offset number
-   * @returns EgaPermission[]
+   * @returns ZodResultAccumulator<EgaPermission>
    */
   const getPermissionsForDataset = async ({
     datasetAccessionId,
@@ -275,15 +286,16 @@ export const egaApiClient = async () => {
   };
 
   /**
-   * GET request to retrieve existing dataset permissions for a user
+   * GET request to retrieve existing dataset permissions for a user.
+   * One permission result is expected with userId and datasetId params, but response from EGA API comes as an array
    * @param userId string
    * @param datasetId DatasetAccessionId
-   * @returns EgaPermission[]
+   * @returns ZodResultAccumulator<EgaPermission>
    */
   const getPermissionByDatasetAndUserId = async (
     userId: string,
     datasetId: DatasetAccessionId,
-  ): Promise<EgaPermission | undefined> => {
+  ): Promise<ZodResultAccumulator<EgaPermission> | undefined> => {
     try {
       const url = urlJoin(DACS, dacId, PERMISSIONS);
       const { data } = await apiAxiosClient.get(url, {
@@ -295,19 +307,18 @@ export const egaApiClient = async () => {
       if (!data.length) {
         return undefined;
       }
-      const result = EgaPermission.safeParse(data[0]);
-      if (result.success) {
-        return result.data;
-      }
+      const result = safeParseArray(EgaPermission, data);
+      return result;
     } catch (err) {
       logger.error('Error retrieving permission for user');
+      return undefined;
     }
   };
 
   /**
    * POST request to create PermissionRequests for a user
    * @param requests PermissionRequest[]
-   * @returns EgaPermissionRequest[]
+   * @returns ZodResultAccumulator<EgaPermissionRequest>
    * @example
    * // returns [
    * {
@@ -338,12 +349,13 @@ export const egaApiClient = async () => {
    */
   const createPermissionRequests = async (
     requests: PermissionRequest[],
-  ): Promise<EgaPermissionRequest[] | undefined> => {
+  ): Promise<ZodResultAccumulator<EgaPermissionRequest> | undefined> => {
     try {
       const { data } = await apiAxiosClient.post(REQUESTS, {
         requests,
       });
-      return data;
+      const result = safeParseArray(EgaPermissionRequest, data);
+      return result;
     } catch (err) {
       logger.error('Create permissions request failed');
       return undefined;

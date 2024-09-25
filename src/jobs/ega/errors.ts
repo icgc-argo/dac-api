@@ -19,11 +19,25 @@
 
 import { AxiosError } from 'axios';
 
+/**
+ * Custom errors for Axios responses.
+ * Defines expected status and code values for error handling.
+ */
+
 export class NotFoundError extends AxiosError {
   constructor(message: string) {
     super(message);
     this.name = 'NotFound';
     this.status = 404;
     this.code = 'NOT_FOUND';
+  }
+}
+
+export class TooManyRequestsError extends AxiosError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TooManyRequests';
+    this.status = 429;
+    this.code = 'TOO_MANY_REQUESTS';
   }
 }

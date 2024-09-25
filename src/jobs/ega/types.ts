@@ -17,7 +17,9 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { z } from 'zod';
+import { z, ZodError, ZodTypeAny } from 'zod';
+
+/** Common types */
 
 // For YYYY-MM-DD Date strings (i.e. '2021-01-01')
 export const DateString = z.string().date();
@@ -27,10 +29,16 @@ export type DateString = z.infer<typeof DateString>;
 export const DateTime = z.string().datetime();
 export type DateTime = z.infer<typeof DateTime>;
 
-// Enums
+/** Enums & Literals */
+
 const DAC_STATUS_ENUM = ['accepted', 'pending', 'declined'] as const;
 export const DacStatus = z.enum(DAC_STATUS_ENUM);
 export type DacStatus = z.infer<typeof DacStatus>;
+
+const IdpTokenType = z.literal('Bearer');
+type IdpTokenType = z.infer<typeof IdpTokenType>;
+
+/** Regexes */
 
 const DAC_ACCESSION_ID_REGEX = new RegExp(`^EGAC\\d{11}$`);
 export const DacAccessionId = z.string().regex(DAC_ACCESSION_ID_REGEX);
@@ -44,7 +52,20 @@ const USER_ACCESSION_ID_REGEX = new RegExp(`^EGAW\\d{11}$`);
 export const UserAccessionId = z.string().regex(USER_ACCESSION_ID_REGEX);
 export type UserAccessionId = z.infer<typeof UserAccessionId>;
 
-// EGA Response Types
+/** EGA Response Types */
+
+export const IdpToken = z.object({
+  access_token: z.string(),
+  scope: z.string(),
+  session_state: z.string(),
+  token_type: IdpTokenType,
+  refresh_token: z.string(),
+  refresh_expires_in: z.number(),
+  expires_in: z.number(),
+  'not-before-policy': z.number(),
+});
+export type IdpToken = z.infer<typeof IdpToken>;
+
 export const Dac = z.object({
   provisional_id: z.number(),
   accession_id: z.string(),
@@ -106,13 +127,8 @@ export type ApprovePermissionResponse = z.infer<typeof ApprovePermissionResponse
 export const RevokePermissionResponse = z.object({ num_revoked: z.number() });
 export type RevokePermissionResponse = z.infer<typeof RevokePermissionResponse>;
 
-// Axios
-export type Success<T> = {
-  success: true;
-  data: T;
-};
+/** Request Data Types */
 
-// Request Data Types
 export type PermissionRequest = {
   username: string;
   dataset_accession_id: DatasetAccessionId;
@@ -130,3 +146,38 @@ export type RevokePermission = {
   id: number;
   reason: string;
 };
+
+/** Utility Functions */
+
+export type ZodResultAccumulator<T> = { success: T[]; failure: ZodError[] };
+/**
+ * Parses an array of Zod SafeParseReturnType results into success (successful parse) and failure (parsing error)
+ * @param acc ZodResultAccumulator<T>
+ * @param item z.SafeParseReturnType<T, T>
+ * @returns ZodResultAccumulator<T>
+ */
+const resultReducer = <T>(acc: ZodResultAccumulator<T>, item: z.SafeParseReturnType<T, T>) => {
+  if (item.success) {
+    acc.success.push(item.data);
+  } else {
+    acc.failure.push(item.error);
+  }
+  return acc;
+};
+
+/**
+ * Run Zod safeParse for Schema T on an array of items, and split results by SafeParseReturnType 'success' or 'error'.
+ * @params schema<T>
+ * @params data unknown[]
+ * @returns { success: [], failure: [] }
+ */
+export const safeParseArray = <T extends ZodTypeAny>(
+  schema: T,
+  data: Array<unknown>,
+): ZodResultAccumulator<z.infer<T>> =>
+  data
+    .map((i) => schema.safeParse(i))
+    .reduce<ZodResultAccumulator<z.infer<T>>>((acc, item) => resultReducer(acc, item), {
+      success: [],
+      failure: [],
+    });
