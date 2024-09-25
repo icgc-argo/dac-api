@@ -17,9 +17,10 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { getUsersFromApprovedApps } from '../../domain/service/applications/search';
-import { UserDataFromApprovedApplicationsResult } from '../../domain/interface';
 import { uniqBy } from 'lodash';
+import { ZodError, ZodTypeAny, z } from 'zod';
+import { UserDataFromApprovedApplicationsResult } from '../../domain/interface';
+import { getUsersFromApprovedApps } from '../../domain/service/applications/search';
 import { DatasetAccessionId, PermissionRequest } from './types';
 
 type ApprovedUser = {
@@ -65,15 +66,55 @@ export const getApprovedUsers = async () => {
 };
 
 // Utils
+
+/**
+ * Create Ega permission request object for POST /requests
+ * @param username
+ * @param dataset_accession_id
+ * @returns PermissionRequest
+ */
 const createPermissionRequest = (
   username: string,
-  dataset_accession_id: DatasetAccessionId,
+  datasetAccessionId: DatasetAccessionId,
 ): PermissionRequest => {
   return {
     username,
-    dataset_accession_id,
+    dataset_accession_id: datasetAccessionId,
     request_data: {
       comment: 'Access granted by ICGC DAC',
     },
   };
 };
+
+export type ZodResultAccumulator<T> = { success: T[]; failure: ZodError[] };
+/**
+ * Parses an array of Zod SafeParseReturnType results into success (successful parse) and failure (parsing error)
+ * @param acc ZodResultAccumulator<T>
+ * @param item z.SafeParseReturnType<T, T>
+ * @returns ZodResultAccumulator<T>
+ */
+const resultReducer = <T>(acc: ZodResultAccumulator<T>, item: z.SafeParseReturnType<T, T>) => {
+  if (item.success) {
+    acc.success.push(item.data);
+  } else {
+    acc.failure.push(item.error);
+  }
+  return acc;
+};
+
+/**
+ * Run Zod safeParse for Schema T on an array of items, and split results by SafeParseReturnType 'success' or 'error'.
+ * @params schema<T>
+ * @params data unknown[]
+ * @returns { success: [], failure: [] }
+ */
+export const safeParseArray = <T extends ZodTypeAny>(
+  schema: T,
+  data: Array<unknown>,
+): ZodResultAccumulator<z.infer<T>> =>
+  data
+    .map((i) => schema.safeParse(i))
+    .reduce<ZodResultAccumulator<z.infer<T>>>((acc, item) => resultReducer(acc, item), {
+      success: [],
+      failure: [],
+    });

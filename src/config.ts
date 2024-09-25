@@ -95,6 +95,7 @@ export interface AppConfig {
     authHost: string;
     authRealmName: string;
     apiUrl: string;
+    dacId: string;
   };
 }
 
@@ -211,6 +212,7 @@ const buildAppContext = (): AppConfig => {
       authHost: checkIsDefined(process.env.EGA_AUTH_HOST),
       authRealmName: checkIsDefined(process.env.EGA_AUTH_REALM_NAME),
       apiUrl: checkIsDefined(process.env.EGA_API_URL),
+      dacId: checkIsDefined(process.env.DAC_ID),
     },
   };
   return config;

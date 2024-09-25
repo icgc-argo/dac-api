@@ -20,8 +20,8 @@
 import axios, { AxiosError, AxiosHeaders } from 'axios';
 import urlJoin from 'url-join';
 import { getAppConfig } from '../../config';
-import getAppSecrets from '../../secrets';
 import logger from '../../logger';
+import getAppSecrets from '../../secrets';
 
 import {
   EGA_API,
@@ -29,12 +29,23 @@ import {
   EGA_REALMS_PATH,
   EGA_TOKEN_ENDPOINT,
 } from '../../utils/constants';
-import { EgaPermission, EgaUser } from './types';
-import { getApprovedUsers } from './utils';
 import { NotFoundError } from './errors';
+import {
+  ApprovePermissionRequest,
+  ApprovePermissionResponse,
+  DacAccessionId,
+  Dataset,
+  DatasetAccessionId,
+  EgaPermission,
+  EgaPermissionRequest,
+  EgaUser,
+  PermissionRequest,
+  RevokePermission,
+  RevokePermissionResponse,
+} from './types';
+import { getApprovedUsers, safeParseArray, ZodResultAccumulator } from './utils';
 
-const { DACS, PERMISSIONS, USERS } = EGA_API;
-const DAC_ACCESSION_ID = 'EGAC00001000010';
+const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
 
 type IdpToken = {
   access_token: string;
@@ -130,6 +141,9 @@ const refreshAccessToken = async (token: IdpToken): Promise<IdpToken> => {
  * @returns API functions that use authenticated Axios instance
  */
 export const egaApiClient = async () => {
+  const {
+    ega: { dacId },
+  } = getAppConfig();
   const token = await getAccessToken();
 
   apiAxiosClient.defaults.headers.common['Authorization'] = `Bearer ${token.access_token}`;
@@ -167,23 +181,19 @@ export const egaApiClient = async () => {
   );
 
   /**
-   * Retrieve a list of DACs of which the user is a member
-   * @returns Dac[]
-   * @example
-   * // returns [
-   *   {
-   *    "provisional_id": 0,
-   *    "accession_id": "123",
-   *    "title": "'Dac 1'",
-   *    "description": "Dac 1",
-   *    "status": "accepted",
-   *    "declined_reason": null
-   *   }
-   * ]
+   * GET request to retrieve all currently release datasets released for a DAC
+   * @param dacId DacAccessionId
+   * @returns Dataset[]
    */
-  const getDacs = async () => {
-    const response = await apiAxiosClient.get('/dacs');
-    return response.data;
+  const getDatasetsForDac = async (dacId: DacAccessionId): Promise<Dataset[]> => {
+    const url = urlJoin(DACS, dacId, DATASETS);
+    try {
+      const { data } = await apiAxiosClient.get(url);
+      return data;
+    } catch (err) {
+      logger.error(`Error retrieving datasets for DAC ${dacId}.`);
+      return [];
+    }
   };
 
   /**
@@ -198,13 +208,13 @@ export const egaApiClient = async () => {
    *    accession_id: EGAW00000009999
    *   }
    * ]
+   * getUser('boysue@example.com')
    */
   const getUsers = async (): Promise<EgaUser[]> => {
     const dacoUsers = await getApprovedUsers();
     let egaUsers: EgaUser[] = [];
     for await (const user of dacoUsers) {
       try {
-        // TODO: handle 404 properly. If the User is not in EGA, do we add to report? Or just ignore? We can't proceed with permissions without a userId
         const { data } = await apiAxiosClient.get(urlJoin(USERS, user.email));
         const egaUser = EgaUser.safeParse(data);
         if (egaUser.success) {
@@ -229,37 +239,180 @@ export const egaApiClient = async () => {
     return egaUsers;
   };
 
-  const getPermissionsForDataset = async (dataset_accession_id: string) => {
-    const url = urlJoin(DACS, DAC_ACCESSION_ID, PERMISSIONS);
-
-    let results: EgaPermission[] = [];
-    let offset = 0;
-    let limit = 100;
-    let paging = true;
-
-    // loop will stop once result length from GET is less than limit
-    while (paging) {
-      const permissions = await apiAxiosClient.get(url, {
+  /**
+   * GET request for list of existing permissions for a dataset
+   * Endpoint is paginated.
+   * @param datasetAccessionId: DatasetAccessionId
+   * @param limit number
+   * @param offset number
+   * @returns EgaPermission[]
+   */
+  const getPermissionsForDataset = async ({
+    datasetAccessionId,
+    limit,
+    offset,
+  }: {
+    datasetAccessionId: DatasetAccessionId;
+    limit: number;
+    offset: number;
+  }): Promise<ZodResultAccumulator<EgaPermission> | undefined> => {
+    const url = urlJoin(DACS, dacId, PERMISSIONS);
+    try {
+      const { data } = await apiAxiosClient.get(url, {
         params: {
-          dataset_accession_id,
+          dataset_accession_id: datasetAccessionId,
           limit,
           offset,
         },
       });
-      // TODO: add permission to a "toDelete" list if not found in approved list
-      // this function will return that list to be sent to the revoke function
-      results.push(permissions.data);
-      offset = offset + 100;
-      paging = permissions.data.length >= limit;
-      console.log(results.length);
+
+      const result = safeParseArray(EgaPermission, data);
+      return result;
+    } catch (err) {
+      logger.error(err);
+      return undefined;
     }
-    return results.flat();
   };
 
-  // TODO: add remaining API requests
-  const getPermissionByDatasetAndUserId = async () => {};
-  const createPermissionRequests = async () => {};
-  const approvePermissionRequests = async () => {};
-  const revokePermissions = async () => {};
-  return { getDacs, getPermissionsForDataset, getUsers };
+  /**
+   * GET request to retrieve existing dataset permissions for a user
+   * @param userId string
+   * @param datasetId DatasetAccessionId
+   * @returns EgaPermission[]
+   */
+  const getPermissionByDatasetAndUserId = async (
+    userId: string,
+    datasetId: DatasetAccessionId,
+  ): Promise<EgaPermission | undefined> => {
+    try {
+      const url = urlJoin(DACS, dacId, PERMISSIONS);
+      const { data } = await apiAxiosClient.get(url, {
+        params: {
+          dataset_accession_id: datasetId,
+          user_id: userId,
+        },
+      });
+      if (!data.length) {
+        return undefined;
+      }
+      const result = EgaPermission.safeParse(data[0]);
+      if (result.success) {
+        return result.data;
+      }
+    } catch (err) {
+      logger.error('Error retrieving permission for user');
+    }
+  };
+
+  /**
+   * POST request to create PermissionRequests for a user
+   * @param requests PermissionRequest[]
+   * @returns EgaPermissionRequest[]
+   * @example
+   * // returns [
+   * {
+   *  "request_id": 1,
+   *  "status": "pending",
+   *  "request_data": {
+   *    "comment": "I'd like to access the dataset"
+   *  },
+   *  "date": "2024-01-31T16:24:13.725724+00:00",
+   *  "username": "boysue",
+   *  "full_name": "Boy Sue",
+   *  "email": "boysue@example.com",
+   *  "organisation": "Research Center",
+   *  "dataset_accession_id": "EGAD00000000001",
+   *  "dataset_title": "Dataset 8",
+   *  "dac_accession_id": "EGAC00000000001",
+   *  "dac_comment": "ticket",
+   *  "dac_comment_edited_at": "2024-01-31T16:25:13.725724+00:00"
+   *  }
+   * ]
+   * createPermissionRequests([{
+   *    username: "boysue",
+   *    dac_accession_id: "EGAC00000000001",
+   *    request_data: {
+   *      "comment": "I'd like to access the dataset"
+   *    },
+   * }])
+   */
+  const createPermissionRequests = async (
+    requests: PermissionRequest[],
+  ): Promise<EgaPermissionRequest[] | undefined> => {
+    try {
+      const { data } = await apiAxiosClient.post(REQUESTS, {
+        requests,
+      });
+      return data;
+    } catch (err) {
+      logger.error('Create permissions request failed');
+      return undefined;
+    }
+  };
+
+  /**
+   * Approves permissions by permission id.
+   * Endpoint accepts an array so multiple permissions can be approved in one request.
+   * @param requests
+   * @returns
+   * @example
+   * // returns { num_granted: 2 }
+   * revokePermissions(
+   * [
+   *  { request_id: 10, expires_at: "2025-01-31T16:25:13.725724+00:00" },
+   *  { request_id: 12, expires_at: "2026-01-31T16:25:13.725724+00:00" }
+   * ]
+   * )
+   */
+  const approvePermissionRequests = async (
+    requests: ApprovePermissionRequest[],
+  ): Promise<ApprovePermissionResponse | undefined> => {
+    try {
+      const { data } = await apiAxiosClient.put(REQUESTS, {
+        requests,
+      });
+      return data;
+    } catch (err) {
+      logger.error('Create permissions request failed');
+      return undefined;
+    }
+  };
+
+  /**
+   * Revokes permissions by permission id.
+   * Endpoint accepts an array so multiple permissions can be revoke in one request.
+   * @param requests RevokePermission[]
+   * @returns RevokePermissionResponse
+   * @example
+   * // returns { num_revoked: 2 }
+   * revokePermissions(
+   * [
+   *  { id: 10, reason: 'Access expired' },
+   *  { id: 12, reason: 'Access expired' }
+   * ]
+   * )
+   */
+  const revokePermissions = async (
+    requests: RevokePermission[],
+  ): Promise<RevokePermissionResponse | undefined> => {
+    try {
+      const { data } = await apiAxiosClient.delete(PERMISSIONS, { data: requests });
+      return data;
+    } catch (err) {
+      logger.error('Create permissions request failed');
+      return undefined;
+    }
+  };
+
+  return {
+    approvePermissionRequests,
+    createPermissionRequests,
+    getDatasetsForDac,
+    getPermissionByDatasetAndUserId,
+    getPermissionsForDataset,
+    getUsers,
+    revokePermissions,
+  };
 };
+
+export type EgaClient = Awaited<ReturnType<typeof egaApiClient>>;

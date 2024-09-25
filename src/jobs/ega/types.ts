@@ -55,6 +55,13 @@ export const Dac = z.object({
 });
 export type Dac = z.infer<typeof Dac>;
 
+export const Dataset = z.object({
+  accession_id: DatasetAccessionId,
+  title: z.string(),
+  description: z.string().optional(),
+});
+export type Dataset = z.infer<typeof Dataset>;
+
 export const EgaUser = z.object({
   id: z.number(),
   username: z.string(),
@@ -89,8 +96,15 @@ export const EgaPermission = z.object({
   username: z.string(),
   user_accession_id: UserAccessionId,
   dataset_accession_id: DatasetAccessionId,
+  dac_accession_id: DacAccessionId,
 });
 export type EgaPermission = z.infer<typeof EgaPermission>;
+
+export const ApprovePermissionResponse = z.object({ num_granted: z.number() });
+export type ApprovePermissionResponse = z.infer<typeof ApprovePermissionResponse>;
+
+export const RevokePermissionResponse = z.object({ num_revoked: z.number() });
+export type RevokePermissionResponse = z.infer<typeof RevokePermissionResponse>;
 
 // Axios
 export type Success<T> = {
@@ -105,4 +119,14 @@ export type PermissionRequest = {
   request_data: {
     comment: string;
   };
+};
+
+export type ApprovePermissionRequest = {
+  request_id: number;
+  expires_at: DateTime;
+};
+
+export type RevokePermission = {
+  id: number;
+  reason: string;
 };
