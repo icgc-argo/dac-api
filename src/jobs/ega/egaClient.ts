@@ -42,9 +42,16 @@ import {
   RevokePermissionResponse,
 } from './types/responses';
 import {
+  ApprovedPermissionRequestsFailure,
+  CreatePermissionRequestsFailure,
   Failure,
   failure,
+  GetDatasetsForDacFailure,
+  GetPermissionsByDatasetAndUserIdFailure,
+  GetPermissionsForDatasetFailure,
+  GetUserFailure,
   Result,
+  RevokePermissionsFailure,
   safeParseArray,
   success,
   ZodResultAccumulator,
@@ -52,7 +59,6 @@ import {
 import { ApprovedUser, getErrorMessage } from './utils';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
-type ServerError = 'SERVER_ERROR';
 
 // initialize IDP client
 const initIdpClient = () => {
@@ -192,7 +198,6 @@ export const egaApiClient = async () => {
     },
   );
 
-  type GetDatasetsForDacFailure = ServerError;
   /**
    * GET request to retrieve all currently release datasets released for a DAC
    * @param dacId DacAccessionId
@@ -213,7 +218,6 @@ export const egaApiClient = async () => {
     }
   };
 
-  type GetUserFailure = 'SERVER_ERROR' | 'NOT_FOUND' | 'INVALID_USER';
   /**
    * Retrieve EGA user data for a DACO ApprovedUser
    * @returns EGAUser
@@ -252,7 +256,6 @@ export const egaApiClient = async () => {
     }
   };
 
-  type GetPermissionsForDatasetFailure = ServerError;
   /**
    * GET request for list of existing permissions for a dataset
    * Endpoint is paginated.
@@ -289,7 +292,6 @@ export const egaApiClient = async () => {
     }
   };
 
-  type GetPermissionsByDatasetAndUserIdFailure = ServerError;
   /**
    * GET request to retrieve existing dataset permissions for a user.
    * One permission result is expected with userId and datasetId params, but response from EGA API comes as an array
@@ -320,7 +322,6 @@ export const egaApiClient = async () => {
     }
   };
 
-  type CreatePermissionRequestsFailure = ServerError;
   /**
    * POST request to create PermissionRequests for a user
    * @param requests PermissionRequest[]
@@ -371,9 +372,6 @@ export const egaApiClient = async () => {
     }
   };
 
-  type ApprovedPermissionRequestsFailure =
-    | ServerError
-    | 'INVALID_APPROVE_PERMISSION_REQUESTS_RESPONSE';
   /**
    * Approves permissions by permission id.
    * Endpoint accepts an array so multiple permissions can be approved in one request.
@@ -409,7 +407,6 @@ export const egaApiClient = async () => {
       return failure('SERVER_ERROR', errMessage);
     }
   };
-  type RevokePermissionsFailure = ServerError | 'INVALID_REVOKE_PERMISSIONS_RESPONSE';
 
   /**
    * Revokes permissions by permission id.

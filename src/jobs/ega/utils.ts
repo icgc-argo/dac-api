@@ -24,10 +24,9 @@ import { DatasetAccessionId } from './types/common';
 import { PermissionRequest, RevokePermission } from './types/requests';
 
 export type ApprovedUser = {
-  username: string;
   email: string;
-  affiliation: string;
   appExpiry: Date;
+  appId: string;
 };
 
 /**
@@ -40,16 +39,14 @@ const parseApprovedUsersForApplication = (
 ): ApprovedUser[] => {
   const applicantInfo = applicationData.applicant.info;
   const applicant = {
-    username: applicantInfo.displayName,
     email: applicantInfo.institutionEmail,
-    affiliation: applicantInfo.primaryAffiliation,
     appExpiry: applicationData.expiresAtUtc,
+    appId: applicationData.appId,
   };
   const collabs = (applicationData.collaborators.list || []).map((collab) => ({
-    username: collab.info.displayName,
     email: collab.info.institutionEmail,
-    affiliation: collab.info.primaryAffiliation,
     appExpiry: applicationData.expiresAtUtc,
+    appId: applicationData.appId,
   }));
 
   return [applicant, ...collabs].flat();

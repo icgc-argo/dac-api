@@ -20,7 +20,7 @@
 import { z, ZodError, ZodTypeAny } from 'zod';
 
 /* ******************* *
-   Success and Failure types 
+   Success and Failure types
  * ******************* */
 
 export type Success<T> = { status: 'SUCCESS'; data: T };
@@ -46,7 +46,7 @@ export type Result<T, FailureStatus extends string, FailureData = void> =
  */
 
 /* ******************* *
-   Convenience methods 
+   Convenience methods
  * ******************* */
 
 export function isSuccess<T, FailureStatus extends string, FailureData>(
@@ -108,3 +108,18 @@ export const safeParseArray = <T extends ZodTypeAny>(
       success: [],
       failure: [],
     });
+
+/* ******************* *
+   Failure types
+ * ******************* */
+
+export type ServerError = 'SERVER_ERROR';
+export type GetDatasetsForDacFailure = ServerError;
+export type GetPermissionsForDatasetFailure = ServerError;
+export type GetPermissionsByDatasetAndUserIdFailure = ServerError;
+export type CreatePermissionRequestsFailure = ServerError;
+export type ApprovedPermissionRequestsFailure =
+  | ServerError
+  | 'INVALID_APPROVE_PERMISSION_REQUESTS_RESPONSE';
+export type RevokePermissionsFailure = ServerError | 'INVALID_REVOKE_PERMISSIONS_RESPONSE';
+export type GetUserFailure = ServerError | 'NOT_FOUND' | 'INVALID_USER';
