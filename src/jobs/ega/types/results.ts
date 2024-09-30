@@ -17,8 +17,6 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { z, ZodError, ZodTypeAny } from 'zod';
-
 /* ******************* *
    Success and Failure types
  * ******************* */
@@ -75,39 +73,6 @@ export const failure = <FailureStatus extends string>(
   message,
   data: undefined,
 });
-
-export type ZodResultAccumulator<T> = { success: T[]; failure: ZodError[] };
-/**
- * Parses an array of Zod SafeParseReturnType results into success (successful parse) and failure (parsing error)
- * @param acc ZodResultAccumulator<T>
- * @param item z.SafeParseReturnType<T, T>
- * @returns ZodResultAccumulator<T>
- */
-const resultReducer = <T>(acc: ZodResultAccumulator<T>, item: z.SafeParseReturnType<T, T>) => {
-  if (item.success) {
-    acc.success.push(item.data);
-  } else {
-    acc.failure.push(item.error);
-  }
-  return acc;
-};
-
-/**
- * Run Zod safeParse for Schema T on an array of items, and split results by SafeParseReturnType 'success' or 'error'.
- * @params schema<T>
- * @params data unknown[]
- * @returns { success: [], failure: [] }
- */
-export const safeParseArray = <T extends ZodTypeAny>(
-  schema: T,
-  data: Array<unknown>,
-): ZodResultAccumulator<z.infer<T>> =>
-  data
-    .map((i) => schema.safeParse(i))
-    .reduce<ZodResultAccumulator<z.infer<T>>>((acc, item) => resultReducer(acc, item), {
-      success: [],
-      failure: [],
-    });
 
 /* ******************* *
    Failure types

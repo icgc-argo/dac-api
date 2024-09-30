@@ -44,7 +44,6 @@ import {
 import {
   ApprovedPermissionRequestsFailure,
   CreatePermissionRequestsFailure,
-  Failure,
   failure,
   GetDatasetsForDacFailure,
   GetPermissionsByDatasetAndUserIdFailure,
@@ -52,10 +51,9 @@ import {
   GetUserFailure,
   Result,
   RevokePermissionsFailure,
-  safeParseArray,
   success,
-  ZodResultAccumulator,
 } from './types/results';
+import { safeParseArray, ZodResultAccumulator } from './types/zodSafeParseArray';
 import { ApprovedUser, getErrorMessage } from './utils';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
@@ -205,12 +203,12 @@ export const egaApiClient = async () => {
    */
   const getDatasetsForDac = async (
     dacId: DacAccessionId,
-  ): Promise<ZodResultAccumulator<Dataset> | Failure<GetDatasetsForDacFailure>> => {
+  ): Promise<Result<ZodResultAccumulator<Dataset>, GetDatasetsForDacFailure>> => {
     const url = urlJoin(DACS, dacId, DATASETS);
     try {
       const { data } = await apiAxiosClient.get(url);
       const result = safeParseArray(Dataset, data);
-      return result;
+      return success(result);
     } catch (err) {
       const errMessage = getErrorMessage(err, `Error retrieving datasets for DAC ${dacId}.`);
       logger.error(`Error retrieving datasets for DAC ${dacId}.`);
@@ -272,7 +270,7 @@ export const egaApiClient = async () => {
     datasetAccessionId: DatasetAccessionId;
     limit: number;
     offset: number;
-  }): Promise<ZodResultAccumulator<EgaPermission> | Failure<GetPermissionsForDatasetFailure>> => {
+  }): Promise<Result<ZodResultAccumulator<EgaPermission>, GetPermissionsForDatasetFailure>> => {
     const url = urlJoin(DACS, dacId, PERMISSIONS);
     try {
       const { data } = await apiAxiosClient.get(url, {
@@ -284,7 +282,7 @@ export const egaApiClient = async () => {
       });
 
       const result = safeParseArray(EgaPermission, data);
-      return result;
+      return success(result);
     } catch (err) {
       const errMessage = getErrorMessage(err, 'Get permissions for dataset request failed.');
       logger.error('Get permissions for dataset request failed.');
@@ -300,10 +298,10 @@ export const egaApiClient = async () => {
    * @returns ZodResultAccumulator<EgaPermission>
    */
   const getPermissionByDatasetAndUserId = async (
-    userId: string,
+    userId: number,
     datasetId: DatasetAccessionId,
   ): Promise<
-    ZodResultAccumulator<EgaPermission> | Failure<GetPermissionsByDatasetAndUserIdFailure>
+    Result<ZodResultAccumulator<EgaPermission>, GetPermissionsByDatasetAndUserIdFailure>
   > => {
     try {
       const url = urlJoin(DACS, dacId, PERMISSIONS);
@@ -314,7 +312,7 @@ export const egaApiClient = async () => {
         },
       });
       const result = safeParseArray(EgaPermission, data);
-      return result;
+      return success(result);
     } catch (err) {
       const errMessage = getErrorMessage(err, 'Error retrieving permission for user');
       logger.error('Error retrieving permission for user');
@@ -357,14 +355,14 @@ export const egaApiClient = async () => {
   const createPermissionRequests = async (
     requests: PermissionRequest[],
   ): Promise<
-    ZodResultAccumulator<EgaPermissionRequest> | Failure<CreatePermissionRequestsFailure>
+    Result<ZodResultAccumulator<EgaPermissionRequest>, CreatePermissionRequestsFailure>
   > => {
     try {
       const { data } = await apiAxiosClient.post(REQUESTS, {
         requests,
       });
       const result = safeParseArray(EgaPermissionRequest, data);
-      return result;
+      return success(result);
     } catch (err) {
       const errMessage = getErrorMessage(err, 'Create permissions request failed.');
       logger.error('Create permissions request failed');
