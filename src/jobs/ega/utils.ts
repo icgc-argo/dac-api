@@ -20,8 +20,9 @@
 import { uniqBy } from 'lodash';
 import { UserDataFromApprovedApplicationsResult } from '../../domain/interface';
 import { getUsersFromApprovedApps } from '../../domain/service/applications/search';
-import { DatasetAccessionId } from './types/common';
-import { PermissionRequest, RevokePermission } from './types/requests';
+import { DatasetAccessionId, DateTime } from './types/common';
+import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from './types/requests';
+import { ApprovePermissionResponse, RevokePermissionResponse } from './types/responses';
 
 export type ApprovedUser = {
   email: string;
@@ -70,7 +71,7 @@ export const getApprovedUsers = async () => {
  * @param dataset_accession_id
  * @returns PermissionRequest
  */
-const createPermissionRequest = (
+export const createPermissionRequest = (
   username: string,
   datasetAccessionId: DatasetAccessionId,
 ): PermissionRequest => {
@@ -84,11 +85,26 @@ const createPermissionRequest = (
 };
 
 /**
+ * Create EGA permission approval request object for PUT /requests
+ * Expiry date of approved DACO application is used for the permission expires_at value
+ * @param permissionRequestId number
+ * @param appExpiry Date
+ * @returns ApprovePermissionRequest
+ */
+export const createPermissionApprovalRequest = (
+  permissionRequestId: number,
+  appExpiry: DateTime,
+): ApprovePermissionRequest => ({
+  request_id: permissionRequestId,
+  expires_at: appExpiry,
+});
+
+/**
  * Create revoke permission request object for DELETE /requests
  * @param permissionId
  * @returns RevokePermissionRequest
  */
-const createRevokePermissionRequest = (permissionId: number): RevokePermission => {
+export const createRevokePermissionRequest = (permissionId: number): RevokePermission => {
   return {
     id: permissionId,
     reason: 'ICGC DAC access has expired.',
@@ -104,3 +120,19 @@ const createRevokePermissionRequest = (permissionId: number): RevokePermission =
  */
 export const getErrorMessage = (error: unknown, defaultMessage: string): string =>
   error instanceof Error ? error.message : defaultMessage;
+
+/**
+ *
+ */
+export const verifyPermissionApprovals = (
+  numRequests: number,
+  approvalResponse: ApprovePermissionResponse,
+): boolean => numRequests === approvalResponse.num_granted;
+
+/**
+ *
+ */
+export const verifyPermissionRevocations = (
+  numRequests: number,
+  revokeResponse: RevokePermissionResponse,
+): boolean => numRequests === revokeResponse.num_revoked;

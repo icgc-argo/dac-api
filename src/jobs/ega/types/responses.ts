@@ -100,3 +100,8 @@ export type ApprovePermissionResponse = z.infer<typeof ApprovePermissionResponse
 
 export const RevokePermissionResponse = z.object({ num_revoked: z.number() });
 export type RevokePermissionResponse = z.infer<typeof RevokePermissionResponse>;
+
+export const EgaDacoUser = EgaUser.merge(z.object({ appExpiry: DateTime, appId: z.string() }));
+export type EgaDacoUser = z.infer<typeof EgaDacoUser>;
+
+export type EgaDacoUserMap = Record<string, EgaDacoUser>;
