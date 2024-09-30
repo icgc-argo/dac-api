@@ -51,10 +51,9 @@ import {
   GetUserFailure,
   Result,
   RevokePermissionsFailure,
-  safeParseArray,
   success,
-  ZodResultAccumulator,
 } from './types/results';
+import { safeParseArray, ZodResultAccumulator } from './types/zodSafeParseArray';
 import { ApprovedUser, getErrorMessage } from './utils';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
