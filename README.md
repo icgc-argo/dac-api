@@ -18,6 +18,7 @@ Development of the Data Access Control API
 | EGA_API_URL         | Root URL for EGA API                                                          | `string` | true     |         |
 | EGA_USERNAME        | Username for account used to gain access token from EGA authentication server | `string` | true     |         |
 | EGA_PASSWORD        | Password for account used to gain access token from EGA authentication server | `string` | true     |         |
+| DAC_ID              | AccessionId for ICGC DAC                                                      | `string` | true     |         |
 
 ## Feature Flags
 
