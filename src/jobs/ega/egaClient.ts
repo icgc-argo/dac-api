@@ -29,7 +29,7 @@ import {
   EGA_REALMS_PATH,
   EGA_TOKEN_ENDPOINT,
 } from '../../utils/constants';
-import { BadRequestError, NotFoundError, ServerError, TooManyRequestsError } from './errors';
+import { BadRequestError, NotFoundError, ServerError, TooManyRequestsError } from './types/errors';
 import { DacAccessionId, DatasetAccessionId } from './types/common';
 import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from './types/requests';
 import {

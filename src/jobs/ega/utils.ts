@@ -124,7 +124,10 @@ export const getErrorMessage = (error: unknown, defaultMessage: string): string 
   error instanceof Error ? error.message : defaultMessage;
 
 /**
- *
+ * Verify total permission approvals sent in request matches response num_granted
+ * @param numRequests number - length of permissionsRequests array
+ * @param approvalResponse ApprovePermissionResponse
+ * @returns boolean
  */
 export const verifyPermissionApprovals = (
   numRequests: number,
@@ -132,7 +135,10 @@ export const verifyPermissionApprovals = (
 ): boolean => numRequests === approvalResponse.num_granted;
 
 /**
- *
+ * Verify total permission re sent in request matches response num_revoked
+ * @param numRequests number - length of permissionsRequests array
+ * @param approvalResponse RevokePermissionResponse
+ * @returns boolean
  */
 export const verifyPermissionRevocations = (
   numRequests: number,
