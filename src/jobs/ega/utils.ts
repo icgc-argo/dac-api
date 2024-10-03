@@ -20,7 +20,7 @@
 import { uniqBy } from 'lodash';
 import { UserDataFromApprovedApplicationsResult } from '../../domain/interface';
 import { getUsersFromApprovedApps } from '../../domain/service/applications/search';
-import { DatasetAccessionId, DateTime } from './types/common';
+import { DatasetAccessionId } from './types/common';
 import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from './types/requests';
 import { ApprovePermissionResponse, RevokePermissionResponse } from './types/responses';
 
@@ -93,11 +93,13 @@ export const createPermissionRequest = (
  */
 export const createPermissionApprovalRequest = (
   permissionRequestId: number,
-  appExpiry: DateTime,
-): ApprovePermissionRequest => ({
-  request_id: permissionRequestId,
-  expires_at: appExpiry,
-});
+  appExpiry: Date,
+): ApprovePermissionRequest => {
+  return {
+    request_id: permissionRequestId,
+    expires_at: appExpiry.toISOString(),
+  };
+};
 
 /**
  * Create revoke permission request object for DELETE /requests

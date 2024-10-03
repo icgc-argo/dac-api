@@ -52,7 +52,7 @@ export type Dac = z.infer<typeof Dac>;
 
 export const Dataset = z.object({
   accession_id: DatasetAccessionId,
-  title: z.string(),
+  title: z.string().nullable(), // TODO: verify this is expected
   description: z.string().optional(),
 });
 export type Dataset = z.infer<typeof Dataset>;
@@ -75,9 +75,9 @@ export const EgaPermissionRequest = z.object({
   // TODO: api docs state this should be a DateTime string, but receiving 'YYYY-MM-DD` string. May need to change to coerceable date?
   date: DateString,
   username: z.string(),
-  full_name: z.string(),
-  email: z.string().email(),
-  organisation: z.string(),
+  full_name: z.string().nullable(),
+  email: z.string().email().nullable(),
+  organisation: z.string().nullable(),
   dataset_accession_id: DatasetAccessionId,
   dataset_title: z.string().nullable(),
   dac_accession_id: DacAccessionId,
@@ -101,7 +101,7 @@ export type ApprovePermissionResponse = z.infer<typeof ApprovePermissionResponse
 export const RevokePermissionResponse = z.object({ num_revoked: z.number() });
 export type RevokePermissionResponse = z.infer<typeof RevokePermissionResponse>;
 
-export const EgaDacoUser = EgaUser.merge(z.object({ appExpiry: DateTime, appId: z.string() }));
+export const EgaDacoUser = EgaUser.merge(z.object({ appExpiry: z.date(), appId: z.string() }));
 export type EgaDacoUser = z.infer<typeof EgaDacoUser>;
 
 export type EgaDacoUserMap = Record<string, EgaDacoUser>;

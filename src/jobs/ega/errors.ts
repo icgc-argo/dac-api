@@ -27,7 +27,7 @@ import { AxiosError } from 'axios';
 export class NotFoundError extends AxiosError {
   constructor(message: string) {
     super(message);
-    this.name = 'NotFound';
+    this.name = 'Not Found';
     this.status = 404;
     this.code = 'NOT_FOUND';
   }
@@ -36,8 +36,26 @@ export class NotFoundError extends AxiosError {
 export class TooManyRequestsError extends AxiosError {
   constructor(message: string) {
     super(message);
-    this.name = 'TooManyRequests';
+    this.name = 'Too Many Requests';
     this.status = 429;
     this.code = 'TOO_MANY_REQUESTS';
+  }
+}
+
+export class BadRequestError extends AxiosError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'Bad Request';
+    this.status = 400;
+    this.code = 'BAD_REQUEST';
+  }
+}
+
+export class ServerError extends AxiosError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'Server Error';
+    this.status = 500;
+    this.code = 'SERVER_ERROR';
   }
 }
