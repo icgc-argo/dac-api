@@ -18,83 +18,18 @@
  */
 
 import { chunk } from 'lodash';
-import { getAppConfig } from '../config';
-import logger, { buildMessage } from '../logger';
-import { egaApiClient, EgaClient } from './ega/egaClient';
-import { DatasetAccessionId } from './ega/types/common';
-import { PermissionRequest, RevokePermission } from './ega/types/requests';
-import { Dataset, EgaDacoUser, EgaDacoUserMap } from './ega/types/responses';
-import { isSuccess } from './ega/types/results';
+import logger from '../../../logger';
+import { EgaClient } from '../egaClient';
+import { DatasetAccessionId } from '../types/common';
+import { DEFAULT_LIMIT, DEFAULT_OFFSET, EGA_MAX_REQUEST_SIZE } from '../types/constants';
+import { PermissionRequest, RevokePermission } from '../types/requests';
+import { Dataset, EgaDacoUser, EgaDacoUserMap } from '../types/responses';
+import { isSuccess } from '../types/results';
 import {
-  ApprovedUser,
   createPermissionApprovalRequest,
   createPermissionRequest,
   createRevokePermissionRequest,
-  getApprovedUsers,
-} from './ega/utils';
-
-const JOB_NAME = 'RECONCILE_EGA_PERMISSIONS';
-
-// API request constants
-const DEFAULT_OFFSET = 50;
-const DEFAULT_LIMIT = 50;
-const EGA_MAX_REQUEST_SIZE = 2000;
-
-/**
- * Retrieve EGA user data for each user on DACO approved list
- * @param client EgaClient
- * @param dacoUsers ApprovedUser[]
- * @returns EgaDacoUserMap
- * @example
- * // returns {
- *   boysue@example.com: {
- *    id: 123,
- *    username: boysue@example.com,
- *    email: boysue@example.com,
- *    accession_id: EGAW00000009999,
- *    appExpiry: 2024-10-01T14:06:41.485Z,
- *    appId: 'DACO-1'
- *   }
- * ...
- * }
- * getUsers(client, approvedUsersList)
- */
-const getUsers = async (
-  client: EgaClient,
-  approvedUsers: ApprovedUser[],
-): Promise<EgaDacoUserMap> => {
-  let egaUsers: EgaDacoUserMap = {};
-  for await (const user of approvedUsers) {
-    try {
-      const egaUser = await client.getUser(user);
-      switch (egaUser.status) {
-        case 'SUCCESS':
-          const { data } = egaUser;
-          const egaDacoUser = {
-            ...data,
-            appExpiry: user.appExpiry,
-            appId: user.appId,
-          };
-          egaUsers[data.username] = egaDacoUser;
-          break;
-        case 'NOT_FOUND':
-          logger.debug(`No user found for [${user.email}].`);
-          break;
-        case 'INVALID_USER':
-          logger.error(`Invalid user: ${egaUser.message}`);
-          break;
-        case 'SERVER_ERROR':
-          logger.error(`Server error: ${egaUser.message}`);
-          break;
-        default:
-          logger.error('Unexpected error fetching user');
-      }
-    } catch (err) {
-      logger.error(err);
-    }
-  }
-  return egaUsers;
-};
+} from '../utils';
 
 /**
  * Function to create + approve a list of PermissionsRequests
@@ -105,7 +40,7 @@ const getUsers = async (
  * @param approvedUser EgaDacoUser
  * @param permissionRequests PermissionRequest[]
  */
-const createRequiredPermissions = async (
+export const createRequiredPermissions = async (
   egaClient: EgaClient,
   approvedUser: EgaDacoUser,
   requests: PermissionRequest[],
@@ -156,7 +91,7 @@ const createRequiredPermissions = async (
  * @param egaUsers
  * @param datasets
  */
-const processPermissionsForApprovedUsers = async (
+export const processPermissionsForApprovedUsers = async (
   egaClient: EgaClient,
   egaUsers: EgaDacoUserMap,
   datasets: Dataset[],
@@ -229,8 +164,10 @@ export const processPermissionsForDataset = async (
       });
       const totalResults = permissionsFailures.length + permissionsSuccesses.length;
       paging = totalResults === limit;
-      // TODO: there is a repeated permission result when paginating,
-      // subtracting 1 from the offset prevents paging from stopping before all unique results are retrieved
+      // TODO: there is a bug in the GET /permissions and GET /dacs/{dacId}/permissions result when paginating
+      // Any request that includes the 19th element of the result array will have the final element in the array is replaced by the first element from the sorted dataset
+      // In practice this means that paging will stop before all unique elements are returned, as some of the total is made up of these duplicate values
+      // Temp solution is to subtract 1 from the offset (limit - 1), which "backtracks" the paging to ensure the element that gets missed in the last array position is captured
       offset = offset + DEFAULT_OFFSET - 1;
     } else {
       logger.error(
@@ -265,50 +202,3 @@ export const processPermissionsForDataset = async (
     logger.info(`There are no permissions to revoke for DATASET ${datasetAccessionId}.`);
   }
 };
-
-/**
- * Steps:
- * 1) Retrieve approved users list from dac db
- * 2) Retrieve datasets for DAC
- * 3) Retrieve corresponding list of users from EGA API
- * 4) Create permissions, on each dataset, for each user on the DACO approved list, if no existing permission is found
- * 5) Process existing permissions for each dataset + revoke those which belong to users not on the DACO approved list
- */
-async function runEgaPermissionsReconciliation() {
-  // retrieve approved users list from daco system
-  const dacoUsers = await getApprovedUsers();
-  // initialize EGA Axios client
-  const egaClient = await egaApiClient();
-
-  // retrieve all datasets for ICGC DAC
-  const {
-    ega: { dacId },
-  } = getAppConfig();
-  const datasets = await egaClient.getDatasetsForDac(dacId);
-
-  // get datasets failed completely
-  if (!isSuccess(datasets)) {
-    // TODO: retry here?
-    throw new Error('Failed to fetch datasets');
-  }
-  logger.debug(`Successfully retrieved ${datasets.data.success.length} for DAC ${dacId}.`);
-  // retrieve corresponding users in EGA system
-  const egaUsers = await getUsers(egaClient, dacoUsers);
-  logger.debug(`Retrieved ${Object.keys(egaUsers).length} corresponding users from EGA.`);
-  const datasetsRetrieved = datasets.data.success;
-  logger.debug(`Retrieved ${datasetsRetrieved.length} datasets for ${dacId}.`);
-  // check DACO approved users have expected EGA permissions for each dataset
-  await processPermissionsForApprovedUsers(egaClient, egaUsers, datasetsRetrieved);
-
-  // can add a return value to these process functions if needed, i.e. BatchJobReport
-
-  // Check existing permissions per dataset + revoke if needed
-  for await (const dataset of datasetsRetrieved) {
-    await processPermissionsForDataset(egaClient, dataset.accession_id, egaUsers);
-  }
-
-  logger.info(buildMessage(JOB_NAME, 'Completed.'));
-  return 'OK';
-}
-
-export default runEgaPermissionsReconciliation;
