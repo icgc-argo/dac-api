@@ -96,19 +96,23 @@ const getUsers = async (
   return egaUsers;
 };
 
-const handlePermissionRequests = async (
+/**
+ * Function to create + approve a list of PermissionsRequests
+ *  1) Sends requests to POST /requests to create a PermissionRequest for each item
+ *  2) Creates an ApprovePermissionRequest for each PermissionRequest received in the list response from (1)
+ *  3) Sends all ApprovePermissionRequests to PUT /requests
+ * @param egaClient EgaClient
+ * @param approvedUser EgaDacoUser
+ * @param permissionRequests PermissionRequest[]
+ */
+const createRequiredPermissions = async (
   egaClient: EgaClient,
   approvedUser: EgaDacoUser,
-  permissionRequests: PermissionRequest[],
+  requests: PermissionRequest[],
 ) => {
-  logger.debug(`There are ${permissionRequests.length} permissions needed.`);
-  // POST all requests
-  const chunkedPermissionRequests = chunk(permissionRequests, EGA_MAX_REQUEST_SIZE);
-  for await (const requests of chunkedPermissionRequests) {
-    const createRequestsResponse = await egaClient.createPermissionRequests(requests);
-
-    if (isSuccess(createRequestsResponse)) {
-      // create approval requests objs + send all
+  const createRequestsResponse = await egaClient.createPermissionRequests(requests);
+  switch (createRequestsResponse.status) {
+    case 'SUCCESS':
       if (createRequestsResponse.data.success.length) {
         const approvalRequests = createRequestsResponse.data.success.map((request) =>
           createPermissionApprovalRequest(request.request_id, approvedUser.appExpiry),
@@ -131,24 +135,23 @@ const handlePermissionRequests = async (
           createRequestsResponse.data.failure,
         );
       }
-    } else {
+      break;
+    case 'SERVER_ERROR':
+    default:
       logger.error(
         `Request to create PermissionRequests failed due to: ${createRequestsResponse.message}`,
       );
-    }
   }
 };
+
 /**
- * Process missing permissions for users on DACO ApprovedList, for each Dataset in the ICGC DAC
+ * Process any missing permissions for all users on DACO ApprovedList, for each Dataset in the ICGC DAC
  * Iterates through each user:
  * 1) For each dataset:
- *  a) queries /permissions endpoint by datasetAccessionId + userId
+ *  a) queries GET dacs/{dacId}/permissions endpoint by datasetAccessionId + userId
  *  b) If no permission is found, creates PermissionRequest object and adds to permissionsRequest list
  * 2) If there are items in the permissionsRequest list, divides requests into EGA_MAX_REQUEST_SIZE chunks
- * For each chunk:
- *  a) Sends requests to POST /requests to create a PermissionRequest for each item
- *  b) Creates an ApprovePermissionRequest for each PermissionRequest received in the response from (a)
- *  c) Sends approval requests to PUT /requests
+ *  a) For each chunk, creates permissions with createRequiredPermissions() call
  * @param egaClient
  * @param egaUsers
  * @param datasets
@@ -181,7 +184,10 @@ const processPermissionsForApprovedUsers = async (
       }
     }
     if (permissionRequests.length) {
-      await handlePermissionRequests(egaClient, approvedUser, permissionRequests);
+      const chunkedPermissionRequests = chunk(permissionRequests, EGA_MAX_REQUEST_SIZE);
+      for await (const requests of chunkedPermissionRequests) {
+        await createRequiredPermissions(egaClient, approvedUser, requests);
+      }
     }
   }
   logger.info('Completed processing permissions for all DACO approved users.');
@@ -290,7 +296,7 @@ async function runEgaPermissionsReconciliation() {
   const egaUsers = await getUsers(egaClient, dacoUsers);
   logger.debug(`Retrieved ${Object.keys(egaUsers).length} corresponding users from EGA.`);
   const datasetsRetrieved = datasets.data.success;
-
+  logger.debug(`Retrieved ${datasetsRetrieved.length} datasets for ${dacId}.`);
   // check DACO approved users have expected EGA permissions for each dataset
   await processPermissionsForApprovedUsers(egaClient, egaUsers, datasetsRetrieved);
 
