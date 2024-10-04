@@ -10,15 +10,17 @@ Development of the Data Access Control API
 
 ## Environment Variables
 
-| Name                | Description                                                                   | Type     | Required | Default |
-| ------------------- | ----------------------------------------------------------------------------- | -------- | -------- | ------- |
-| EGA_CLIENT_ID       | Client ID for EGA API                                                         | `string` | true     |         |
-| EGA_AUTH_HOST       | Root URL for EGA authentication server                                        | `string` | true     |         |
-| EGA_AUTH_REALM_NAME | Realm name for EGA authentication server                                      | `string` | true     |         |
-| EGA_API_URL         | Root URL for EGA API                                                          | `string` | true     |         |
-| EGA_USERNAME        | Username for account used to gain access token from EGA authentication server | `string` | true     |         |
-| EGA_PASSWORD        | Password for account used to gain access token from EGA authentication server | `string` | true     |         |
-| DAC_ID              | AccessionId for ICGC DAC                                                      | `string` | true     |         |
+| Name                     | Description                                                                                                | Type     | Required | Default |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- | -------- | -------- | ------- |
+| EGA_CLIENT_ID            | Client ID for EGA API                                                                                      | `string` | true     |         |
+| EGA_AUTH_HOST            | Root URL for EGA authentication server                                                                     | `string` | true     |         |
+| EGA_AUTH_REALM_NAME      | Realm name for EGA authentication server                                                                   | `string` | true     |         |
+| EGA_API_URL              | Root URL for EGA API                                                                                       | `string` | true     |         |
+| EGA_USERNAME             | Username for account used to gain access token from EGA authentication server                              | `string` | true     |         |
+| EGA_PASSWORD             | Password for account used to gain access token from EGA authentication server                              | `string` | true     |         |
+| DAC_ID                   | AccessionId for ICGC DAC                                                                                   | `string` | true     |         |
+| EGA_MAX_REQUEST_LIMIT    | For EGA API rate limiting. The max number of API requests per interval value `EGA_MAX_REQUEST_INTERVAL`    | `number` | true     | 3       |
+| EGA_MAX_REQUEST_INTERVAL | For EGA API rate limiting. Interval of time for API request limit `EGA_MAX_REQUEST_LIMIT`, in milliseconds | `number` | true     | 1000    |
 
 ## Feature Flags
 

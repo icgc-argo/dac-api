@@ -56,7 +56,6 @@ import {
 import { safeParseArray, ZodResultAccumulator } from './types/zodSafeParseArray';
 import { ApprovedUser, getErrorMessage } from './utils';
 import pThrottle from '../../../pThrottle';
-import { EGA_MAX_REQUEST_INTERVAL, EGA_MAX_REQUEST_LIMIT } from './types/constants';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
 
@@ -158,14 +157,14 @@ const refreshAccessToken = async (token: IdpToken): Promise<IdpToken> => {
  */
 export const egaApiClient = async () => {
   const {
-    ega: { dacId },
+    ega: { dacId, maxRequestLimit, maxRequestInterval },
   } = getAppConfig();
   const token = await getAccessToken();
 
   // rate limit requests to a maximum of 3 per 1 second
   const throttle = pThrottle({
-    limit: EGA_MAX_REQUEST_LIMIT,
-    interval: EGA_MAX_REQUEST_INTERVAL,
+    limit: maxRequestLimit,
+    interval: maxRequestInterval,
   });
 
   apiAxiosClient.defaults.headers.common['Authorization'] = `Bearer ${token.access_token}`;

@@ -96,6 +96,8 @@ export interface AppConfig {
     authRealmName: string;
     apiUrl: string;
     dacId: string;
+    maxRequestLimit: number;
+    maxRequestInterval: number;
   };
 }
 
@@ -213,6 +215,8 @@ const buildAppContext = (): AppConfig => {
       authRealmName: checkIsDefined(process.env.EGA_AUTH_REALM_NAME),
       apiUrl: checkIsDefined(process.env.EGA_API_URL),
       dacId: checkIsDefined(process.env.DAC_ID),
+      maxRequestLimit: Number(process.env.EGA_MAX_REQUEST_LIMIT) || 3,
+      maxRequestInterval: Number(process.env.EGA_MAX_REQUEST_INTERVAL) || 1000,
     },
   };
   return config;
