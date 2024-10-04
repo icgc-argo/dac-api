@@ -55,6 +55,8 @@ import {
 } from './types/results';
 import { safeParseArray, ZodResultAccumulator } from './types/zodSafeParseArray';
 import { ApprovedUser, getErrorMessage } from './utils';
+import pThrottle from '../../../pThrottle';
+import { EGA_MAX_REQUEST_INTERVAL, EGA_MAX_REQUEST_LIMIT } from './types/constants';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
 
@@ -159,6 +161,12 @@ export const egaApiClient = async () => {
     ega: { dacId },
   } = getAppConfig();
   const token = await getAccessToken();
+
+  // rate limit requests to a maximum of 3 per 1 second
+  const throttle = pThrottle({
+    limit: EGA_MAX_REQUEST_LIMIT,
+    interval: EGA_MAX_REQUEST_INTERVAL,
+  });
 
   apiAxiosClient.defaults.headers.common['Authorization'] = `Bearer ${token.access_token}`;
 
@@ -450,13 +458,13 @@ export const egaApiClient = async () => {
   };
 
   return {
-    approvePermissionRequests,
-    createPermissionRequests,
-    getDatasetsForDac,
-    getPermissionByDatasetAndUserId,
-    getPermissionsForDataset,
-    getUser,
-    revokePermissions,
+    approvePermissionRequests: throttle(approvePermissionRequests),
+    createPermissionRequests: throttle(createPermissionRequests),
+    getDatasetsForDac: throttle(getDatasetsForDac),
+    getPermissionByDatasetAndUserId: throttle(getPermissionByDatasetAndUserId),
+    getPermissionsForDataset: throttle(getPermissionsForDataset),
+    getUser: throttle(getUser),
+    revokePermissions: throttle(revokePermissions),
   };
 };
 
