@@ -54,10 +54,10 @@ const parseApprovedUsersForApplication = (
 };
 
 /**
- * Retrieves applicant and collaborator information from all currently approved applications
+ * Retrieves applicant and collaborator information from all currently approved applications in the DAC-API db
  * @returns Promise<ApprovedUser[]>
  */
-export const getApprovedUsers = async () => {
+export const getDacoApprovedUsers = async () => {
   const results = await getUsersFromApprovedApps();
   const parsedUsers = results.map((app) => parseApprovedUsersForApplication(app)).flat();
   return uniqBy(parsedUsers, 'email');

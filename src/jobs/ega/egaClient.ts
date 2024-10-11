@@ -34,7 +34,7 @@ import { DacAccessionId, DatasetAccessionId } from './types/common';
 import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from './types/requests';
 import {
   ApprovePermissionResponse,
-  Dataset,
+  EgaDataset,
   EgaPermission,
   EgaPermissionRequest,
   EgaUser,
@@ -209,15 +209,15 @@ export const egaApiClient = async () => {
   /**
    * GET request to retrieve all currently release datasets released for a DAC
    * @param dacId DacAccessionId
-   * @returns ZodResultAccumulator<Dataset>
+   * @returns ZodResultAccumulator<EgaDataset>
    */
   const getDatasetsForDac = async (
     dacId: DacAccessionId,
-  ): Promise<Result<ZodResultAccumulator<Dataset>, GetDatasetsForDacFailure>> => {
+  ): Promise<Result<ZodResultAccumulator<EgaDataset>, GetDatasetsForDacFailure>> => {
     const url = urlJoin(DACS, dacId, DATASETS);
     try {
       const { data } = await apiAxiosClient.get(url);
-      const result = safeParseArray(Dataset, data);
+      const result = safeParseArray(EgaDataset, data);
       return success(result);
     } catch (err) {
       const errMessage = getErrorMessage(err, `Error retrieving datasets for DAC ${dacId}.`);

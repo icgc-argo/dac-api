@@ -23,7 +23,7 @@ import { EgaClient } from '../egaClient';
 import { DatasetAccessionId } from '../types/common';
 import { DEFAULT_LIMIT, DEFAULT_OFFSET, EGA_MAX_REQUEST_SIZE } from '../types/constants';
 import { PermissionRequest, RevokePermission } from '../types/requests';
-import { Dataset, EgaDacoUser, EgaDacoUserMap } from '../types/responses';
+import { EgaDataset, EgaDacoUser, EgaDacoUserMap } from '../types/responses';
 import { isSuccess } from '../types/results';
 import {
   createPermissionApprovalRequest,
@@ -94,7 +94,7 @@ export const createRequiredPermissions = async (
 export const processPermissionsForApprovedUsers = async (
   egaClient: EgaClient,
   egaUsers: EgaDacoUserMap,
-  datasets: Dataset[],
+  datasets: EgaDataset[],
 ) => {
   const userList = Object.values(egaUsers);
   for await (const approvedUser of userList) {
@@ -105,17 +105,22 @@ export const processPermissionsForApprovedUsers = async (
         approvedUser.id,
         dataset.accession_id,
       );
-      if (isSuccess(existingPermission)) {
-        if (existingPermission.data.success.length === 0) {
-          // create permission request, add to requestList
-          const permissionRequest = createPermissionRequest(
-            approvedUser.username,
-            dataset.accession_id,
-          );
-          permissionRequests.push(permissionRequest);
-        }
-      } else {
-        logger.info(`Error fetching existing permission: ${existingPermission.message}`);
+      switch (existingPermission.status) {
+        case 'SUCCESS':
+          // if no permissions exist for a DACO approved user, a permission request needs to be created
+          if (existingPermission.data.success.length === 0) {
+            // create permission request, add to requestList
+            const permissionRequest = createPermissionRequest(
+              approvedUser.username,
+              dataset.accession_id,
+            );
+            permissionRequests.push(permissionRequest);
+          }
+          break;
+        case 'SERVER_ERROR':
+        default:
+          logger.info(`Error fetching existing permission: ${existingPermission.message}`);
+          break;
       }
     }
     if (permissionRequests.length) {
@@ -180,7 +185,7 @@ export const processPermissionsForDataset = async (
   }
   const setSize = permissionsSet.size;
   if (setSize > 0) {
-    logger.debug(`There are ${permissionsSet.size} permissions to remove.`);
+    logger.debug(`There are ${setSize} permissions to remove.`);
     permissionsSet.forEach((perm) => {
       const revokeReq = createRevokePermissionRequest(perm);
       permissionsToRevoke.push(revokeReq);

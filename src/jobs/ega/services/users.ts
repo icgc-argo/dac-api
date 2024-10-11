@@ -23,7 +23,7 @@ import { EgaDacoUserMap } from '../types/responses';
 import { ApprovedUser } from '../utils';
 
 /**
- * Retrieve EGA user data for each user on DACO approved list
+ * Retrieve corresponding EGA user data for each user on DACO Approved Users list
  * @param client EgaClient
  * @param dacoUsers ApprovedUser[]
  * @returns EgaDacoUserMap
@@ -41,7 +41,7 @@ import { ApprovedUser } from '../utils';
  * }
  * getUsers(client, approvedUsersList)
  */
-export const getUsers = async (
+export const getEgaUsers = async (
   client: EgaClient,
   approvedUsers: ApprovedUser[],
 ): Promise<EgaDacoUserMap> => {

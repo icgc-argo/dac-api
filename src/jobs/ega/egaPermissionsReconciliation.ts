@@ -24,9 +24,9 @@ import {
   processPermissionsForApprovedUsers,
   processPermissionsForDataset,
 } from './services/permissions';
-import { getUsers } from './services/users';
+import { getEgaUsers } from './services/users';
 import { isSuccess } from './types/results';
-import { getApprovedUsers } from './utils';
+import { getDacoApprovedUsers } from './utils';
 
 const JOB_NAME = 'RECONCILE_EGA_PERMISSIONS';
 
@@ -40,7 +40,7 @@ const JOB_NAME = 'RECONCILE_EGA_PERMISSIONS';
  */
 async function runEgaPermissionsReconciliation() {
   // retrieve approved users list from daco system
-  const dacoUsers = await getApprovedUsers();
+  const dacoUsers = await getDacoApprovedUsers();
   // initialize EGA Axios client
   const egaClient = await egaApiClient();
 
@@ -57,7 +57,7 @@ async function runEgaPermissionsReconciliation() {
   }
   logger.debug(`Successfully retrieved ${datasets.data.success.length} for DAC ${dacId}.`);
   // retrieve corresponding users in EGA system
-  const egaUsers = await getUsers(egaClient, dacoUsers);
+  const egaUsers = await getEgaUsers(egaClient, dacoUsers);
   logger.debug(`Retrieved ${Object.keys(egaUsers).length} corresponding users from EGA.`);
   const datasetsRetrieved = datasets.data.success;
   logger.debug(`Retrieved ${datasetsRetrieved.length} datasets for ${dacId}.`);

@@ -50,12 +50,12 @@ export const Dac = z.object({
 });
 export type Dac = z.infer<typeof Dac>;
 
-export const Dataset = z.object({
+export const EgaDataset = z.object({
   accession_id: DatasetAccessionId,
   title: z.string().nullable(), // TODO: verify this is expected
   description: z.string().optional(),
 });
-export type Dataset = z.infer<typeof Dataset>;
+export type EgaDataset = z.infer<typeof EgaDataset>;
 
 export const EgaUser = z.object({
   id: z.number(),
