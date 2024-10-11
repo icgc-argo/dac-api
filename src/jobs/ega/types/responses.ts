@@ -22,8 +22,6 @@ import {
   DacAccessionId,
   DacStatus,
   DatasetAccessionId,
-  DateString,
-  DateTime,
   IdpTokenType,
   UserAccessionId,
 } from './common';
@@ -66,23 +64,9 @@ export const EgaUser = z.object({
 });
 export type EgaUser = z.infer<typeof EgaUser>;
 
+// the full response from EGA has several other fields, but we only parse for the request_id field required for the permission approval step in createRequiredPermissions()
 export const EgaPermissionRequest = z.object({
   request_id: z.number(),
-  status: z.string(),
-  request_data: z.object({
-    comment: z.string(),
-  }),
-  // TODO: api docs state this should be a DateTime string, but receiving 'YYYY-MM-DD` string. May need to change to coerceable date?
-  date: DateString,
-  username: z.string(),
-  full_name: z.string().nullable(),
-  email: z.string().email().nullable(),
-  organisation: z.string().nullable(),
-  dataset_accession_id: DatasetAccessionId,
-  dataset_title: z.string().nullable(),
-  dac_accession_id: DacAccessionId,
-  dac_comment: z.string().nullable(),
-  dac_comment_edited_at: DateTime.nullable(), // TODO: api docs state this should be DateTime string, but need to verify
 });
 export type EgaPermissionRequest = z.infer<typeof EgaPermissionRequest>;
 

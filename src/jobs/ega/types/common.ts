@@ -23,10 +23,6 @@ import { z } from 'zod';
    Dates 
  * ******************* */
 
-// For YYYY-MM-DD Date strings (i.e. '2021-01-01')
-export const DateString = z.string().date();
-export type DateString = z.infer<typeof DateString>;
-
 // For ISO8601 Datetime strings (i.e. '2021-01-01T00:00:00.000Z')
 // Note: for safeParse to allow the +00:00, as in '2024-01-31T16:25:13.725724+00:00', would need .datetime({ offset: true })
 export const DateTime = z.string().datetime({ offset: true });
