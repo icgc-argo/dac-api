@@ -17,13 +17,13 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { chunk } from 'lodash';
+import { chunk, difference } from 'lodash';
 import logger from '../../../logger';
 import { EgaClient } from '../egaClient';
 import { DatasetAccessionId } from '../types/common';
 import { DEFAULT_LIMIT, DEFAULT_OFFSET, EGA_MAX_REQUEST_SIZE } from '../types/constants';
 import { PermissionRequest, RevokePermission } from '../types/requests';
-import { EgaDataset, EgaDacoUser, EgaDacoUserMap } from '../types/responses';
+import { EgaDacoUser, EgaDacoUserMap, EgaDataset } from '../types/responses';
 import { isSuccess } from '../types/results';
 import {
   createPermissionApprovalRequest,
@@ -44,7 +44,7 @@ export const createRequiredPermissions = async (
   egaClient: EgaClient,
   approvedUser: EgaDacoUser,
   requests: PermissionRequest[],
-) => {
+): Promise<number | undefined> => {
   const createRequestsResponse = await egaClient.createPermissionRequests(requests);
   switch (createRequestsResponse.status) {
     case 'SUCCESS':
@@ -59,6 +59,7 @@ export const createRequiredPermissions = async (
           logger.debug(
             `${approvePermissionRequestsResponse.data.num_granted} of ${requests.length} approval requests completed.`,
           );
+          return approvePermissionRequestsResponse.data.num_granted;
         } else {
           logger.error(
             `ApprovalRequests failed due to: ${approvePermissionRequestsResponse.message}`,
@@ -83,10 +84,12 @@ export const createRequiredPermissions = async (
  * Process any missing permissions for all users on DACO ApprovedList, for each Dataset in the ICGC DAC
  * Iterates through each user:
  * 1) For each dataset:
- *  a) queries GET dacs/{dacId}/permissions endpoint by datasetAccessionId + userId
- *  b) If no permission is found, creates PermissionRequest object and adds to permissionsRequest list
- * 2) If there are items in the permissionsRequest list, divides requests into EGA_MAX_REQUEST_SIZE chunks
- *  a) For each chunk, creates permissions with createRequiredPermissions() call
+ *  a) query GET /permissions endpoint by userId + limit=total number of datasets for ICGC DAC, to get all permissions for a user
+ *  b) compare the datasetIds in the result from a) with the list of datasets included with the ICGC DAC, and create an array of the missing ids
+ *  c) create a PermissionRequest object for each datasetId in b) and add to permissionsRequest list
+ * 2) If there are items in the permissionsRequest list:
+ *  a) Divides requests into EGA_MAX_REQUEST_SIZE chunks
+ *  b) For each chunk, create permissions with createRequiredPermissions()
  * @param egaClient
  * @param egaUsers
  * @param datasets
@@ -99,30 +102,36 @@ export const processPermissionsForApprovedUsers = async (
   const userList = Object.values(egaUsers);
   for await (const approvedUser of userList) {
     const permissionRequests: PermissionRequest[] = [];
-    for await (const dataset of datasets) {
-      // check for existing permission
-      const existingPermission = await egaClient.getPermissionByDatasetAndUserId(
-        approvedUser.id,
-        dataset.accession_id,
-      );
-      switch (existingPermission.status) {
-        case 'SUCCESS':
-          // if no permissions exist for a DACO approved user, a permission request needs to be created
-          if (existingPermission.data.success.length === 0) {
+    const existingPermission = await egaClient.getPermissionsByUserId(
+      approvedUser.id,
+      datasets.length,
+    );
+    switch (existingPermission.status) {
+      case 'SUCCESS':
+        if (existingPermission.data.success.length) {
+          const datasetsWithPermissions = existingPermission.data.success.map(
+            (perm) => perm.dataset_accession_id,
+          );
+          const datasetsRequiringPermissions = datasets.map((dataset) => dataset.accession_id);
+          const missingDatasetIds = difference(
+            datasetsRequiringPermissions,
+            datasetsWithPermissions,
+          );
+          missingDatasetIds.map((datasetId: DatasetAccessionId) => {
             // create permission request, add to requestList
-            const permissionRequest = createPermissionRequest(
-              approvedUser.username,
-              dataset.accession_id,
-            );
+            // TODO: looks like username MUST be in email format, the one-name usernames in the test env fail (silently, an empty array is returned by createPermissionRequests)
+            const permissionRequest = createPermissionRequest(approvedUser.username, datasetId);
             permissionRequests.push(permissionRequest);
-          }
-          break;
-        case 'SERVER_ERROR':
-        default:
-          logger.info(`Error fetching existing permission: ${existingPermission.message}`);
-          break;
-      }
+          });
+        }
+        break;
+      case 'SERVER_ERROR':
+        logger.info(`Error fetching existing permission: ${existingPermission.message}`);
+        break;
+      default:
+        logger.error(`Unexpected error fetching existing permission: ${existingPermission}`);
     }
+
     if (permissionRequests.length) {
       const chunkedPermissionRequests = chunk(permissionRequests, EGA_MAX_REQUEST_SIZE);
       for await (const requests of chunkedPermissionRequests) {
@@ -169,11 +178,7 @@ export const processPermissionsForDataset = async (
       });
       const totalResults = permissionsFailures.length + permissionsSuccesses.length;
       paging = totalResults === limit;
-      // TODO: there is a bug in the GET /permissions and GET /dacs/{dacId}/permissions result when paginating
-      // Any request that includes the 19th element of the result array will have the final element in the array is replaced by the first element from the sorted dataset
-      // In practice this means that paging will stop before all unique elements are returned, as some of the total is made up of these duplicate values
-      // Temp solution is to subtract 1 from the offset (limit - 1), which "backtracks" the paging to ensure the element that gets missed in the last array position is captured
-      offset = offset + DEFAULT_OFFSET - 1;
+      offset = offset + DEFAULT_OFFSET;
     } else {
       logger.error(
         `GET permissions for dataset ${datasetAccessionId} failed - ${permissions.message}`,
