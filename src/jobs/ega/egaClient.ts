@@ -17,20 +17,21 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import axios, { AxiosError, AxiosHeaders } from 'axios';
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import urlJoin from 'url-join';
 import { getAppConfig } from '../../config';
 import logger from '../../logger';
 import getAppSecrets from '../../secrets';
 
+import pThrottle from '../../../pThrottle';
 import {
   EGA_API,
   EGA_GRANT_TYPE,
   EGA_REALMS_PATH,
   EGA_TOKEN_ENDPOINT,
 } from '../../utils/constants';
-import { BadRequestError, NotFoundError, ServerError, TooManyRequestsError } from './types/errors';
 import { DacAccessionId, DatasetAccessionId } from './types/common';
+import { BadRequestError, NotFoundError, ServerError, TooManyRequestsError } from './types/errors';
 import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from './types/requests';
 import {
   ApprovePermissionResponse,
@@ -55,7 +56,6 @@ import {
 } from './types/results';
 import { safeParseArray, ZodResultAccumulator } from './types/zodSafeParseArray';
 import { ApprovedUser, getErrorMessage } from './utils';
-import pThrottle from '../../../pThrottle';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
 
@@ -88,7 +88,7 @@ const apiAxiosClient = initApiAxiosClient();
  * POST request to retrieve an accessToken for the EGA API client
  * @returns Promise<IdpToken>
  */
-const getAccessToken = async (): Promise<IdpToken> => {
+const fetchAccessToken = async (): Promise<IdpToken> => {
   const {
     ega: { authRealmName, clientId },
   } = getAppConfig();
@@ -96,59 +96,40 @@ const getAccessToken = async (): Promise<IdpToken> => {
     auth: { egaUsername, egaPassword },
   } = await getAppSecrets();
 
-  const response = await idpClient.post(
-    urlJoin(EGA_REALMS_PATH, authRealmName, EGA_TOKEN_ENDPOINT),
-    {
-      grant_type: EGA_GRANT_TYPE,
+  try {
+    const response = await idpClient.post(
+      urlJoin(EGA_REALMS_PATH, authRealmName, EGA_TOKEN_ENDPOINT),
+      {
+        grant_type: EGA_GRANT_TYPE,
 
-      client_id: clientId,
-      username: egaUsername,
-      password: egaPassword,
-    },
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        client_id: clientId,
+        username: egaUsername,
+        password: egaPassword,
       },
-    },
-  );
-
-  const token = IdpToken.safeParse(response.data);
-  if (token.success) {
-    return token.data;
-  }
-  logger.error('Authentication with EGA failed.');
-  throw new Error('Failed to retrieve access token');
-};
-
-/**
- * POST request to retrieve a new access token via refresh token flow
- * @param token IdpToken
- * @returns IdpToken
- */
-const refreshAccessToken = async (token: IdpToken): Promise<IdpToken> => {
-  const {
-    ega: { authRealmName, clientId },
-  } = getAppConfig();
-  const response = await idpClient.post(
-    urlJoin(EGA_REALMS_PATH, authRealmName, EGA_TOKEN_ENDPOINT),
-    {
-      grant_type: 'refresh_token',
-      client_id: clientId,
-      refresh_token: token.refresh_token,
-    },
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       },
-    },
-  );
+    );
 
-  const result = IdpToken.safeParse(response.data);
-  if (result.success) {
-    return result.data;
+    const token = IdpToken.safeParse(response.data);
+    if (token.success) {
+      return token.data;
+    }
+    logger.error('Invalid token response.');
+    throw new Error('Invalid token response');
+  } catch (err) {
+    if (err instanceof Error) {
+      logger.error(`TOKEN MESSAGE: ${err.message}`);
+      logger.error(`STACK: ${err.stack}`);
+      throw new Error(err.message);
+    } else {
+      logger.error('Unexpected error from fetch token request');
+      logger.error(err);
+      throw err;
+    }
   }
-  logger.error('Refresh access token request failed.');
-  throw new Error('Failed to refresh access token');
 };
 
 /**
@@ -159,39 +140,58 @@ export const egaApiClient = async () => {
   const {
     ega: { dacId, maxRequestLimit, maxRequestInterval },
   } = getAppConfig();
-  const token = await getAccessToken();
 
-  // rate limit requests to a maximum of 3 per 1 second
+  let currentToken: IdpToken | undefined = undefined;
+  let refreshTokenPromise: Promise<IdpToken> | undefined = undefined; // this holds any in-progress token refresh requests
+
+  const getAccessToken = async (): Promise<IdpToken> => {
+    if (currentToken) {
+      return currentToken;
+    }
+    if (refreshTokenPromise) {
+      return refreshTokenPromise;
+    }
+    refreshTokenPromise = fetchAccessToken()
+      .then((rToken) => {
+        currentToken = rToken;
+        return rToken;
+      })
+      .finally(() => {
+        // reset refreshTokenPromise state
+        refreshTokenPromise = undefined;
+      });
+    return refreshTokenPromise;
+  };
+
+  const resetAccessToken = (): void => {
+    currentToken = undefined;
+  };
+
+  // default rate limit requests to a maximum of 3 per 1 second
   const throttle = pThrottle({
     limit: maxRequestLimit,
     interval: maxRequestInterval,
   });
 
-  apiAxiosClient.defaults.headers.common['Authorization'] = `Bearer ${token.access_token}`;
+  const accessToken = await getAccessToken();
+  apiAxiosClient.defaults.headers.common['Authorization'] = `Bearer ${accessToken.access_token}`;
 
   apiAxiosClient.interceptors.response.use(
     (response) => response,
     async (error) => {
-      if (error instanceof AxiosError) {
-        switch (error.status) {
+      if (error.response && error.config) {
+        switch (error.response.status) {
           case 401:
-            logger.info('Access expired, attempting refresh');
-            // Access token has expired, refresh it
-            try {
-              const newAccessToken = await refreshAccessToken(token);
-              // Update the request headers with the new access token
-              const headers = new AxiosHeaders(error.config?.headers);
-              headers.setAuthorization(`Bearer ${newAccessToken.access_token}`);
-              error.config = {
-                ...error.config,
-                headers,
-              };
-              // Retry the original request
-              return apiAxiosClient(error.config);
-            } catch (refreshError) {
-              // Handle token refresh error
-              throw refreshError;
+            if (!refreshTokenPromise) {
+              resetAccessToken();
             }
+            const updatedAccessToken = await getAccessToken();
+            const refreshedBearerToken = `Bearer ${updatedAccessToken.access_token}`;
+            // set new token on original request that had the 401 error
+            error.config.headers['Authorization'] = refreshedBearerToken;
+            // reset on client headers so subsequent requests have new access token
+            apiAxiosClient.defaults.headers['Authorization'] = refreshedBearerToken;
+            return apiAxiosClient.request(error.config);
           case 400:
             return new BadRequestError(error.message);
           case 404:
@@ -199,10 +199,11 @@ export const egaApiClient = async () => {
           case 429:
             throw new TooManyRequestsError(error.message);
           default:
+            logger.error(`Unexpected Axios Error: ${error.response.status}`);
             throw new ServerError('Unexpected Axios Error');
         }
       }
-      return new Response('Server error', { status: 500 });
+      return Promise.reject(error);
     },
   );
 
@@ -258,7 +259,6 @@ export const egaApiClient = async () => {
         }
       } else {
         const errMessage = getErrorMessage(err, 'Get user request failed');
-        logger.error('Get user request failed');
         return failure('SERVER_ERROR', errMessage);
       }
     }
@@ -303,21 +303,21 @@ export const egaApiClient = async () => {
    * GET request to retrieve existing dataset permissions for a user.
    * One permission result is expected with userId and datasetId params, but response from EGA API comes as an array
    * @param userId string
-   * @param datasetId DatasetAccessionId
+   * @param datasetsTotal number - total number of datasets expected for DAC
    * @returns ZodResultAccumulator<EgaPermission>
    */
-  const getPermissionByDatasetAndUserId = async (
+  const getPermissionsByUserId = async (
     userId: number,
-    datasetId: DatasetAccessionId,
+    datasetsTotal: number,
   ): Promise<
     Result<ZodResultAccumulator<EgaPermission>, GetPermissionsByDatasetAndUserIdFailure>
   > => {
     try {
-      const url = urlJoin(DACS, dacId, PERMISSIONS);
+      const url = urlJoin(PERMISSIONS);
       const { data } = await apiAxiosClient.get(url, {
         params: {
-          dataset_accession_id: datasetId,
           user_id: userId,
+          limit: datasetsTotal,
         },
       });
       const result = safeParseArray(EgaPermission, data);
@@ -395,15 +395,18 @@ export const egaApiClient = async () => {
     requests: ApprovePermissionRequest[],
   ): Promise<Result<ApprovePermissionResponse, ApprovedPermissionRequestsFailure>> => {
     try {
-      const { data } = await apiAxiosClient.put(REQUESTS, requests);
-      const result = ApprovePermissionResponse.safeParse(data);
-      if (result.success) {
-        return success(result.data);
+      const response = await apiAxiosClient.put(REQUESTS, requests);
+      if (response.data) {
+        const result = ApprovePermissionResponse.safeParse(response.data);
+        if (result.success) {
+          return success(result.data);
+        }
+        return failure(
+          'INVALID_APPROVE_PERMISSION_REQUESTS_RESPONSE',
+          `Invalid response from approve permission requests: ${result.error}`,
+        );
       }
-      return failure(
-        'INVALID_APPROVE_PERMISSION_REQUESTS_RESPONSE',
-        `Invalid response from approve permission requests: ${result.error}`,
-      );
+      throw new ServerError(response.statusText);
     } catch (err) {
       const errMessage = getErrorMessage(err, 'Approve permissions requests failed.');
       logger.error('Create permissions request failed');
@@ -460,7 +463,7 @@ export const egaApiClient = async () => {
     approvePermissionRequests: throttle(approvePermissionRequests),
     createPermissionRequests: throttle(createPermissionRequests),
     getDatasetsForDac: throttle(getDatasetsForDac),
-    getPermissionByDatasetAndUserId: throttle(getPermissionByDatasetAndUserId),
+    getPermissionsByUserId: throttle(getPermissionsByUserId),
     getPermissionsForDataset: throttle(getPermissionsForDataset),
     getUser: throttle(getUser),
     revokePermissions: throttle(revokePermissions),

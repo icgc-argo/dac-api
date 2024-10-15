@@ -28,6 +28,8 @@ import { getEgaUsers } from './services/users';
 import { isSuccess } from './types/results';
 import { getDacoApprovedUsers } from './utils';
 
+import moment from 'moment';
+
 const JOB_NAME = 'RECONCILE_EGA_PERMISSIONS';
 
 /**
@@ -39,6 +41,8 @@ const JOB_NAME = 'RECONCILE_EGA_PERMISSIONS';
  * 5) Process existing permissions for each dataset + revoke those which belong to users not on the DACO approved list
  */
 async function runEgaPermissionsReconciliation() {
+  const startTime = new Date();
+  logger.info(`Job started at ${startTime}`);
   // retrieve approved users list from daco system
   const dacoUsers = await getDacoApprovedUsers();
   // initialize EGA Axios client
@@ -72,6 +76,10 @@ async function runEgaPermissionsReconciliation() {
   }
 
   logger.info(buildMessage(JOB_NAME, 'Completed.'));
+  const endTime = new Date();
+  logger.info(`Job completed at ${endTime}`);
+  const timeElapsed = moment(endTime).diff(startTime, 'minutes');
+  logger.info(`Job took ${timeElapsed} minutes to complete.`);
   return 'OK';
 }
 
