@@ -22,8 +22,6 @@ import {
   DacAccessionId,
   DacStatus,
   DatasetAccessionId,
-  DateString,
-  DateTime,
   IdpTokenType,
   UserAccessionId,
 } from './common';
@@ -50,12 +48,12 @@ export const Dac = z.object({
 });
 export type Dac = z.infer<typeof Dac>;
 
-export const Dataset = z.object({
+export const EgaDataset = z.object({
   accession_id: DatasetAccessionId,
-  title: z.string(),
+  title: z.string().nullable(), // TODO: verify this is expected
   description: z.string().optional(),
 });
-export type Dataset = z.infer<typeof Dataset>;
+export type EgaDataset = z.infer<typeof EgaDataset>;
 
 export const EgaUser = z.object({
   id: z.number(),
@@ -66,23 +64,9 @@ export const EgaUser = z.object({
 });
 export type EgaUser = z.infer<typeof EgaUser>;
 
+// the full response from EGA has several other fields, but we only parse for the request_id field required for the permission approval step in createRequiredPermissions()
 export const EgaPermissionRequest = z.object({
   request_id: z.number(),
-  status: z.string(),
-  request_data: z.object({
-    comment: z.string(),
-  }),
-  // TODO: api docs state this should be a DateTime string, but receiving 'YYYY-MM-DD` string. May need to change to coerceable date?
-  date: DateString,
-  username: z.string(),
-  full_name: z.string(),
-  email: z.string().email(),
-  organisation: z.string(),
-  dataset_accession_id: DatasetAccessionId,
-  dataset_title: z.string().nullable(),
-  dac_accession_id: DacAccessionId,
-  dac_comment: z.string().nullable(),
-  dac_comment_edited_at: DateTime.nullable(), // TODO: api docs state this should be DateTime string, but need to verify
 });
 export type EgaPermissionRequest = z.infer<typeof EgaPermissionRequest>;
 
@@ -100,3 +84,8 @@ export type ApprovePermissionResponse = z.infer<typeof ApprovePermissionResponse
 
 export const RevokePermissionResponse = z.object({ num_revoked: z.number() });
 export type RevokePermissionResponse = z.infer<typeof RevokePermissionResponse>;
+
+export const EgaDacoUser = EgaUser.merge(z.object({ appExpiry: z.date(), appId: z.string() }));
+export type EgaDacoUser = z.infer<typeof EgaDacoUser>;
+
+export type EgaDacoUserMap = Record<string, EgaDacoUser>;

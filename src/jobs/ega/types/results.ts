@@ -86,5 +86,8 @@ export type CreatePermissionRequestsFailure = ServerError;
 export type ApprovedPermissionRequestsFailure =
   | ServerError
   | 'INVALID_APPROVE_PERMISSION_REQUESTS_RESPONSE';
-export type RevokePermissionsFailure = ServerError | 'INVALID_REVOKE_PERMISSIONS_RESPONSE';
+export type RevokePermissionsFailure =
+  | ServerError
+  | 'INVALID_REVOKE_PERMISSIONS_RESPONSE'
+  | 'PERMISSION_DOES_NOT_EXIST';
 export type GetUserFailure = ServerError | 'NOT_FOUND' | 'INVALID_USER';

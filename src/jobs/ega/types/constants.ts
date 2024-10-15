@@ -17,27 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { AxiosError } from 'axios';
-
-/**
- * Custom errors for Axios responses.
- * Defines expected status and code values for error handling.
- */
-
-export class NotFoundError extends AxiosError {
-  constructor(message: string) {
-    super(message);
-    this.name = 'NotFound';
-    this.status = 404;
-    this.code = 'NOT_FOUND';
-  }
-}
-
-export class TooManyRequestsError extends AxiosError {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TooManyRequests';
-    this.status = 429;
-    this.code = 'TOO_MANY_REQUESTS';
-  }
-}
+// API request constants
+export const DEFAULT_LIMIT = 50;
+export const DEFAULT_OFFSET = DEFAULT_LIMIT;
+export const EGA_MAX_REQUEST_SIZE = 2000;

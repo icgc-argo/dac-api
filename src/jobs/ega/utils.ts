@@ -21,7 +21,8 @@ import { uniqBy } from 'lodash';
 import { UserDataFromApprovedApplicationsResult } from '../../domain/interface';
 import { getUsersFromApprovedApps } from '../../domain/service/applications/search';
 import { DatasetAccessionId } from './types/common';
-import { PermissionRequest, RevokePermission } from './types/requests';
+import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from './types/requests';
+import { ApprovePermissionResponse, RevokePermissionResponse } from './types/responses';
 
 export type ApprovedUser = {
   email: string;
@@ -53,10 +54,10 @@ const parseApprovedUsersForApplication = (
 };
 
 /**
- * Retrieves applicant and collaborator information from all currently approved applications
+ * Retrieves applicant and collaborator information from all currently approved applications in the DAC-API db
  * @returns Promise<ApprovedUser[]>
  */
-export const getApprovedUsers = async () => {
+export const getDacoApprovedUsers = async () => {
   const results = await getUsersFromApprovedApps();
   const parsedUsers = results.map((app) => parseApprovedUsersForApplication(app)).flat();
   return uniqBy(parsedUsers, 'email');
@@ -70,7 +71,7 @@ export const getApprovedUsers = async () => {
  * @param dataset_accession_id
  * @returns PermissionRequest
  */
-const createPermissionRequest = (
+export const createPermissionRequest = (
   username: string,
   datasetAccessionId: DatasetAccessionId,
 ): PermissionRequest => {
@@ -84,11 +85,28 @@ const createPermissionRequest = (
 };
 
 /**
+ * Create EGA permission approval request object for PUT /requests
+ * Expiry date of approved DACO application is used for the permission expires_at value
+ * @param permissionRequestId number
+ * @param appExpiry Date
+ * @returns ApprovePermissionRequest
+ */
+export const createPermissionApprovalRequest = (
+  permissionRequestId: number,
+  appExpiry: Date,
+): ApprovePermissionRequest => {
+  return {
+    request_id: permissionRequestId,
+    expires_at: appExpiry.toISOString(),
+  };
+};
+
+/**
  * Create revoke permission request object for DELETE /requests
  * @param permissionId
  * @returns RevokePermissionRequest
  */
-const createRevokePermissionRequest = (permissionId: number): RevokePermission => {
+export const createRevokePermissionRequest = (permissionId: number): RevokePermission => {
   return {
     id: permissionId,
     reason: 'ICGC DAC access has expired.',
@@ -104,3 +122,25 @@ const createRevokePermissionRequest = (permissionId: number): RevokePermission =
  */
 export const getErrorMessage = (error: unknown, defaultMessage: string): string =>
   error instanceof Error ? error.message : defaultMessage;
+
+/**
+ * Verify total permission approvals sent in request matches response num_granted
+ * @param numRequests number - length of permissionsRequests array
+ * @param approvalResponse ApprovePermissionResponse
+ * @returns boolean
+ */
+export const verifyPermissionApprovals = (
+  numRequests: number,
+  approvalResponse: ApprovePermissionResponse,
+): boolean => numRequests === approvalResponse.num_granted;
+
+/**
+ * Verify total permission re sent in request matches response num_revoked
+ * @param numRequests number - length of permissionsRequests array
+ * @param approvalResponse RevokePermissionResponse
+ * @returns boolean
+ */
+export const verifyPermissionRevocations = (
+  numRequests: number,
+  revokeResponse: RevokePermissionResponse,
+): boolean => numRequests === revokeResponse.num_revoked;
