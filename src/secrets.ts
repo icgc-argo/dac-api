@@ -19,6 +19,8 @@ export interface AppSecrets {
   };
   auth: {
     dacoEncryptionKey: string;
+    egaUsername: string;
+    egaPassword: string;
   };
   storage: {
     key: string;
@@ -57,6 +59,8 @@ const buildSecrets = async (vaultSecrets: Record<string, any> = {}): Promise<App
     },
     auth: {
       dacoEncryptionKey: vaultSecrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY || '',
+      egaUsername: vaultSecrets.EGA_USERNAME || process.env.EGA_USERNAME || '',
+      egaPassword: vaultSecrets.EGA_PASSWORD || process.env.EGA_PASSWORD || '',
     },
     storage: {
       key: vaultSecrets.OBJECT_STORAGE_KEY || process.env.OBJECT_STORAGE_KEY || '',

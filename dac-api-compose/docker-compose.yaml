@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   vault:
-    image: vault
+    image: vault:1.13.3
     volumes:
       - $PWD/logs/:/tmp/logs
       - ./vault:/scripts
@@ -47,8 +45,8 @@ services:
 
   # for email services
   mailhog:
-    image: mailhog/mailhog
-    container_name: 'mailhog'
+    image: jcalonso/mailhog:latest
+    container_name: mailhog
     ports:
       - '1025:1025'
       - '8025:8025'

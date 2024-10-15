@@ -271,3 +271,21 @@ export const ICGC_ARGO_CONTACT_URL = urlJoin(ICGC_ARGO_PLATFORM_URL, 'contact');
 // batch job
 export const NOTIFICATION_UNIT_OF_TIME: unitOfTime.DurationConstructor = 'days';
 export const REQUEST_CHUNK_SIZE = 5;
+
+/** EGA IDP */
+// pathnames
+export const EGA_REALMS_PATH = 'realms';
+export const EGA_TOKEN_ENDPOINT = 'protocol/openid-connect/token';
+// oauth grant type parameter
+export const EGA_GRANT_TYPE = 'password';
+
+//** EGA API */
+// pathnames
+export const EGA_API = {
+  DACS: 'dacs',
+  PERMISSIONS: 'permissions',
+  USERS: 'users',
+  MEMBERS: 'members',
+  REQUESTS: 'requests',
+  DATASETS: 'datasets',
+};

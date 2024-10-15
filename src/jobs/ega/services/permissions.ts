@@ -1,0 +1,209 @@
+/*
+ * Copyright (c) 2024 The Ontario Institute for Cancer Research. All rights reserved
+ *
+ * This program and the accompanying materials are made available under the terms of
+ * the GNU Affero General Public License v3.0. You should have received a copy of the
+ * GNU Affero General Public License along with this program.
+ *  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+ * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+import { chunk } from 'lodash';
+import logger from '../../../logger';
+import { EgaClient } from '../egaClient';
+import { DatasetAccessionId } from '../types/common';
+import { DEFAULT_LIMIT, DEFAULT_OFFSET, EGA_MAX_REQUEST_SIZE } from '../types/constants';
+import { PermissionRequest, RevokePermission } from '../types/requests';
+import { EgaDataset, EgaDacoUser, EgaDacoUserMap } from '../types/responses';
+import { isSuccess } from '../types/results';
+import {
+  createPermissionApprovalRequest,
+  createPermissionRequest,
+  createRevokePermissionRequest,
+} from '../utils';
+
+/**
+ * Function to create + approve a list of PermissionsRequests
+ *  1) Sends requests to POST /requests to create a PermissionRequest for each item
+ *  2) Creates an ApprovePermissionRequest for each PermissionRequest received in the list response from (1)
+ *  3) Sends all ApprovePermissionRequests to PUT /requests
+ * @param egaClient EgaClient
+ * @param approvedUser EgaDacoUser
+ * @param permissionRequests PermissionRequest[]
+ */
+export const createRequiredPermissions = async (
+  egaClient: EgaClient,
+  approvedUser: EgaDacoUser,
+  requests: PermissionRequest[],
+) => {
+  const createRequestsResponse = await egaClient.createPermissionRequests(requests);
+  switch (createRequestsResponse.status) {
+    case 'SUCCESS':
+      if (createRequestsResponse.data.success.length) {
+        const approvalRequests = createRequestsResponse.data.success.map((request) =>
+          createPermissionApprovalRequest(request.request_id, approvedUser.appExpiry),
+        );
+        const approvePermissionRequestsResponse = await egaClient.approvePermissionRequests(
+          approvalRequests,
+        );
+        if (isSuccess(approvePermissionRequestsResponse)) {
+          logger.debug(
+            `${approvePermissionRequestsResponse.data.num_granted} of ${requests.length} approval requests completed.`,
+          );
+        } else {
+          logger.error(
+            `ApprovalRequests failed due to: ${approvePermissionRequestsResponse.message}`,
+          );
+        }
+      } else {
+        console.log(
+          `Failures from create permission requests`,
+          createRequestsResponse.data.failure,
+        );
+      }
+      break;
+    case 'SERVER_ERROR':
+    default:
+      logger.error(
+        `Request to create PermissionRequests failed due to: ${createRequestsResponse.message}`,
+      );
+  }
+};
+
+/**
+ * Process any missing permissions for all users on DACO ApprovedList, for each Dataset in the ICGC DAC
+ * Iterates through each user:
+ * 1) For each dataset:
+ *  a) queries GET dacs/{dacId}/permissions endpoint by datasetAccessionId + userId
+ *  b) If no permission is found, creates PermissionRequest object and adds to permissionsRequest list
+ * 2) If there are items in the permissionsRequest list, divides requests into EGA_MAX_REQUEST_SIZE chunks
+ *  a) For each chunk, creates permissions with createRequiredPermissions() call
+ * @param egaClient
+ * @param egaUsers
+ * @param datasets
+ */
+export const processPermissionsForApprovedUsers = async (
+  egaClient: EgaClient,
+  egaUsers: EgaDacoUserMap,
+  datasets: EgaDataset[],
+) => {
+  const userList = Object.values(egaUsers);
+  for await (const approvedUser of userList) {
+    const permissionRequests: PermissionRequest[] = [];
+    for await (const dataset of datasets) {
+      // check for existing permission
+      const existingPermission = await egaClient.getPermissionByDatasetAndUserId(
+        approvedUser.id,
+        dataset.accession_id,
+      );
+      switch (existingPermission.status) {
+        case 'SUCCESS':
+          // if no permissions exist for a DACO approved user, a permission request needs to be created
+          if (existingPermission.data.success.length === 0) {
+            // create permission request, add to requestList
+            const permissionRequest = createPermissionRequest(
+              approvedUser.username,
+              dataset.accession_id,
+            );
+            permissionRequests.push(permissionRequest);
+          }
+          break;
+        case 'SERVER_ERROR':
+        default:
+          logger.info(`Error fetching existing permission: ${existingPermission.message}`);
+          break;
+      }
+    }
+    if (permissionRequests.length) {
+      const chunkedPermissionRequests = chunk(permissionRequests, EGA_MAX_REQUEST_SIZE);
+      for await (const requests of chunkedPermissionRequests) {
+        await createRequiredPermissions(egaClient, approvedUser, requests);
+      }
+    }
+  }
+  logger.info('Completed processing permissions for all DACO approved users.');
+};
+
+/**
+ * Paginates through all permissions for a dataset and revokes permissions for users not found in approvedUsers
+ * @param client EgaClient
+ * @param dataset_accession_id DatasetAccessionId
+ * @param approvedUsers EgaDacoUserMap
+ * @returns void
+ */
+export const processPermissionsForDataset = async (
+  client: EgaClient,
+  datasetAccessionId: DatasetAccessionId,
+  approvedUsers: EgaDacoUserMap,
+): Promise<void> => {
+  let permissionsSet: Set<number> = new Set();
+  let permissionsToRevoke: RevokePermission[] = [];
+  let offset = 0;
+  let limit = DEFAULT_LIMIT;
+  let paging = true;
+
+  // loop will stop once result length from GET is less than limit
+  while (paging) {
+    const permissions = await client.getPermissionsForDataset({
+      datasetAccessionId,
+      limit,
+      offset,
+    });
+    if (isSuccess(permissions)) {
+      const { success: permissionsSuccesses, failure: permissionsFailures } = permissions.data;
+      permissionsSuccesses.map((permission) => {
+        // check if permission username is found in approvedUsers
+        const hasAccess = approvedUsers[permission.username];
+        if (!hasAccess) {
+          permissionsSet.add(permission.permission_id);
+        }
+      });
+      const totalResults = permissionsFailures.length + permissionsSuccesses.length;
+      paging = totalResults === limit;
+      // TODO: there is a bug in the GET /permissions and GET /dacs/{dacId}/permissions result when paginating
+      // Any request that includes the 19th element of the result array will have the final element in the array is replaced by the first element from the sorted dataset
+      // In practice this means that paging will stop before all unique elements are returned, as some of the total is made up of these duplicate values
+      // Temp solution is to subtract 1 from the offset (limit - 1), which "backtracks" the paging to ensure the element that gets missed in the last array position is captured
+      offset = offset + DEFAULT_OFFSET - 1;
+    } else {
+      logger.error(
+        `GET permissions for dataset ${datasetAccessionId} failed - ${permissions.message}`,
+      );
+      // stop paging results if request completely fails to prevent endless loop
+      // can a retry mechanism be added here, if error is retryable?
+      paging = false;
+    }
+  }
+  const setSize = permissionsSet.size;
+  if (setSize > 0) {
+    logger.debug(`There are ${setSize} permissions to remove.`);
+    permissionsSet.forEach((perm) => {
+      const revokeReq = createRevokePermissionRequest(perm);
+      permissionsToRevoke.push(revokeReq);
+    });
+    const chunkedRevokeRequests = chunk(permissionsToRevoke, EGA_MAX_REQUEST_SIZE);
+    for await (const requests of chunkedRevokeRequests) {
+      const revokeResponse = await client.revokePermissions(requests);
+      if (isSuccess(revokeResponse)) {
+        logger.info(
+          `Successfully revoked ${revokeResponse.data.num_revoked} of total ${setSize} permissions for DATASET ${datasetAccessionId}.`,
+        );
+      } else {
+        logger.error(
+          `There was an error revoking permissions for DATASET ${datasetAccessionId} - ${revokeResponse.message}.`,
+        );
+      }
+    }
+  } else {
+    logger.info(`There are no permissions to revoke for DATASET ${datasetAccessionId}.`);
+  }
+};

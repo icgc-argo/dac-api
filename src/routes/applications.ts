@@ -41,6 +41,7 @@ import { Storage } from '../storage';
 import runAllJobs from '../jobs/runAllJobs';
 import { sendEncryptedApprovedUsersEmail } from '../jobs/approvedUsersEmail';
 import { isUserJwt } from '../utils/permissions';
+import { validateId, validateType } from './utils';
 
 const createApplicationsRouter = (
   config: AppConfig,
@@ -441,26 +442,5 @@ const createApplicationsRouter = (
 
   return router;
 };
-
-function validateId(id: string) {
-  if (!id) {
-    throw new BadRequest('id is required');
-  }
-  if (!id.startsWith('DACO-')) {
-    throw new BadRequest('Invalid id');
-  }
-  return id;
-}
-
-function validateType(type: string) {
-  if (
-    !['ETHICS', 'SIGNED_APP', 'APPROVED_PDF', 'ethics', 'signed_app', 'approved_pdf'].includes(type)
-  ) {
-    throw new BadRequest(
-      'unknown document type, should be one of ETHICS, SIGNED_APP or APPROVED_PDF',
-    );
-  }
-  return type.toUpperCase();
-}
 
 export default createApplicationsRouter;

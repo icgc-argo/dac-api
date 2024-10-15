@@ -90,6 +90,15 @@ export interface AppConfig {
     renewalEnabled: boolean;
     adminPauseEnabled: boolean;
   };
+  ega: {
+    clientId: string;
+    authHost: string;
+    authRealmName: string;
+    apiUrl: string;
+    dacId: string;
+    maxRequestLimit: number;
+    maxRequestInterval: number;
+  };
 }
 
 // Mongo
@@ -199,6 +208,15 @@ const buildAppContext = (): AppConfig => {
     featureFlags: {
       renewalEnabled: process.env.FEATURE_RENEWAL_ENABLED === 'true',
       adminPauseEnabled: process.env.FEATURE_ADMIN_PAUSE_ENABLED === 'true',
+    },
+    ega: {
+      clientId: checkIsDefined(process.env.EGA_CLIENT_ID),
+      authHost: checkIsDefined(process.env.EGA_AUTH_HOST),
+      authRealmName: checkIsDefined(process.env.EGA_AUTH_REALM_NAME),
+      apiUrl: checkIsDefined(process.env.EGA_API_URL),
+      dacId: checkIsDefined(process.env.DAC_ID),
+      maxRequestLimit: Number(process.env.EGA_MAX_REQUEST_LIMIT) || 3,
+      maxRequestInterval: Number(process.env.EGA_MAX_REQUEST_INTERVAL) || 1000,
     },
   };
   return config;
