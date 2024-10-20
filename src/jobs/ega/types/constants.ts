@@ -18,6 +18,6 @@
  */
 
 // API request constants
-export const DEFAULT_LIMIT = 50;
+export const DEFAULT_LIMIT = 100;
 export const DEFAULT_OFFSET = DEFAULT_LIMIT;
-export const EGA_MAX_REQUEST_SIZE = 2000;
+export const EGA_MAX_REQUEST_SIZE = 5000;

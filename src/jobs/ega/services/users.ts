@@ -18,7 +18,7 @@
  */
 
 import logger from '../../../logger';
-import { EgaClient } from '../egaClient';
+import { EgaClient } from '../axios/egaClient';
 import { EgaDacoUserMap } from '../types/responses';
 import { ApprovedUser } from '../utils';
 
