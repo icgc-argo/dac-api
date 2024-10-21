@@ -284,8 +284,6 @@ export const egaApiClient = async () => {
     } catch (err) {
       const errMessage = getErrorMessage(err, 'Get permissions for dataset request failed.');
       logger.error('Get permissions for dataset request failed.');
-      // this error return here doesn't differentiate the type, so you may need more checks to see if it is retryable
-      // i.e., socket hangup, too many requests. although the former may not bubble that far with current ega client setup
       return failure('SERVER_ERROR', errMessage);
     }
   };
@@ -303,7 +301,6 @@ export const egaApiClient = async () => {
   ): Promise<
     Result<ZodResultAccumulator<EgaPermission>, GetPermissionsByDatasetAndUserIdFailure>
   > => {
-    // logger.info(`GetPermissionsByUserId [${userId}]`);
     try {
       const url = urlJoin(PERMISSIONS);
       const response = await apiAxiosClient.get(url, {

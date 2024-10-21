@@ -19,11 +19,6 @@
 
 import { DatasetAccessionId, EgaUserId } from './common';
 
-type PermissionsProcessingResult<T> = {
-  success: number;
-  error: T[];
-};
-
 type ProcessErrorStatus =
   | 'SERVER_ERROR'
   | 'INVALID_APPROVE_PERMISSION_REQUESTS_RESPONSE'
@@ -62,10 +57,6 @@ export type PermissionsCreatedPerUserResult = {
   permissionsMissingCount: number;
   permissionsGrantedCount: number;
 };
-
-export type PermissionsCreatedResult = PermissionsProcessingResult<
-  PermissionProcessingError & { userId: EgaUserId }
->;
 
 export type ProcessApprovedUsersDetails = {
   numUsersSuccessfullyProcessed: number;
