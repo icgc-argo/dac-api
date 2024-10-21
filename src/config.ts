@@ -89,6 +89,7 @@ export interface AppConfig {
   featureFlags: {
     renewalEnabled: boolean;
     adminPauseEnabled: boolean;
+    egaReconciliationEnabled: boolean;
   };
   ega: {
     clientId: string;
@@ -208,6 +209,7 @@ const buildAppContext = (): AppConfig => {
     featureFlags: {
       renewalEnabled: process.env.FEATURE_RENEWAL_ENABLED === 'true',
       adminPauseEnabled: process.env.FEATURE_ADMIN_PAUSE_ENABLED === 'true',
+      egaReconciliationEnabled: process.env.FEATURE_EGA_RECONCILIATION_ENABLED === 'true',
     },
     ega: {
       clientId: checkIsDefined(process.env.EGA_CLIENT_ID),
