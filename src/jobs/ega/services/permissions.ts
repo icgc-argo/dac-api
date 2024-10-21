@@ -18,10 +18,19 @@
  */
 
 import { chunk, difference } from 'lodash';
+import moment from 'moment';
 import logger from '../../../logger';
-import { EgaClient } from '../egaClient';
+import { EgaClient } from '../axios/egaClient';
 import { DatasetAccessionId } from '../types/common';
 import { DEFAULT_LIMIT, DEFAULT_OFFSET, EGA_MAX_REQUEST_SIZE } from '../types/constants';
+import {
+  DatasetPermissionsRevocationResult,
+  PermissionProcessingError,
+  PermissionsCreatedPerUserResult,
+  ProcessApprovedUsersDetails,
+  ProcessExpiredPermissionsDetails,
+  ProcessResultReport,
+} from '../types/reports';
 import { PermissionRequest, RevokePermission } from '../types/requests';
 import { EgaDacoUser, EgaDacoUserMap, EgaDataset } from '../types/responses';
 import { isSuccess } from '../types/results';
@@ -44,11 +53,13 @@ export const createRequiredPermissions = async (
   egaClient: EgaClient,
   approvedUser: EgaDacoUser,
   requests: PermissionRequest[],
-): Promise<number | undefined> => {
+): Promise<{ num_granted: number; error?: PermissionProcessingError }> => {
+  // create requests for permissions
   const createRequestsResponse = await egaClient.createPermissionRequests(requests);
   switch (createRequestsResponse.status) {
     case 'SUCCESS':
       if (createRequestsResponse.data.success.length) {
+        // if permissions request successfully created, approve them
         const approvalRequests = createRequestsResponse.data.success.map((request) =>
           createPermissionApprovalRequest(request.request_id, approvedUser.appExpiry),
         );
@@ -56,20 +67,37 @@ export const createRequiredPermissions = async (
           approvalRequests,
         );
         if (isSuccess(approvePermissionRequestsResponse)) {
-          logger.debug(
-            `${approvePermissionRequestsResponse.data.num_granted} of ${requests.length} approval requests completed.`,
-          );
-          return approvePermissionRequestsResponse.data.num_granted;
+          const {
+            data: { num_granted },
+          } = approvePermissionRequestsResponse;
+          return { num_granted };
         } else {
           logger.error(
             `ApprovalRequests failed due to: ${approvePermissionRequestsResponse.message}`,
           );
+          return {
+            num_granted: 0,
+            error: {
+              processName: 'approvePermissionRequests',
+              status: approvePermissionRequestsResponse.status,
+              message: approvePermissionRequestsResponse.message,
+            },
+          };
         }
-      } else {
-        console.log(
-          `Failures from create permission requests`,
-          createRequestsResponse.data.failure,
+      }
+      if (createRequestsResponse.data.failure.length) {
+        // if there are failures, report them
+        logger.error(
+          `Failures from create permission requests: ${createRequestsResponse.data.failure}`,
         );
+        return {
+          num_granted: 0,
+          error: {
+            processName: 'createPermissionRequests',
+            message: 'Some permissions requests were not created',
+            status: 'PARSING_FAILURE',
+          },
+        };
       }
       break;
     case 'SERVER_ERROR':
@@ -77,7 +105,16 @@ export const createRequiredPermissions = async (
       logger.error(
         `Request to create PermissionRequests failed due to: ${createRequestsResponse.message}`,
       );
+      return {
+        num_granted: 0,
+        error: {
+          processName: 'createPermissionRequests',
+          status: createRequestsResponse.status,
+          message: createRequestsResponse.message,
+        },
+      };
   }
+  return { num_granted: 0 };
 };
 
 /**
@@ -98,10 +135,24 @@ export const processPermissionsForApprovedUsers = async (
   egaClient: EgaClient,
   egaUsers: EgaDacoUserMap,
   datasets: EgaDataset[],
-) => {
+): Promise<ProcessResultReport<ProcessApprovedUsersDetails>> => {
+  const startTime = new Date();
   const userList = Object.values(egaUsers);
+
+  const totalCreatedPermissionsResult: ProcessApprovedUsersDetails = {
+    numUsersSuccessfullyProcessed: 0,
+    numUsersWithNewPermissions: 0,
+    errors: [],
+  };
   for await (const approvedUser of userList) {
+    logger.info(
+      `Checking permissions for user ${approvedUser.username} - userId: [${approvedUser.id}]`,
+    );
     const permissionRequests: PermissionRequest[] = [];
+    const userPermissionResult: PermissionsCreatedPerUserResult = {
+      permissionsMissingCount: 0,
+      permissionsGrantedCount: 0,
+    };
     const existingPermission = await egaClient.getPermissionsByUserId(
       approvedUser.id,
       datasets.length,
@@ -117,6 +168,7 @@ export const processPermissionsForApprovedUsers = async (
             datasetsRequiringPermissions,
             datasetsWithPermissions,
           );
+          userPermissionResult.permissionsMissingCount = missingDatasetIds.length;
           missingDatasetIds.map((datasetId: DatasetAccessionId) => {
             // create permission request, add to requestList
             // TODO: looks like username MUST be in email format, the one-name usernames in the test env fail (silently, an empty array is returned by createPermissionRequests)
@@ -126,20 +178,51 @@ export const processPermissionsForApprovedUsers = async (
         }
         break;
       case 'SERVER_ERROR':
-        logger.info(`Error fetching existing permission: ${existingPermission.message}`);
-        break;
       default:
-        logger.error(`Unexpected error fetching existing permission: ${existingPermission}`);
+        logger.error(`Error fetching existing permission: ${existingPermission.message}`);
+        totalCreatedPermissionsResult.errors.push({
+          processName: 'getPermissionsByUserId',
+          message: existingPermission.message,
+          status: existingPermission.status,
+        });
     }
 
     if (permissionRequests.length) {
       const chunkedPermissionRequests = chunk(permissionRequests, EGA_MAX_REQUEST_SIZE);
       for await (const requests of chunkedPermissionRequests) {
-        await createRequiredPermissions(egaClient, approvedUser, requests);
+        const createdPermissions = await createRequiredPermissions(
+          egaClient,
+          approvedUser,
+          requests,
+        );
+        if (createdPermissions.num_granted !== 0) {
+          userPermissionResult.permissionsGrantedCount =
+            userPermissionResult.permissionsGrantedCount + createdPermissions.num_granted;
+          totalCreatedPermissionsResult.numUsersWithNewPermissions++;
+        }
       }
+    }
+
+    if (
+      userPermissionResult.permissionsGrantedCount === userPermissionResult.permissionsMissingCount
+    ) {
+      totalCreatedPermissionsResult.numUsersSuccessfullyProcessed++;
     }
   }
   logger.info('Completed processing permissions for all DACO approved users.');
+  const endTime = new Date();
+  const timeElapsed = moment(endTime).diff(startTime, 'minutes');
+  return {
+    startTime,
+    endTime,
+    timeElapsed: `${timeElapsed} minutes`,
+    completionStatus:
+      totalCreatedPermissionsResult.errors.length === 0 &&
+      totalCreatedPermissionsResult.numUsersSuccessfullyProcessed === Object.keys(egaUsers).length
+        ? 'SUCCESS'
+        : 'FAILURE',
+    details: totalCreatedPermissionsResult,
+  };
 };
 
 /**
@@ -147,19 +230,24 @@ export const processPermissionsForApprovedUsers = async (
  * @param client EgaClient
  * @param dataset_accession_id DatasetAccessionId
  * @param approvedUsers EgaDacoUserMap
- * @returns void
+ * @returns DatasetPermissionsRevocationResult
  */
 export const processPermissionsForDataset = async (
   client: EgaClient,
   datasetAccessionId: DatasetAccessionId,
   approvedUsers: EgaDacoUserMap,
-): Promise<void> => {
+): Promise<DatasetPermissionsRevocationResult> => {
   let permissionsSet: Set<number> = new Set();
   let permissionsToRevoke: RevokePermission[] = [];
   let offset = 0;
   let limit = DEFAULT_LIMIT;
   let paging = true;
 
+  const permissionsRevocationResult: DatasetPermissionsRevocationResult = {
+    permissionRevocationsExpected: 0,
+    permissionRevocationsCompleted: 0,
+    errors: [],
+  };
   // loop will stop once result length from GET is less than limit
   while (paging) {
     const permissions = await client.getPermissionsForDataset({
@@ -183,12 +271,17 @@ export const processPermissionsForDataset = async (
       logger.error(
         `GET permissions for dataset ${datasetAccessionId} failed - ${permissions.message}`,
       );
-      // stop paging results if request completely fails to prevent endless loop
-      // can a retry mechanism be added here, if error is retryable?
-      paging = false;
+      permissionsRevocationResult.errors.push({
+        processName: 'getPermissionsForDataset',
+        status: permissions.status,
+        message: permissions.message,
+        datasetId: datasetAccessionId,
+      });
+      // TODO: add a max number of retries to prevent endless loop, then set paging = false?
     }
   }
   const setSize = permissionsSet.size;
+  permissionsRevocationResult.permissionRevocationsExpected = setSize;
   if (setSize > 0) {
     logger.debug(`There are ${setSize} permissions to remove.`);
     permissionsSet.forEach((perm) => {
@@ -199,16 +292,76 @@ export const processPermissionsForDataset = async (
     for await (const requests of chunkedRevokeRequests) {
       const revokeResponse = await client.revokePermissions(requests);
       if (isSuccess(revokeResponse)) {
-        logger.info(
+        logger.debug(
           `Successfully revoked ${revokeResponse.data.num_revoked} of total ${setSize} permissions for DATASET ${datasetAccessionId}.`,
         );
+        permissionsRevocationResult.permissionRevocationsCompleted =
+          permissionsRevocationResult.permissionRevocationsCompleted +
+          revokeResponse.data.num_revoked;
       } else {
         logger.error(
           `There was an error revoking permissions for DATASET ${datasetAccessionId} - ${revokeResponse.message}.`,
         );
+        permissionsRevocationResult.errors.push({
+          processName: 'revokePermissions',
+          status: revokeResponse.status,
+          message: revokeResponse.message,
+          datasetId: datasetAccessionId,
+        });
       }
     }
   } else {
-    logger.info(`There are no permissions to revoke for DATASET ${datasetAccessionId}.`);
+    logger.debug(`There are no permissions to revoke for DATASET ${datasetAccessionId}.`);
   }
+
+  return permissionsRevocationResult;
+};
+
+/**
+ * Remove expired permissions from each Dataset in the ICGC DAC.
+ * Permissions are considered expired if the associated username is not found on the EgaUsers list
+ * Returns a report detailing the number of datasets successfully process, and any errors encountered.
+ * A dataset is considered successfully processed if the number of expected revoked permissions matches the number that are revoked
+ * @param egaClient
+ * @param egaUsers
+ * @param datasets
+ * @returns Promise<ProcessResultReport<ProcessExpiredPermissionsDetails>>
+ */
+export const removeExpiredPermissions = async (
+  client: EgaClient,
+  egaUsers: EgaDacoUserMap,
+  datasets: EgaDataset[],
+): Promise<ProcessResultReport<ProcessExpiredPermissionsDetails>> => {
+  const startTime = new Date();
+  // Check existing permissions per dataset + revoke if needed
+  const revocationErrors: PermissionProcessingError[] = [];
+  const permissionsRevokedResult: ProcessExpiredPermissionsDetails = {
+    numDatasetsProcessed: 0,
+    numDatasetsWithPermissionsRevoked: 0,
+    errors: revocationErrors,
+  };
+  for await (const dataset of datasets) {
+    const result = await processPermissionsForDataset(client, dataset.accession_id, egaUsers);
+    if (result.permissionRevocationsCompleted > 0) {
+      permissionsRevokedResult.numDatasetsWithPermissionsRevoked++;
+    }
+    if (result.permissionRevocationsCompleted === result.permissionRevocationsExpected) {
+      permissionsRevokedResult.numDatasetsProcessed++;
+    } else {
+      permissionsRevokedResult.errors.concat(result.errors);
+    }
+  }
+  const endTime = new Date();
+  const timeElapsed = moment(endTime).diff(startTime, 'minutes');
+  return {
+    startTime,
+    endTime,
+    timeElapsed: `${timeElapsed} minutes`,
+    completionStatus: permissionsRevokedResult.errors.length === 0 ? 'SUCCESS' : 'FAILURE',
+    details: {
+      numDatasetsProcessed: permissionsRevokedResult.numDatasetsProcessed,
+      numDatasetsWithPermissionsRevoked: permissionsRevokedResult.numDatasetsWithPermissionsRevoked,
+      errors: permissionsRevokedResult.errors,
+    },
+  };
 };

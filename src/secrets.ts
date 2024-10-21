@@ -1,6 +1,9 @@
 import * as dotenv from 'dotenv';
 
+import { getAppConfig } from './config';
+import { fetchPublicKeyFromKeycloak } from './jobs/ega/fetchPublicKey';
 import logger from './logger';
+import { checkIsDefined } from './utils/misc';
 import * as vault from './vault';
 
 export interface MongoSecrets {
@@ -21,6 +24,7 @@ export interface AppSecrets {
     dacoEncryptionKey: string;
     egaUsername: string;
     egaPassword: string;
+    egaPublicKey: string;
   };
   storage: {
     key: string;
@@ -49,7 +53,8 @@ const loadVaultSecrets = async () => {
 
 const buildSecrets = async (vaultSecrets: Record<string, any> = {}): Promise<AppSecrets> => {
   logger.info('Building app secrets...');
-
+  const config = getAppConfig();
+  const publicKey = await fetchPublicKeyFromKeycloak(config);
   secrets = {
     email: {
       auth: {
@@ -61,6 +66,7 @@ const buildSecrets = async (vaultSecrets: Record<string, any> = {}): Promise<App
       dacoEncryptionKey: vaultSecrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY || '',
       egaUsername: vaultSecrets.EGA_USERNAME || process.env.EGA_USERNAME || '',
       egaPassword: vaultSecrets.EGA_PASSWORD || process.env.EGA_PASSWORD || '',
+      egaPublicKey: checkIsDefined(publicKey || process.env.EGA_PUBLIC_KEY || ''),
     },
     storage: {
       key: vaultSecrets.OBJECT_STORAGE_KEY || process.env.OBJECT_STORAGE_KEY || '',

@@ -13,6 +13,7 @@ import secondExpiryNotificationCheck from './secondExpiryNotification';
 import runCloseUnsubmittedRenewalsCheck from './closeUnsubmittedRenewalsCheck';
 import { JobReport, Report } from './types';
 import { getAppConfig } from '../config';
+import runEgaPermissionsReconciliation from './ega/egaPermissionsReconciliation';
 
 const JOB_NAME = 'ALL BATCH JOBS';
 
@@ -28,7 +29,7 @@ export default async function (
 ) {
   logger.info(`${JOB_NAME} - Initiating...`);
   const {
-    featureFlags: { renewalEnabled },
+    featureFlags: { renewalEnabled, egaReconciliationEnabled },
   } = getAppConfig();
   // define currentDate here so each job has the same reference date
   const currentDate = moment.utc().toDate();
@@ -51,7 +52,12 @@ export default async function (
     const closedRenewalsReport = renewalEnabled
       ? await runCloseUnsubmittedRenewalsCheck(currentDate, user)
       : getReportFeatureDisabled('CLOSING UNSUBMITTED RENEWALS');
-    const approvedUsersEmailReport = await approvedUsersEmail(emailClient);
+    const approvedUsersEmailReport = egaReconciliationEnabled
+      ? getReportFeatureDisabled('APPROVED USERS EMAIL')
+      : await approvedUsersEmail(emailClient);
+    const egaReconciliationReport = egaReconciliationEnabled
+      ? await runEgaPermissionsReconciliation()
+      : getReportFeatureDisabled('EGA RECONCILIATION');
     // define report to collect all affected appIds
     // each job will return its own report
     // this function will build a complete summary
@@ -66,10 +72,10 @@ export default async function (
       expiredApps: expiringAppsReport,
       closedApps: closedRenewalsReport,
       approvedUsers: approvedUsersEmailReport,
+      egaReconciliation: egaReconciliationReport,
     };
     logger.info(`${JOB_NAME} - Logging report`);
     logger.info(`${JOB_NAME} - ${JSON.stringify(completeReport)}`);
-    // TODO: Slack integration for report/error visibility
   } catch (err) {
     logger.error(`${JOB_NAME} - failed with error: ${err}`);
     logger.error(`${JOB_NAME} - ${err as Error}`);

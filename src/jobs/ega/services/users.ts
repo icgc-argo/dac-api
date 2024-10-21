@@ -17,8 +17,9 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import moment from 'moment';
 import logger from '../../../logger';
-import { EgaClient } from '../egaClient';
+import { EgaClient } from '../axios/egaClient';
 import { EgaDacoUserMap } from '../types/responses';
 import { ApprovedUser } from '../utils';
 
@@ -45,6 +46,7 @@ export const getEgaUsers = async (
   client: EgaClient,
   approvedUsers: ApprovedUser[],
 ): Promise<EgaDacoUserMap> => {
+  const startTime = new Date();
   let egaUsers: EgaDacoUserMap = {};
   for await (const user of approvedUsers) {
     try {
@@ -54,6 +56,7 @@ export const getEgaUsers = async (
           const { data } = egaUser;
           const egaDacoUser = {
             ...data,
+            email: user.email,
             appExpiry: user.appExpiry,
             appId: user.appId,
           };
@@ -75,5 +78,8 @@ export const getEgaUsers = async (
       logger.error(err);
     }
   }
+  const endTime = new Date();
+  const timeElapsed = moment(endTime).diff(startTime, 'minutes');
+  logger.debug(`getEgaUsers took ${timeElapsed} minutes to complete.`);
   return egaUsers;
 };

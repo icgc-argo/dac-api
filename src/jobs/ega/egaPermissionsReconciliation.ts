@@ -18,17 +18,19 @@
  */
 
 import { getAppConfig } from '../../config';
-import logger, { buildMessage } from '../../logger';
-import { egaApiClient } from './egaClient';
+import logger from '../../logger';
+import { egaApiClient } from './axios/egaClient';
 import {
   processPermissionsForApprovedUsers,
-  processPermissionsForDataset,
+  removeExpiredPermissions,
 } from './services/permissions';
 import { getEgaUsers } from './services/users';
 import { isSuccess } from './types/results';
 import { getDacoApprovedUsers } from './utils';
 
 import moment from 'moment';
+import { JobReport } from '../types';
+import { ReconciliationJobReport } from './types/reports';
 
 const JOB_NAME = 'RECONCILE_EGA_PERMISSIONS';
 
@@ -39,12 +41,15 @@ const JOB_NAME = 'RECONCILE_EGA_PERMISSIONS';
  * 3) Retrieve corresponding list of users from EGA API
  * 4) Create permissions, on each dataset, for each user on the DACO approved list, if no existing permission is found
  * 5) Process existing permissions for each dataset + revoke those which belong to users not on the DACO approved list
+ * 6) Return completed JobReport
+ * @returns Promise<JobReport<ReconciliationJobReport>>
  */
-async function runEgaPermissionsReconciliation() {
+async function runEgaPermissionsReconciliation(): Promise<JobReport<ReconciliationJobReport>> {
   const startTime = new Date();
-  logger.info(`Job started at ${startTime}`);
+
   // retrieve approved users list from daco system
   const dacoUsers = await getDacoApprovedUsers();
+
   // initialize EGA Axios client
   const egaClient = await egaApiClient();
 
@@ -54,33 +59,73 @@ async function runEgaPermissionsReconciliation() {
   } = getAppConfig();
   const datasets = await egaClient.getDatasetsForDac(dacId);
 
-  // get datasets failed completely
+  // get datasets failed completely - not recoverable
   if (!isSuccess(datasets)) {
-    // TODO: retry here?
-    throw new Error('Failed to fetch datasets');
+    logger.error(`${JOB_NAME} - Failed to fetch datasets, aborting.`);
+    const jobFailureReport: JobReport<ReconciliationJobReport> = {
+      startedAt: startTime,
+      finishedAt: new Date(),
+      jobName: JOB_NAME,
+      success: false,
+      error: datasets.message,
+      details: {
+        approvedDacoUsersCount: dacoUsers.length,
+        approvedEgaUsersCount: 0,
+        datasetsCount: 0,
+        permissionsCreated: 0,
+        permissionsRevoked: 0,
+      },
+    };
+    return jobFailureReport;
   }
-  logger.debug(`Successfully retrieved ${datasets.data.success.length} for DAC ${dacId}.`);
+
+  logger.debug(
+    `${JOB_NAME} - Successfully retrieved ${datasets.data.success.length} for DAC ${dacId}.`,
+  );
   // retrieve corresponding users in EGA system
   const egaUsers = await getEgaUsers(egaClient, dacoUsers);
-  logger.debug(`Retrieved ${Object.keys(egaUsers).length} corresponding users from EGA.`);
+  logger.debug(`${JOB_NAME} - Completed fetching users`);
+  logger.debug(
+    `${JOB_NAME} - Retrieved ${Object.keys(egaUsers).length} corresponding users from EGA.`,
+  );
   const datasetsRetrieved = datasets.data.success;
-  logger.debug(`Retrieved ${datasetsRetrieved.length} datasets for ${dacId}.`);
+  logger.debug(`${JOB_NAME} - Retrieved ${datasetsRetrieved.length} datasets for ${dacId}.`);
+
   // check DACO approved users have expected EGA permissions for each dataset
-  await processPermissionsForApprovedUsers(egaClient, egaUsers, datasetsRetrieved);
+  const permissionsCreatedResult = await processPermissionsForApprovedUsers(
+    egaClient,
+    egaUsers,
+    datasetsRetrieved,
+  );
 
-  // can add a return value to these process functions if needed, i.e. BatchJobReport
+  // remove any expired permissions for each dataset
+  const permissionsRevokedResult = await removeExpiredPermissions(
+    egaClient,
+    egaUsers,
+    datasetsRetrieved,
+  );
 
-  // Check existing permissions per dataset + revoke if needed
-  for await (const dataset of datasetsRetrieved) {
-    await processPermissionsForDataset(egaClient, dataset.accession_id, egaUsers);
-  }
-
-  logger.info(buildMessage(JOB_NAME, 'Completed.'));
   const endTime = new Date();
-  logger.info(`Job completed at ${endTime}`);
   const timeElapsed = moment(endTime).diff(startTime, 'minutes');
-  logger.info(`Job took ${timeElapsed} minutes to complete.`);
-  return 'OK';
+  logger.info(`${JOB_NAME} - Job took ${timeElapsed} minutes to complete.`);
+
+  const reportHasErrors =
+    permissionsCreatedResult.details.errors.length | permissionsRevokedResult.details.errors.length;
+  const permissionsReconciliationJobReport: JobReport<ReconciliationJobReport> = {
+    startedAt: startTime,
+    finishedAt: endTime,
+    jobName: JOB_NAME,
+    success: !reportHasErrors,
+    error: reportHasErrors ? 'Completed, with some errors' : undefined,
+    details: {
+      approvedDacoUsersCount: dacoUsers.length,
+      approvedEgaUsersCount: Object.keys(egaUsers).length,
+      datasetsCount: datasetsRetrieved.length,
+      permissionsCreated: permissionsCreatedResult,
+      permissionsRevoked: permissionsRevokedResult,
+    },
+  };
+  return permissionsReconciliationJobReport;
 }
 
 export default runEgaPermissionsReconciliation;
