@@ -26,7 +26,6 @@ import logger from '../../../logger';
 import getAppSecrets from '../../../secrets';
 
 import { EGA_GRANT_TYPE, EGA_REALMS_PATH, EGA_TOKEN_ENDPOINT } from '../../../utils/constants';
-import { DEFAULT_RETRIES } from '../types/constants';
 import { IdpToken } from '../types/responses';
 const { verify } = jwt;
 
@@ -76,12 +75,18 @@ export const isTokenExpired = async (token: IdpToken): Promise<boolean> => {
 // initialize IDP client
 const initIdpClient = () => {
   const {
-    ega: { authHost },
+    ega: { authHost, maxAccessTokenRequestRetries },
   } = getAppConfig();
   const client = axios.create({
     baseURL: authHost,
   });
-  axiosRetry(client, { retries: DEFAULT_RETRIES });
+  axiosRetry(client, {
+    retries: maxAccessTokenRequestRetries,
+    onMaxRetryTimesExceeded: (error, retryCount) => {
+      logger.error(`${CLIENT_NAME} - TOKEN_REQUEST_FAILURE - Max allowed retries`);
+      return Promise.reject('TOKEN_REQUEST_FAILURE');
+    },
+  });
   return client;
 };
 const idpClient = initIdpClient();
@@ -122,6 +127,10 @@ idpClient.interceptors.response.use(
         logger.error(`${CLIENT_NAME} - Instanceof Error message: ${error.message}`);
         return Promise.reject(error);
       default:
+        if (error === 'TOKEN_REQUEST_FAILURE') {
+          logger.error(`${CLIENT_NAME} - Unable to retrieve new access token, rejecting request.`);
+          return Promise.reject(error);
+        }
         logger.error(`${CLIENT_NAME} - Unknown error type: ${error}`);
         return Promise.reject(error);
     }

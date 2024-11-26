@@ -26,7 +26,6 @@ import axiosRetry from 'axios-retry';
 import pThrottle from '../../../../pThrottle';
 import { EGA_API } from '../../../utils/constants';
 import { DacAccessionId, DatasetAccessionId } from '../types/common';
-import { DEFAULT_RETRIES } from '../types/constants';
 import { BadRequestError, NotFoundError, ServerError } from '../types/errors';
 import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from '../types/requests';
 import {
@@ -61,7 +60,7 @@ const CLIENT_NAME = 'EGA_API_CLIENT';
 // initialize API client
 const initApiAxiosClient = () => {
   const {
-    ega: { apiUrl },
+    ega: { apiUrl, maxRequestRetries },
   } = getAppConfig();
   const client = axios.create({
     baseURL: apiUrl,
@@ -69,7 +68,13 @@ const initApiAxiosClient = () => {
       'Content-Type': 'application/json',
     },
   });
-  axiosRetry(client, { retries: DEFAULT_RETRIES });
+  axiosRetry(client, {
+    retries: maxRequestRetries,
+    onMaxRetryTimesExceeded: (error, retryCount) => {
+      // return rejection to allow process to move to next request
+      return Promise.reject(`${CLIENT_NAME} - Max allowed retries`);
+    },
+  });
   return client;
 };
 const apiAxiosClient = initApiAxiosClient();

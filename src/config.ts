@@ -99,6 +99,8 @@ export interface AppConfig {
     dacId: string;
     maxRequestLimit: number;
     maxRequestInterval: number;
+    maxRequestRetries: number;
+    maxAccessTokenRequestRetries: number;
   };
 }
 
@@ -219,6 +221,8 @@ const buildAppContext = (): AppConfig => {
       dacId: checkIsDefined(process.env.DAC_ID),
       maxRequestLimit: Number(process.env.EGA_MAX_REQUEST_LIMIT) || 3,
       maxRequestInterval: Number(process.env.EGA_MAX_REQUEST_INTERVAL) || 1000,
+      maxRequestRetries: Number(process.env.EGA_MAX_REQUEST_RETRIES) || 3,
+      maxAccessTokenRequestRetries: Number(process.env.EGA_MAX_ACCESS_TOKEN_REQUEST_RETRIES) || 5,
     },
   };
   return config;
