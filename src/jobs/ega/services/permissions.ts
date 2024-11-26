@@ -174,9 +174,6 @@ export const processPermissionsForApprovedUsers = async (
     errors: [],
   };
   for await (const approvedUser of userList) {
-    logger.info(
-      `Checking permissions for user ${approvedUser.username} - userId: [${approvedUser.id}]`,
-    );
     const permissionRequests: PermissionRequest[] = [];
     const userPermissionResult: PermissionsCreatedPerUserResult = {
       permissionsMissingCount: 0,
@@ -315,7 +312,6 @@ export const processPermissionsForDataset = async (
         message: permissions.message,
         datasetId: datasetAccessionId,
       });
-      // TODO: add a max number of retries to prevent endless loop, then set paging = false?
     }
   }
   const setSize = permissionsSet.size;
