@@ -50,7 +50,9 @@ import {
 } from '../types/results';
 import { safeParseArray, ZodResultAccumulator } from '../types/zodSafeParseArray';
 import { ApprovedUser, getErrorMessage } from '../utils';
-import { fetchAccessToken, tokenExpired } from './idpClient';
+import { fetchAccessToken, isTokenExpired } from './idpClient';
+import axiosRetry from 'axios-retry';
+import { DEFAULT_RETRIES } from '../types/constants';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
 
@@ -61,12 +63,14 @@ const initApiAxiosClient = () => {
   const {
     ega: { apiUrl },
   } = getAppConfig();
-  return axios.create({
+  const client = axios.create({
     baseURL: apiUrl,
     headers: {
       'Content-Type': 'application/json',
     },
   });
+  axiosRetry(client, { retries: DEFAULT_RETRIES });
+  return client;
 };
 const apiAxiosClient = initApiAxiosClient();
 
@@ -84,9 +88,9 @@ export const egaApiClient = async () => {
 
   const getAccessToken = async (): Promise<IdpToken> => {
     if (currentToken) {
-      const tokenIsExpired = await tokenExpired(currentToken);
+      const tokenIsExpired = await isTokenExpired(currentToken);
       if (tokenIsExpired) {
-        logger.info('token is expired');
+        logger.debug('Token is expired.');
         resetAccessToken();
       } else {
         return currentToken;
@@ -117,6 +121,13 @@ export const egaApiClient = async () => {
     interval: maxRequestInterval,
   });
 
+  // throttled axios methods
+  const throttledDelete = throttle(apiAxiosClient.delete);
+  const throttledGet = throttle(apiAxiosClient.get);
+  const throttledPost = throttle(apiAxiosClient.post);
+  const throttledPut = throttle(apiAxiosClient.put);
+  const throttledGenericRequest = throttle(apiAxiosClient.request);
+
   const accessToken = await getAccessToken();
   apiAxiosClient.defaults.headers.common['Authorization'] = `Bearer ${accessToken.access_token}`;
 
@@ -142,7 +153,7 @@ export const egaApiClient = async () => {
                 // reset on client headers so subsequent requests have new access token
                 apiAxiosClient.defaults.headers['Authorization'] = refreshedBearerToken;
                 // returns Promise for original request
-                return apiAxiosClient.request(error.config);
+                return throttledGenericRequest(error.config);
               case 400:
                 // don't retry
                 logger.error(`Bad Request`);
@@ -157,13 +168,13 @@ export const egaApiClient = async () => {
                   `${CLIENT_NAME} - ${error.response.status} - ${error.response.statusText} - retrying original request.`,
                 );
                 // retry original request. this response error shouldn't be an issue because throttling is in place
-                return apiAxiosClient.request(error.config);
+                return throttledGenericRequest(error.config);
               case 504:
                 logger.error(
                   `${CLIENT_NAME} - ${error.response.status} - ${error.response.statusText} - retrying original request.`,
                 );
                 // retry original request
-                return apiAxiosClient.request(error.config);
+                return throttledGenericRequest(error.config);
               default:
                 logger.error(`Unexpected Axios Error: ${error.response.status}`);
                 return new ServerError('Unexpected Axios Error');
@@ -177,7 +188,7 @@ export const egaApiClient = async () => {
               logger.error(`${CLIENT_NAME} - AxiosError - ECONNRESET`);
               if (originalRequest) {
                 logger.info(`${CLIENT_NAME} - ECONNRESET - retrying original request`);
-                return apiAxiosClient.request(originalRequest);
+                return throttledGenericRequest(originalRequest);
               }
               return Promise.reject(error);
             case 'ERR_BAD_REQUEST':
@@ -203,7 +214,7 @@ export const egaApiClient = async () => {
   ): Promise<Result<ZodResultAccumulator<EgaDataset>, GetDatasetsForDacFailure>> => {
     const url = urlJoin(DACS, dacId, DATASETS);
     try {
-      const { data } = await apiAxiosClient.get(url);
+      const { data } = await throttledGet(url);
       const result = safeParseArray(EgaDataset, data);
       return success(result);
     } catch (err) {
@@ -229,7 +240,7 @@ export const egaApiClient = async () => {
   const getUser = async (user: ApprovedUser): Promise<Result<EgaUser, GetUserFailure>> => {
     const url = urlJoin(USERS, user.email);
     try {
-      const response = await apiAxiosClient.get(url);
+      const response = await throttledGet(url);
       const egaUser = EgaUser.safeParse(response.data);
       if (egaUser.success) {
         return success(egaUser.data);
@@ -269,7 +280,7 @@ export const egaApiClient = async () => {
   }): Promise<Result<ZodResultAccumulator<EgaPermission>, GetPermissionsForDatasetFailure>> => {
     const url = urlJoin(DACS, dacId, PERMISSIONS);
     try {
-      const response = await apiAxiosClient.get(url, {
+      const response = await throttledGet(url, {
         params: {
           dataset_accession_id: datasetAccessionId,
           limit,
@@ -303,7 +314,7 @@ export const egaApiClient = async () => {
   > => {
     try {
       const url = urlJoin(PERMISSIONS);
-      const response = await apiAxiosClient.get(url, {
+      const response = await throttledGet(url, {
         params: {
           user_id: userId,
           limit: datasetsTotal,
@@ -359,7 +370,7 @@ export const egaApiClient = async () => {
     Result<ZodResultAccumulator<EgaPermissionRequest>, CreatePermissionRequestsFailure>
   > => {
     try {
-      const { data } = await apiAxiosClient.post(REQUESTS, requests);
+      const { data } = await throttledPost(REQUESTS, requests);
       const result = safeParseArray(EgaPermissionRequest, data);
       return success(result);
     } catch (err) {
@@ -387,7 +398,7 @@ export const egaApiClient = async () => {
     requests: ApprovePermissionRequest[],
   ): Promise<Result<ApprovePermissionResponse, ApprovedPermissionRequestsFailure>> => {
     try {
-      const response = await apiAxiosClient.put(REQUESTS, requests);
+      const response = await throttledPut(REQUESTS, requests);
       if (response.data) {
         const result = ApprovePermissionResponse.safeParse(response.data);
         if (result.success) {
@@ -424,7 +435,7 @@ export const egaApiClient = async () => {
     requests: RevokePermission[],
   ): Promise<Result<RevokePermissionResponse, RevokePermissionsFailure>> => {
     try {
-      const response = await apiAxiosClient.delete(PERMISSIONS, { data: requests });
+      const response = await throttledDelete(PERMISSIONS, { data: requests });
       if (response.status === 400) {
         throw new BadRequestError('Permission not found.');
       }
@@ -452,13 +463,13 @@ export const egaApiClient = async () => {
   };
 
   return {
-    approvePermissionRequests: throttle(approvePermissionRequests),
-    createPermissionRequests: throttle(createPermissionRequests),
-    getDatasetsForDac: throttle(getDatasetsForDac),
-    getPermissionsByUserId: throttle(getPermissionsByUserId),
-    getPermissionsForDataset: throttle(getPermissionsForDataset),
-    getUser: throttle(getUser),
-    revokePermissions: throttle(revokePermissions),
+    approvePermissionRequests,
+    createPermissionRequests,
+    getDatasetsForDac,
+    getPermissionsByUserId,
+    getPermissionsForDataset,
+    getUser,
+    revokePermissions,
   };
 };
 

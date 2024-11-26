@@ -21,3 +21,4 @@
 export const DEFAULT_LIMIT = 100;
 export const DEFAULT_OFFSET = DEFAULT_LIMIT;
 export const EGA_MAX_REQUEST_SIZE = 5000;
+export const DEFAULT_RETRIES = 3;

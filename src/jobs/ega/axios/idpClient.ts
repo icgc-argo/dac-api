@@ -61,11 +61,12 @@ const decodeToken = async (
 };
 
 /**
- * Uses jsonwebtoken.verify to validate token is not expired
+ * Uses jsonwebtoken.verify to validate token is not expired.
+ * Returns true if token is expired, otherwise returns false; the token may be invalid and still return false
  * @param token IdpToken
  * @returns Promise<boolean>
  */
-export const tokenExpired = async (token: IdpToken): Promise<boolean> => {
+export const isTokenExpired = async (token: IdpToken): Promise<boolean> => {
   const decoded = await decodeToken(token.access_token);
   return decoded === 'TokenExpiredError';
 };

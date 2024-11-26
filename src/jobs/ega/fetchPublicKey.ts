@@ -33,7 +33,7 @@ export const fetchPublicKeyFromKeycloak = async (
     console.error('Keycloak realm info not provided in config, aborting fetch attempt.');
     return undefined;
   }
-  console.info(`Fetching public key from Keycloak realm ${authRealmName}.`);
+  console.debug(`Fetching public key from Keycloak realm ${authRealmName}.`);
   const keycloakUrl = urlJoin(authHost, 'realms', authRealmName);
   try {
     const response = await fetch(keycloakUrl);
