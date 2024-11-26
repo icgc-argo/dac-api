@@ -41,6 +41,7 @@ export type PermissionProcessingError = {
 export type DatasetPermissionsRevocationResult = {
   permissionRevocationsExpected: number;
   permissionRevocationsCompleted: number;
+  hasIncorrectPermissionsCount: boolean;
   errors: (PermissionProcessingError & { datasetId: DatasetAccessionId })[];
 };
 
@@ -48,6 +49,7 @@ export type ProcessExpiredPermissionsDetails = {
   numDatasetsProcessed: number;
   numDatasetsWithPermissionsRevoked: number;
   errors: PermissionProcessingError[];
+  datasetsWithIncorrectPermissionsCounts: DatasetAccessionId[];
 };
 /* ******************* *
    Create permissions types
@@ -68,7 +70,7 @@ export type ProcessApprovedUsersDetails = {
     Main Permissions Report types
  * ******************* */
 
-export type CompletionStatus = 'SUCCESS' | 'FAILURE';
+export type CompletionStatus = 'SUCCESS' | 'FAILURE' | 'INCOMPLETE';
 
 export type ProcessResultReport<T> = {
   startTime: Date;

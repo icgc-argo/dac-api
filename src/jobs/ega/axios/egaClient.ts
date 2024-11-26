@@ -22,9 +22,11 @@ import urlJoin from 'url-join';
 import { getAppConfig } from '../../../config';
 import logger from '../../../logger';
 
+import axiosRetry from 'axios-retry';
 import pThrottle from '../../../../pThrottle';
 import { EGA_API } from '../../../utils/constants';
 import { DacAccessionId, DatasetAccessionId } from '../types/common';
+import { DEFAULT_RETRIES } from '../types/constants';
 import { BadRequestError, NotFoundError, ServerError } from '../types/errors';
 import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from '../types/requests';
 import {
@@ -51,8 +53,6 @@ import {
 import { safeParseArray, ZodResultAccumulator } from '../types/zodSafeParseArray';
 import { ApprovedUser, getErrorMessage } from '../utils';
 import { fetchAccessToken, isTokenExpired } from './idpClient';
-import axiosRetry from 'axios-retry';
-import { DEFAULT_RETRIES } from '../types/constants';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
 

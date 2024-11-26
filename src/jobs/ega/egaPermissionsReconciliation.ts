@@ -43,6 +43,41 @@ const JOB_NAME = 'RECONCILE_EGA_PERMISSIONS';
  * 5) Process existing permissions for each dataset + revoke those which belong to users not on the DACO approved list
  * 6) Return completed JobReport
  * @returns Promise<JobReport<ReconciliationJobReport>>
+ * @example
+ * // returns {
+  "startedAt": "2024-11-25T22:14:57.306Z",
+  "finishedAt": "2024-11-26T01:52:51.339Z",
+  "jobName": "RECONCILE_EGA_PERMISSIONS",
+  "success": true,
+  "details": {
+    "approvedDacoUsersCount": 1514,
+    "approvedEgaUsersCount": 1514,
+    "datasetsCount": 503,
+    "permissionsCreated": {
+      "startTime": "2024-11-25T22:26:38.344Z",
+      "endTime": "2024-11-26T00:04:22.968Z",
+      "timeElapsed": "97 minutes",
+      "completionStatus": "SUCCESS",
+      "details": {
+        "numUsersSuccessfullyProcessed": 1514,
+        "numUsersWithNewPermissions": 1402,
+        "errors": []
+      }
+    },
+    "permissionsRevoked": {
+      "startTime": "2024-11-26T00:04:22.980Z",
+      "endTime": "2024-11-26T01:52:51.331Z",
+      "timeElapsed": "108 minutes",
+      "completionStatus": "SUCCESS",
+      "details": {
+        "numDatasetsProcessed": 503,
+        "numDatasetsWithPermissionsRevoked": 293,
+        "errors": [],
+        "datasetsWithIncorrectPermissionsCounts": []
+      }
+    }
+  }
+}
  */
 async function runEgaPermissionsReconciliation(): Promise<JobReport<ReconciliationJobReport>> {
   const startTime = new Date();
@@ -110,7 +145,8 @@ async function runEgaPermissionsReconciliation(): Promise<JobReport<Reconciliati
   logger.info(`${JOB_NAME} - Job took ${timeElapsed} minutes to complete.`);
 
   const reportHasErrors =
-    permissionsCreatedResult.details.errors.length | permissionsRevokedResult.details.errors.length;
+    permissionsCreatedResult.details.errors.length > 0 ||
+    permissionsRevokedResult.details.errors.length > 0;
   const permissionsReconciliationJobReport: JobReport<ReconciliationJobReport> = {
     startedAt: startTime,
     finishedAt: endTime,

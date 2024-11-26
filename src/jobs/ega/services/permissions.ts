@@ -24,6 +24,7 @@ import { EgaClient } from '../axios/egaClient';
 import { DatasetAccessionId } from '../types/common';
 import { DEFAULT_LIMIT, DEFAULT_OFFSET, EGA_MAX_REQUEST_SIZE } from '../types/constants';
 import {
+  CompletionStatus,
   DatasetPermissionsRevocationResult,
   PermissionProcessingError,
   PermissionsCreatedPerUserResult,
@@ -39,6 +40,34 @@ import {
   createPermissionRequest,
   createRevokePermissionRequest,
 } from '../utils';
+
+/**
+ * Parse completionStatus for a reconciliation step, based on the number of successfully processed items vs total expected
+ * Any errors during a step will result in a FAILURE status
+ * SUCCESS = no errors, and totalProcessed count matches totalExpected count
+ * INCOMPLETE = no errors, but totalProcessed count does not match totalExpected count
+ * FAILURE = errors occurred during job. Disregards other totals
+ * @param errors
+ * @param totalProcessed
+ * @param totalExpected
+ * @returns CompletionStatus
+ */
+const getCompletionStatus = (
+  errors: PermissionProcessingError[],
+  totalProcessed: number,
+  totalExpected: number,
+): CompletionStatus => {
+  switch (true) {
+    case errors.length > 0:
+      return 'FAILURE';
+    case errors.length === 0 && totalProcessed === totalExpected:
+      return 'SUCCESS';
+    case errors.length === 0 && totalProcessed !== totalExpected:
+      return 'INCOMPLETE';
+    default:
+      return 'FAILURE';
+  }
+};
 
 /**
  * Function to create + approve a list of PermissionsRequests
@@ -164,6 +193,11 @@ export const processPermissionsForApprovedUsers = async (
             (perm) => perm.dataset_accession_id,
           );
           const datasetsRequiringPermissions = datasets.map((dataset) => dataset.accession_id);
+          // if a dataset is removed from the incoming datasets list argument, i.e. the user has more dataset permissions than the incoming list,
+          // the call to difference() here would still return an empty array
+          // const incomingDatasetList = [1, 2, 3, 4, 6];
+          // const existingDatasetListForUser = [1, 2, 3, 4, 5]; // list with now defunct datasetId
+          // const response = difference(one, two) => [6]
           const missingDatasetIds = difference(
             datasetsRequiringPermissions,
             datasetsWithPermissions,
@@ -209,18 +243,20 @@ export const processPermissionsForApprovedUsers = async (
       totalCreatedPermissionsResult.numUsersSuccessfullyProcessed++;
     }
   }
+
   logger.info('Completed processing permissions for all DACO approved users.');
   const endTime = new Date();
   const timeElapsed = moment(endTime).diff(startTime, 'minutes');
+
   return {
     startTime,
     endTime,
     timeElapsed: `${timeElapsed} minutes`,
-    completionStatus:
-      totalCreatedPermissionsResult.errors.length === 0 &&
-      totalCreatedPermissionsResult.numUsersSuccessfullyProcessed === Object.keys(egaUsers).length
-        ? 'SUCCESS'
-        : 'FAILURE',
+    completionStatus: getCompletionStatus(
+      totalCreatedPermissionsResult.errors,
+      totalCreatedPermissionsResult.numUsersSuccessfullyProcessed,
+      Object.keys(egaUsers).length,
+    ),
     details: totalCreatedPermissionsResult,
   };
 };
@@ -242,10 +278,11 @@ export const processPermissionsForDataset = async (
   let offset = 0;
   let limit = DEFAULT_LIMIT;
   let paging = true;
-
+  let totalExistingPermissions = 0;
   const permissionsRevocationResult: DatasetPermissionsRevocationResult = {
     permissionRevocationsExpected: 0,
     permissionRevocationsCompleted: 0,
+    hasIncorrectPermissionsCount: false,
     errors: [],
   };
   // loop will stop once result length from GET is less than limit
@@ -265,6 +302,7 @@ export const processPermissionsForDataset = async (
         }
       });
       const totalResults = permissionsFailures.length + permissionsSuccesses.length;
+      totalExistingPermissions = totalExistingPermissions + permissionsSuccesses.length;
       paging = totalResults === limit;
       offset = offset + DEFAULT_OFFSET;
     } else {
@@ -292,7 +330,7 @@ export const processPermissionsForDataset = async (
     for await (const requests of chunkedRevokeRequests) {
       const revokeResponse = await client.revokePermissions(requests);
       if (isSuccess(revokeResponse)) {
-        logger.debug(
+        logger.info(
           `Successfully revoked ${revokeResponse.data.num_revoked} of total ${setSize} permissions for DATASET ${datasetAccessionId}.`,
         );
         permissionsRevocationResult.permissionRevocationsCompleted =
@@ -313,6 +351,11 @@ export const processPermissionsForDataset = async (
   } else {
     logger.debug(`There are no permissions to revoke for DATASET ${datasetAccessionId}.`);
   }
+
+  const datasetHasCorrectPermissionsCount =
+    totalExistingPermissions - permissionsRevocationResult.permissionRevocationsCompleted ===
+    Object.keys(approvedUsers).length;
+  permissionsRevocationResult.hasIncorrectPermissionsCount = !datasetHasCorrectPermissionsCount;
 
   return permissionsRevocationResult;
 };
@@ -339,6 +382,7 @@ export const removeExpiredPermissions = async (
     numDatasetsProcessed: 0,
     numDatasetsWithPermissionsRevoked: 0,
     errors: revocationErrors,
+    datasetsWithIncorrectPermissionsCounts: [],
   };
   for await (const dataset of datasets) {
     const result = await processPermissionsForDataset(client, dataset.accession_id, egaUsers);
@@ -350,18 +394,33 @@ export const removeExpiredPermissions = async (
     } else {
       permissionsRevokedResult.errors.concat(result.errors);
     }
+    if (result.hasIncorrectPermissionsCount) {
+      permissionsRevokedResult.datasetsWithIncorrectPermissionsCounts.concat(dataset.accession_id);
+    }
   }
   const endTime = new Date();
   const timeElapsed = moment(endTime).diff(startTime, 'minutes');
+
+  // datasets with permissions counts that do not match the number of approved users are not "successfully processed"
+  const datasetsSuccessfullyProcessed =
+    permissionsRevokedResult.numDatasetsProcessed -
+    permissionsRevokedResult.datasetsWithIncorrectPermissionsCounts.length;
+
   return {
     startTime,
     endTime,
     timeElapsed: `${timeElapsed} minutes`,
-    completionStatus: permissionsRevokedResult.errors.length === 0 ? 'SUCCESS' : 'FAILURE',
+    completionStatus: getCompletionStatus(
+      permissionsRevokedResult.errors,
+      datasetsSuccessfullyProcessed,
+      datasets.length,
+    ),
     details: {
       numDatasetsProcessed: permissionsRevokedResult.numDatasetsProcessed,
       numDatasetsWithPermissionsRevoked: permissionsRevokedResult.numDatasetsWithPermissionsRevoked,
       errors: permissionsRevokedResult.errors,
+      datasetsWithIncorrectPermissionsCounts:
+        permissionsRevokedResult.datasetsWithIncorrectPermissionsCounts,
     },
   };
 };

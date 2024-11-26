@@ -18,6 +18,7 @@
  */
 
 import axios, { AxiosError } from 'axios';
+import axiosRetry from 'axios-retry';
 import jwt from 'jsonwebtoken';
 import urlJoin from 'url-join';
 import { getAppConfig } from '../../../config';
@@ -25,6 +26,7 @@ import logger from '../../../logger';
 import getAppSecrets from '../../../secrets';
 
 import { EGA_GRANT_TYPE, EGA_REALMS_PATH, EGA_TOKEN_ENDPOINT } from '../../../utils/constants';
+import { DEFAULT_RETRIES } from '../types/constants';
 import { IdpToken } from '../types/responses';
 const { verify } = jwt;
 
@@ -39,7 +41,7 @@ const CLIENT_NAME = 'IDP_CLIENT';
 const decodeToken = async (
   token: string,
 ): Promise<jwt.JwtPayload | 'TokenExpiredError' | undefined> => {
-  logger.info('Verifying token');
+  logger.debug('Verifying token');
   const {
     auth: { egaPublicKey },
   } = await getAppSecrets();
@@ -76,9 +78,11 @@ const initIdpClient = () => {
   const {
     ega: { authHost },
   } = getAppConfig();
-  return axios.create({
+  const client = axios.create({
     baseURL: authHost,
   });
+  axiosRetry(client, { retries: DEFAULT_RETRIES });
+  return client;
 };
 const idpClient = initIdpClient();
 
@@ -101,7 +105,7 @@ idpClient.interceptors.response.use(
               logger.error(`${CLIENT_NAME} - AxiosError - ECONNRESET`);
               const originalRequest = error.config;
               if (originalRequest) {
-                logger.info(`${CLIENT_NAME} - retrying original request`);
+                logger.debug(`${CLIENT_NAME} - retrying original request`);
                 return idpClient.request(originalRequest);
               }
               break;
