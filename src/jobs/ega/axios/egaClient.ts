@@ -17,22 +17,17 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from 'axios';
 import urlJoin from 'url-join';
-import { getAppConfig } from '../../config';
-import logger from '../../logger';
-import getAppSecrets from '../../secrets';
+import { getAppConfig } from '../../../config';
+import logger from '../../../logger';
 
-import pThrottle from '../../../pThrottle';
-import {
-  EGA_API,
-  EGA_GRANT_TYPE,
-  EGA_REALMS_PATH,
-  EGA_TOKEN_ENDPOINT,
-} from '../../utils/constants';
-import { DacAccessionId, DatasetAccessionId } from './types/common';
-import { BadRequestError, NotFoundError, ServerError, TooManyRequestsError } from './types/errors';
-import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from './types/requests';
+import axiosRetry from 'axios-retry';
+import pThrottle from '../../../../pThrottle';
+import { EGA_API } from '../../../utils/constants';
+import { DacAccessionId, DatasetAccessionId } from '../types/common';
+import { BadRequestError, NotFoundError, ServerError } from '../types/errors';
+import { ApprovePermissionRequest, PermissionRequest, RevokePermission } from '../types/requests';
 import {
   ApprovePermissionResponse,
   EgaDataset,
@@ -41,7 +36,7 @@ import {
   EgaUser,
   IdpToken,
   RevokePermissionResponse,
-} from './types/responses';
+} from '../types/responses';
 import {
   ApprovedPermissionRequestsFailure,
   CreatePermissionRequestsFailure,
@@ -53,84 +48,36 @@ import {
   Result,
   RevokePermissionsFailure,
   success,
-} from './types/results';
-import { safeParseArray, ZodResultAccumulator } from './types/zodSafeParseArray';
-import { ApprovedUser, getErrorMessage } from './utils';
+} from '../types/results';
+import { safeParseArray, ZodResultAccumulator } from '../types/zodSafeParseArray';
+import { ApprovedUser, getErrorMessage } from '../utils';
+import { fetchAccessToken, isTokenExpired } from './idpClient';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
 
-// initialize IDP client
-const initIdpClient = () => {
-  const {
-    ega: { authHost },
-  } = getAppConfig();
-  return axios.create({
-    baseURL: authHost,
-  });
-};
-const idpClient = initIdpClient();
+const CLIENT_NAME = 'EGA_API_CLIENT';
 
 // initialize API client
 const initApiAxiosClient = () => {
   const {
-    ega: { apiUrl },
+    ega: { apiUrl, maxRequestRetries },
   } = getAppConfig();
-  return axios.create({
+  const client = axios.create({
     baseURL: apiUrl,
     headers: {
       'Content-Type': 'application/json',
     },
   });
+  axiosRetry(client, {
+    retries: maxRequestRetries,
+    onMaxRetryTimesExceeded: (error, retryCount) => {
+      // return rejection to allow process to move to next request
+      return Promise.reject(`${CLIENT_NAME} - Max allowed retries`);
+    },
+  });
+  return client;
 };
 const apiAxiosClient = initApiAxiosClient();
-
-/**
- * POST request to retrieve an accessToken for the EGA API client
- * @returns Promise<IdpToken>
- */
-const fetchAccessToken = async (): Promise<IdpToken> => {
-  const {
-    ega: { authRealmName, clientId },
-  } = getAppConfig();
-  const {
-    auth: { egaUsername, egaPassword },
-  } = await getAppSecrets();
-
-  try {
-    const response = await idpClient.post(
-      urlJoin(EGA_REALMS_PATH, authRealmName, EGA_TOKEN_ENDPOINT),
-      {
-        grant_type: EGA_GRANT_TYPE,
-
-        client_id: clientId,
-        username: egaUsername,
-        password: egaPassword,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      },
-    );
-
-    const token = IdpToken.safeParse(response.data);
-    if (token.success) {
-      return token.data;
-    }
-    logger.error('Invalid token response.');
-    throw new Error('Invalid token response');
-  } catch (err) {
-    if (err instanceof Error) {
-      logger.error(`TOKEN MESSAGE: ${err.message}`);
-      logger.error(`STACK: ${err.stack}`);
-      throw new Error(err.message);
-    } else {
-      logger.error('Unexpected error from fetch token request');
-      logger.error(err);
-      throw err;
-    }
-  }
-};
 
 /**
  * Fetches access token and attaches to Axios instance headers for apiClient
@@ -146,7 +93,13 @@ export const egaApiClient = async () => {
 
   const getAccessToken = async (): Promise<IdpToken> => {
     if (currentToken) {
-      return currentToken;
+      const tokenIsExpired = await isTokenExpired(currentToken);
+      if (tokenIsExpired) {
+        logger.debug('Token is expired.');
+        resetAccessToken();
+      } else {
+        return currentToken;
+      }
     }
     if (refreshTokenPromise) {
       return refreshTokenPromise;
@@ -173,36 +126,85 @@ export const egaApiClient = async () => {
     interval: maxRequestInterval,
   });
 
+  // throttled axios methods
+  const throttledDelete = throttle(apiAxiosClient.delete);
+  const throttledGet = throttle(apiAxiosClient.get);
+  const throttledPost = throttle(apiAxiosClient.post);
+  const throttledPut = throttle(apiAxiosClient.put);
+  const throttledGenericRequest = throttle(apiAxiosClient.request);
+
   const accessToken = await getAccessToken();
   apiAxiosClient.defaults.headers.common['Authorization'] = `Bearer ${accessToken.access_token}`;
 
   apiAxiosClient.interceptors.response.use(
     (response) => response,
     async (error) => {
-      if (error.response && error.config) {
-        switch (error.response.status) {
-          case 401:
-            if (!refreshTokenPromise) {
-              resetAccessToken();
+      if (error instanceof AxiosError) {
+        // Must check for error.response *before* error.request, because a 401 error will also trigger error.request
+        // This can cause an endless loop where the token is never refreshed
+        if (error.response) {
+          if (error.config) {
+            logger.error(`${CLIENT_NAME} - AxiosError - error.response - error.config`);
+            switch (error.response.status) {
+              case 401:
+                logger.info('Access token expired');
+                if (!refreshTokenPromise) {
+                  resetAccessToken();
+                }
+                const updatedAccessToken = await getAccessToken();
+                const refreshedBearerToken = `Bearer ${updatedAccessToken.access_token}`;
+                // set new token on original request that had the 401 error
+                error.config.headers['Authorization'] = refreshedBearerToken;
+                // reset on client headers so subsequent requests have new access token
+                apiAxiosClient.defaults.headers['Authorization'] = refreshedBearerToken;
+                // returns Promise for original request
+                return throttledGenericRequest(error.config);
+              case 400:
+                // don't retry
+                logger.error(`Bad Request`);
+                return new BadRequestError(error.message);
+              case 404:
+                logger.error(`Not Found`);
+                // don't retry
+                return new NotFoundError(error.message);
+              case 429:
+                logger.error(`Too Many Requests`);
+                logger.error(
+                  `${CLIENT_NAME} - ${error.response.status} - ${error.response.statusText} - retrying original request.`,
+                );
+                // retry original request. this response error shouldn't be an issue because throttling is in place
+                return throttledGenericRequest(error.config);
+              case 504:
+                logger.error(
+                  `${CLIENT_NAME} - ${error.response.status} - ${error.response.statusText} - retrying original request.`,
+                );
+                // retry original request
+                return throttledGenericRequest(error.config);
+              default:
+                logger.error(`Unexpected Axios Error: ${error.response.status}`);
+                return new ServerError('Unexpected Axios Error');
             }
-            const updatedAccessToken = await getAccessToken();
-            const refreshedBearerToken = `Bearer ${updatedAccessToken.access_token}`;
-            // set new token on original request that had the 401 error
-            error.config.headers['Authorization'] = refreshedBearerToken;
-            // reset on client headers so subsequent requests have new access token
-            apiAxiosClient.defaults.headers['Authorization'] = refreshedBearerToken;
-            return apiAxiosClient.request(error.config);
-          case 400:
-            return new BadRequestError(error.message);
-          case 404:
-            throw new NotFoundError(error.message);
-          case 429:
-            throw new TooManyRequestsError(error.message);
-          default:
-            logger.error(`Unexpected Axios Error: ${error.response.status}`);
-            throw new ServerError('Unexpected Axios Error');
+          }
+        } else if (error.request) {
+          switch (error.code) {
+            case 'ECONNRESET':
+              // socket hangup is caught here
+              const originalRequest = error.config;
+              logger.error(`${CLIENT_NAME} - AxiosError - ECONNRESET`);
+              if (originalRequest) {
+                logger.info(`${CLIENT_NAME} - ECONNRESET - retrying original request`);
+                return throttledGenericRequest(originalRequest);
+              }
+              return Promise.reject(error);
+            case 'ERR_BAD_REQUEST':
+              logger.error(`${CLIENT_NAME} - AxiosError - ERR_BAD_REQUEST`);
+              return new BadRequestError(`${error.code} - ${error.message}`);
+            default:
+              return new ServerError(`Unknown error from Axios error.request: ${error.code}`);
+          }
         }
       }
+      logger.error(`${CLIENT_NAME} - Unknown error, rejecting ${error}`);
       return Promise.reject(error);
     },
   );
@@ -217,7 +219,7 @@ export const egaApiClient = async () => {
   ): Promise<Result<ZodResultAccumulator<EgaDataset>, GetDatasetsForDacFailure>> => {
     const url = urlJoin(DACS, dacId, DATASETS);
     try {
-      const { data } = await apiAxiosClient.get(url);
+      const { data } = await throttledGet(url);
       const result = safeParseArray(EgaDataset, data);
       return success(result);
     } catch (err) {
@@ -243,7 +245,7 @@ export const egaApiClient = async () => {
   const getUser = async (user: ApprovedUser): Promise<Result<EgaUser, GetUserFailure>> => {
     const url = urlJoin(USERS, user.email);
     try {
-      const response = await apiAxiosClient.get(url);
+      const response = await throttledGet(url);
       const egaUser = EgaUser.safeParse(response.data);
       if (egaUser.success) {
         return success(egaUser.data);
@@ -283,15 +285,18 @@ export const egaApiClient = async () => {
   }): Promise<Result<ZodResultAccumulator<EgaPermission>, GetPermissionsForDatasetFailure>> => {
     const url = urlJoin(DACS, dacId, PERMISSIONS);
     try {
-      const { data } = await apiAxiosClient.get(url, {
+      const response = await throttledGet(url, {
         params: {
           dataset_accession_id: datasetAccessionId,
           limit,
           offset,
         },
       });
-      const result = safeParseArray(EgaPermission, data);
-      return success(result);
+      if (response) {
+        const result = safeParseArray(EgaPermission, response.data);
+        return success(result);
+      }
+      throw new ServerError('No response from GET /dacs/{dacId}/permissions');
     } catch (err) {
       const errMessage = getErrorMessage(err, 'Get permissions for dataset request failed.');
       logger.error('Get permissions for dataset request failed.');
@@ -314,14 +319,17 @@ export const egaApiClient = async () => {
   > => {
     try {
       const url = urlJoin(PERMISSIONS);
-      const { data } = await apiAxiosClient.get(url, {
+      const response = await throttledGet(url, {
         params: {
           user_id: userId,
           limit: datasetsTotal,
         },
       });
-      const result = safeParseArray(EgaPermission, data);
-      return success(result);
+      if (response) {
+        const result = safeParseArray(EgaPermission, response.data);
+        return success(result);
+      }
+      throw new ServerError('No response from GET /permissions?user_id');
     } catch (err) {
       const errMessage = getErrorMessage(err, 'Error retrieving permission for user');
       logger.error('Error retrieving permission for user');
@@ -367,7 +375,7 @@ export const egaApiClient = async () => {
     Result<ZodResultAccumulator<EgaPermissionRequest>, CreatePermissionRequestsFailure>
   > => {
     try {
-      const { data } = await apiAxiosClient.post(REQUESTS, requests);
+      const { data } = await throttledPost(REQUESTS, requests);
       const result = safeParseArray(EgaPermissionRequest, data);
       return success(result);
     } catch (err) {
@@ -395,7 +403,7 @@ export const egaApiClient = async () => {
     requests: ApprovePermissionRequest[],
   ): Promise<Result<ApprovePermissionResponse, ApprovedPermissionRequestsFailure>> => {
     try {
-      const response = await apiAxiosClient.put(REQUESTS, requests);
+      const response = await throttledPut(REQUESTS, requests);
       if (response.data) {
         const result = ApprovePermissionResponse.safeParse(response.data);
         if (result.success) {
@@ -432,7 +440,7 @@ export const egaApiClient = async () => {
     requests: RevokePermission[],
   ): Promise<Result<RevokePermissionResponse, RevokePermissionsFailure>> => {
     try {
-      const response = await apiAxiosClient.delete(PERMISSIONS, { data: requests });
+      const response = await throttledDelete(PERMISSIONS, { data: requests });
       if (response.status === 400) {
         throw new BadRequestError('Permission not found.');
       }
@@ -460,13 +468,13 @@ export const egaApiClient = async () => {
   };
 
   return {
-    approvePermissionRequests: throttle(approvePermissionRequests),
-    createPermissionRequests: throttle(createPermissionRequests),
-    getDatasetsForDac: throttle(getDatasetsForDac),
-    getPermissionsByUserId: throttle(getPermissionsByUserId),
-    getPermissionsForDataset: throttle(getPermissionsForDataset),
-    getUser: throttle(getUser),
-    revokePermissions: throttle(revokePermissions),
+    approvePermissionRequests,
+    createPermissionRequests,
+    getDatasetsForDac,
+    getPermissionsByUserId,
+    getPermissionsForDataset,
+    getUser,
+    revokePermissions,
   };
 };
 

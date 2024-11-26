@@ -17,7 +17,30 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// API request constants
-export const DEFAULT_LIMIT = 100;
-export const DEFAULT_OFFSET = DEFAULT_LIMIT;
-export const EGA_MAX_REQUEST_SIZE = 5000;
+import urlJoin from 'url-join';
+import { AppConfig } from '../../config';
+
+/**
+ * Fetches public key value from specified Keycloak host and realm, if both values are present in the appConfig
+ * @param appConfig
+ * @returns string | undefined - formatted public key string or undefined
+ */
+export const fetchPublicKeyFromKeycloak = async (
+  appConfig: AppConfig,
+): Promise<string | undefined> => {
+  const { authHost, authRealmName } = appConfig.ega;
+  if (!authHost || !authRealmName) {
+    console.error('Keycloak realm info not provided in config, aborting fetch attempt.');
+    return undefined;
+  }
+  console.debug(`Fetching public key from Keycloak realm ${authRealmName}.`);
+  const keycloakUrl = urlJoin(authHost, 'realms', authRealmName);
+  try {
+    const response = await fetch(keycloakUrl);
+    const result = await response.json();
+    return `-----BEGIN PUBLIC KEY-----\n${result.public_key}\n-----END PUBLIC KEY-----`;
+  } catch (err) {
+    console.error(`Failed to fetch public key from realm ${authRealmName}:`, err);
+    return undefined;
+  }
+};

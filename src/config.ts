@@ -89,6 +89,7 @@ export interface AppConfig {
   featureFlags: {
     renewalEnabled: boolean;
     adminPauseEnabled: boolean;
+    egaReconciliationEnabled: boolean;
   };
   ega: {
     clientId: string;
@@ -98,6 +99,8 @@ export interface AppConfig {
     dacId: string;
     maxRequestLimit: number;
     maxRequestInterval: number;
+    maxRequestRetries: number;
+    maxAccessTokenRequestRetries: number;
   };
 }
 
@@ -208,6 +211,7 @@ const buildAppContext = (): AppConfig => {
     featureFlags: {
       renewalEnabled: process.env.FEATURE_RENEWAL_ENABLED === 'true',
       adminPauseEnabled: process.env.FEATURE_ADMIN_PAUSE_ENABLED === 'true',
+      egaReconciliationEnabled: process.env.FEATURE_EGA_RECONCILIATION_ENABLED === 'true',
     },
     ega: {
       clientId: checkIsDefined(process.env.EGA_CLIENT_ID),
@@ -217,6 +221,8 @@ const buildAppContext = (): AppConfig => {
       dacId: checkIsDefined(process.env.DAC_ID),
       maxRequestLimit: Number(process.env.EGA_MAX_REQUEST_LIMIT) || 3,
       maxRequestInterval: Number(process.env.EGA_MAX_REQUEST_INTERVAL) || 1000,
+      maxRequestRetries: Number(process.env.EGA_MAX_REQUEST_RETRIES) || 3,
+      maxAccessTokenRequestRetries: Number(process.env.EGA_MAX_ACCESS_TOKEN_REQUEST_RETRIES) || 5,
     },
   };
   return config;

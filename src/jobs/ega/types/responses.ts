@@ -22,6 +22,7 @@ import {
   DacAccessionId,
   DacStatus,
   DatasetAccessionId,
+  EgaUserId,
   IdpTokenType,
   UserAccessionId,
 } from './common';
@@ -56,9 +57,8 @@ export const EgaDataset = z.object({
 export type EgaDataset = z.infer<typeof EgaDataset>;
 
 export const EgaUser = z.object({
-  id: z.number(),
+  id: EgaUserId,
   username: z.string(),
-  // several Users are coming back with null email values, is this expected? Assuming that if there is a userid, the User is valid
   email: z.string().nullable(),
   accession_id: UserAccessionId,
 });
