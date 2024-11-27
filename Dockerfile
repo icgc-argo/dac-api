@@ -48,4 +48,4 @@ ENV SVC_COMMIT_ID=${COMMIT_ID}
 ARG VERSION
 ENV SVC_VERSION=${VERSION}
 EXPOSE 3000
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/src/server.js"]
