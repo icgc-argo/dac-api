@@ -1,34 +1,12 @@
-import { Router, Request, Response, RequestHandler, NextFunction } from 'express';
-import { Transporter } from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
-import moment from 'moment';
 import { UserIdentity } from '@overture-stack/ego-token-middleware';
+import { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 import JSZip from 'jszip';
 import { isArray } from 'lodash';
+import moment from 'moment';
+import { Transporter } from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
-import wrapAsync from '../utils/wrapAsync';
-import { create, handleRenewalRequest, updatePartial } from '../domain/service/applications';
-import {
-  createCollaborator,
-  deleteCollaborator,
-  updateCollaborator,
-} from '../domain/service/collaborators';
-import {
-  deleteDocument,
-  getApplicationAssetsAsStream,
-  uploadDocument,
-  createAppHistoryTSV,
-  createDacoCSVFile,
-} from '../domain/service/files';
-import {
-  deleteApp,
-  getById,
-  search,
-  searchCollaboratorApplications,
-  getSearchParams,
-} from '../domain/service/applications/search';
-import { BadRequest, Forbidden } from '../utils/errors';
-import logger from '../logger';
+import { AppConfig } from '../config';
 import {
   FileFormat,
   IRequest,
@@ -36,11 +14,33 @@ import {
   UpdateApplication,
   UploadDocumentType,
 } from '../domain/interface';
-import { AppConfig } from '../config';
-import { Storage } from '../storage';
-import runAllJobs from '../jobs/runAllJobs';
+import { create, handleRenewalRequest, updatePartial } from '../domain/service/applications';
+import {
+  deleteApp,
+  getById,
+  getSearchParams,
+  search,
+  searchCollaboratorApplications,
+} from '../domain/service/applications/search';
+import {
+  createCollaborator,
+  deleteCollaborator,
+  updateCollaborator,
+} from '../domain/service/collaborators';
+import {
+  createAppHistoryTSV,
+  createDacoCSVFile,
+  deleteDocument,
+  getApplicationAssetsAsStream,
+  uploadDocument,
+} from '../domain/service/files';
 import { sendEncryptedApprovedUsersEmail } from '../jobs/approvedUsersEmail';
+import runAllJobs from '../jobs/runAllJobs';
+import logger from '../logger';
+import { Storage } from '../storage';
+import { BadRequest, Forbidden } from '../utils/errors';
 import { isUserJwt } from '../utils/permissions';
+import wrapAsync from '../utils/wrapAsync';
 import { validateId, validateType } from './utils';
 
 const createApplicationsRouter = (
