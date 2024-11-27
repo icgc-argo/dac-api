@@ -2,8 +2,8 @@ import { Identity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
 import { cloneDeep } from 'lodash';
 
-import { DacoRole } from '../domain/interface';
-import { hasReviewScope, hasDacoSystemScope, getDacoRole } from '../utils/permissions';
+import { DacoRole } from '../src/domain/interface';
+import { getDacoRole, hasDacoSystemScope, hasReviewScope } from '../src/utils/permissions';
 import {
   mockAdminToken,
   mockApplicantScope,

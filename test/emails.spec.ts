@@ -1,18 +1,20 @@
-import renderSubmitted from '../emails/submitted';
-import renderNewReview from '../emails/review-new';
-import renderRevisionsEmail from '../emails/revisions-requested';
-import renderApprovedEmail from '../emails/application-approved';
-import renderCollaboratorNotificationEmail from '../emails/collaborator-notification';
-import renderCollaboratorRemovedEmail from '../emails/collaborator-removed';
-import renderClosedEmail from '../emails/closed-approved';
-import rejected from '../emails/rejected';
-import renderAccessExpiringEmail from '../emails/access-expiring';
-import renderAccessHasExpiredEmail from '../emails/access-has-expired';
-import renderAttestationRequiredEmail from '../emails/attestation-required';
-import renderApplicationPausedEmail from '../emails/application-paused';
-import renderAttestationReceivedEmail from '../emails/attestation-received';
-import renderRenewalReviewEmail from '../emails/review-renewal';
+import renderAccessExpiringEmail from '../src/emails/access-expiring';
+import renderAccessHasExpiredEmail from '../src/emails/access-has-expired';
+import renderApprovedEmail from '../src/emails/application-approved';
+import renderApplicationPausedEmail from '../src/emails/application-paused';
+import renderAttestationReceivedEmail from '../src/emails/attestation-received';
+import renderAttestationRequiredEmail from '../src/emails/attestation-required';
+import renderClosedEmail from '../src/emails/closed-approved';
+import renderCollaboratorNotificationEmail from '../src/emails/collaborator-notification';
+import renderCollaboratorRemovedEmail from '../src/emails/collaborator-removed';
+import rejected from '../src/emails/rejected';
+import renderNewReview from '../src/emails/review-new';
+import renderRenewalReviewEmail from '../src/emails/review-renewal';
+import renderRevisionsEmail from '../src/emails/revisions-requested';
+import renderSubmitted from '../src/emails/submitted';
 
+import { Collaborator } from '../src/domain/interface';
+import { mockedConfig } from './mocks.spec';
 import {
   getAppInReview,
   getAppInRevisionRequested,
@@ -21,8 +23,6 @@ import {
   getPausedApplication,
   getRejectedApplication,
 } from './state.spec';
-import { Collaborator } from '../domain/interface';
-import { mockedConfig } from './mocks.spec';
 
 const emailTestConfig = mockedConfig();
 const emailLinksStub = emailTestConfig.email.links;

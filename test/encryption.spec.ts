@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 import { createDecipheriv } from 'crypto';
-import { encrypt } from '../domain/service/encryption';
+import { encrypt } from '../src/domain/service/encryption';
+import logger from '../src/logger';
 import {
-  EMAIL_ENCRYPTION_CREDENTIALS_ENCODING,
   DACO_ENCRYPTION_ALGO,
   EMAIL_CONTENT_ENCODING,
-} from '../utils/constants';
-import logger from '../logger';
+  EMAIL_ENCRYPTION_CREDENTIALS_ENCODING,
+} from '../src/utils/constants';
 
 describe('encryption', () => {
   it('should encrypt and decrypt text', async () => {

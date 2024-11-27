@@ -1,6 +1,6 @@
+import fs from 'fs';
 import JSZip from 'jszip';
 import { Readable } from 'stream';
-import fs from 'fs';
 
 describe('zip', () => {
   it('should package string correctly', async () => {

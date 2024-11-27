@@ -1,9 +1,9 @@
-import { expect } from 'chai';
-import * as config from '../config';
-import sinon from 'sinon';
 import { Identity } from '@overture-stack/ego-token-middleware';
+import { expect } from 'chai';
+import sinon from 'sinon';
+import * as config from '../src/config';
 
-import { isApplicationJwt, isUserJwt } from '../utils/permissions';
+import { isApplicationJwt, isUserJwt } from '../src/utils/permissions';
 
 const mockConfig = {
   serverPort: '3000',

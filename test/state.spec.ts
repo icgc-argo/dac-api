@@ -1,6 +1,6 @@
 import { UserIdentity } from '@overture-stack/ego-token-middleware';
 import { expect } from 'chai';
-import { isDate, pick, cloneDeep, omit, get, every, set, isEqual } from 'lodash';
+import { cloneDeep, every, get, isDate, isEqual, omit, pick, set } from 'lodash';
 import moment, { unitOfTime } from 'moment';
 
 import {
@@ -11,11 +11,11 @@ import {
   DacoRole,
   PauseReason,
   UpdateApplication,
-} from '../domain/interface';
-import { ApplicationStateManager, newApplication, renewalApplication } from '../domain/state';
-import { BadRequest, ConflictError, Forbidden } from '../utils/errors';
-import { checkIsDefined, getExpiredEventDate } from '../utils/misc';
-import { NOTIFICATION_UNIT_OF_TIME } from '../utils/constants';
+} from '../src/domain/interface';
+import { ApplicationStateManager, newApplication, renewalApplication } from '../src/domain/state';
+import { NOTIFICATION_UNIT_OF_TIME } from '../src/utils/constants';
+import { BadRequest, ConflictError, Forbidden } from '../src/utils/errors';
+import { checkIsDefined, getExpiredEventDate } from '../src/utils/misc';
 import { mockApplicantToken, mockedConfig } from './mocks.spec';
 
 const stateTestConfig = mockedConfig();
