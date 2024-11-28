@@ -198,7 +198,6 @@ export const processPermissionsForApprovedUsers = async (
         userPermissionResult.permissionsMissingCount = missingDatasetIds.length;
         missingDatasetIds.map((datasetId: DatasetAccessionId) => {
           // create permission request, add to requestList
-          // TODO: looks like username MUST be in email format, the one-name usernames in the test env fail (silently, an empty array is returned by createPermissionRequests)
           const permissionRequest = createPermissionRequest(approvedUser.username, datasetId);
           permissionRequests.push(permissionRequest);
         });
