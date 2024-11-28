@@ -185,28 +185,22 @@ export const processPermissionsForApprovedUsers = async (
     );
     switch (existingPermission.status) {
       case 'SUCCESS':
-        if (existingPermission.data.success.length) {
-          const datasetsWithPermissions = existingPermission.data.success.map(
-            (perm) => perm.dataset_accession_id,
-          );
-          const datasetsRequiringPermissions = datasets.map((dataset) => dataset.accession_id);
-          // if a dataset is removed from the incoming datasets list argument, i.e. the user has more dataset permissions than the incoming list,
-          // the call to difference() here would still return an empty array
-          // const incomingDatasetList = [1, 2, 3, 4, 6];
-          // const existingDatasetListForUser = [1, 2, 3, 4, 5]; // list with now defunct datasetId
-          // const response = difference(one, two) => [6]
-          const missingDatasetIds = difference(
-            datasetsRequiringPermissions,
-            datasetsWithPermissions,
-          );
-          userPermissionResult.permissionsMissingCount = missingDatasetIds.length;
-          missingDatasetIds.map((datasetId: DatasetAccessionId) => {
-            // create permission request, add to requestList
-            // TODO: looks like username MUST be in email format, the one-name usernames in the test env fail (silently, an empty array is returned by createPermissionRequests)
-            const permissionRequest = createPermissionRequest(approvedUser.username, datasetId);
-            permissionRequests.push(permissionRequest);
-          });
-        }
+        const datasetsWithPermissions = existingPermission.data.success.map(
+          (perm) => perm.dataset_accession_id,
+        );
+        const datasetsRequiringPermissions = datasets.map((dataset) => dataset.accession_id);
+        // if a dataset is removed from the incoming datasets list argument, i.e. the user has more dataset permissions than the incoming list,
+        // the call to difference() here would still return an empty array
+        // const incomingDatasetList = [1, 2, 3, 4, 6];
+        // const existingDatasetListForUser = [1, 2, 3, 4, 5]; // list with now defunct datasetId
+        // const response = difference(one, two) => [6]
+        const missingDatasetIds = difference(datasetsRequiringPermissions, datasetsWithPermissions);
+        userPermissionResult.permissionsMissingCount = missingDatasetIds.length;
+        missingDatasetIds.map((datasetId: DatasetAccessionId) => {
+          // create permission request, add to requestList
+          const permissionRequest = createPermissionRequest(approvedUser.username, datasetId);
+          permissionRequests.push(permissionRequest);
+        });
         break;
       case 'SERVER_ERROR':
       default:
