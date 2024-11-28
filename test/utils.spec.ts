@@ -3,8 +3,10 @@ import { expect } from 'chai';
 import moment from 'moment';
 
 import { cloneDeep } from 'lodash';
-import { newApplication } from '../domain/state';
-import { getDaysElapsed, isAttestable, isExpirable, isRenewable } from '../utils/calculations';
+import { Application } from '../src/domain/interface';
+import { newApplication } from '../src/domain/state';
+import { getDaysElapsed, isAttestable, isExpirable, isRenewable } from '../src/utils/calculations';
+import { mockApplicantToken, mockedConfig } from './mocks.spec';
 import {
   getAppInReview,
   getAppInRevisionRequested,
@@ -15,8 +17,6 @@ import {
   getReadyToSignApp,
   getRejectedApplication,
 } from './state.spec';
-import { Application } from '../domain/interface';
-import { mockApplicantToken, mockedConfig } from './mocks.spec';
 
 const newApplication1: Partial<Application> = newApplication(mockApplicantToken as UserIdentity);
 

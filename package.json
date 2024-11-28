@@ -1,12 +1,12 @@
 {
   "name": "dac-api",
-  "version": "1.8.9",
+  "version": "1.9.0",
   "description": "",
   "scripts": {
     "start": "npm run serve",
-    "serve": "node dist/server.js",
-    "build-ts": "tsc",
-    "resources": "copyfiles -u 1 src/resources/*.* dist/",
+    "serve": "node dist/src/server.js",
+    "build-ts": "tsc -p tsconfig.build.json",
+    "resources": "copyfiles -u 1 src/resources/*.* dist/src/",
     "build": "npm run build-ts && npm run resources",
     "debug": "npm run build && sleep 3 && npm run watch-debug",
     "watch-debug": "nodemon --delay 1000ms --inspect --watch 'src/**/*.ts' --exec node -r ts-node/register ./src/server.ts",
@@ -37,6 +37,7 @@
     "@types/errorhandler": "^1.5.0",
     "@types/express": "^4.17.11",
     "@types/express-fileupload": "^1.1.6",
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/lodash": "^4.14.168",
     "@types/memoizee": "^0.4.5",
     "@types/migrate-mongo": "^8.1.0",
@@ -76,7 +77,7 @@
     "sinon": "^10.0.0",
     "testcontainers": "^7.8.0",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^4.9.5"
+    "typescript": "^5.6.2"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.18.0",
@@ -84,6 +85,8 @@
     "@overture-stack/ego-token-middleware": "^2.4.1",
     "archiver": "^5.3.0",
     "aws-sdk": "^2.923.0",
+    "axios": "^1.7.7",
+    "axios-retry": "^4.5.0",
     "body-parser": "^1.19.0",
     "cd": "^0.3.3",
     "connect-mongo": "^4.4.1",
@@ -121,7 +124,8 @@
     "uuid": "^8.3.2",
     "validate.js": "^0.13.1",
     "winston": "^3.3.3",
-    "yamljs": "^0.3.0"
+    "yamljs": "^0.3.0",
+    "zod": "^3.23.8"
   },
   "husky": {
     "hooks": {

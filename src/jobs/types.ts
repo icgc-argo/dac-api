@@ -1,4 +1,6 @@
 import { Application } from '../domain/interface';
+import { DatasetAccessionId, EgaUserId } from './ega/types/common';
+import { ReconciliationJobReport } from './ega/types/reports';
 
 export type JobSuccessResultForApplication = {
   success: true;
@@ -37,4 +39,5 @@ export interface Report {
   expiryNotifications2: JobReport<BatchJobDetails>;
   closedApps: JobReport<BatchJobDetails>;
   approvedUsers: JobReport<void>;
+  egaReconciliation?: JobReport<ReconciliationJobReport>;
 }
