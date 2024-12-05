@@ -64,8 +64,8 @@ const buildSecrets = async (vaultSecrets: Record<string, any> = {}): Promise<App
     },
     auth: {
       dacoEncryptionKey: vaultSecrets.DACO_ENCRYPTION_KEY || process.env.DACO_ENCRYPTION_KEY || '',
-      egaUsername: vaultSecrets.EGA_USERNAME || process.env.EGA_USERNAME || '',
-      egaPassword: vaultSecrets.EGA_PASSWORD || process.env.EGA_PASSWORD || '',
+      egaUsername: checkIsDefined(vaultSecrets.EGA_USERNAME || process.env.EGA_USERNAME || ''),
+      egaPassword: checkIsDefined(vaultSecrets.EGA_PASSWORD || process.env.EGA_PASSWORD || ''),
       egaPublicKey: checkIsDefined(publicKey || process.env.EGA_PUBLIC_KEY || ''),
     },
     storage: {

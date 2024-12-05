@@ -339,7 +339,7 @@ export const processPermissionsForDataset = async (
       }
     }
   } else {
-    logger.debug(`There are no permissions to revoke for DATASET ${datasetAccessionId}.`);
+    logger.info(`There are no permissions to revoke for DATASET ${datasetAccessionId}.`);
   }
 
   const datasetHasCorrectPermissionsCount =

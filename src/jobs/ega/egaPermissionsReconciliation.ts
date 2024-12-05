@@ -114,17 +114,14 @@ async function runEgaPermissionsReconciliation(): Promise<JobReport<Reconciliati
     return jobFailureReport;
   }
 
-  logger.debug(
-    `${JOB_NAME} - Successfully retrieved ${datasets.data.success.length} for DAC ${dacId}.`,
-  );
   // retrieve corresponding users in EGA system
   const egaUsers = await getEgaUsers(egaClient, dacoUsers);
   logger.debug(`${JOB_NAME} - Completed fetching users`);
-  logger.debug(
+  logger.info(
     `${JOB_NAME} - Retrieved ${Object.keys(egaUsers).length} corresponding users from EGA.`,
   );
   const datasetsRetrieved = datasets.data.success;
-  logger.debug(`${JOB_NAME} - Retrieved ${datasetsRetrieved.length} datasets for ${dacId}.`);
+  logger.info(`${JOB_NAME} - Retrieved ${datasetsRetrieved.length} datasets for ${dacId}.`);
 
   // check DACO approved users have expected EGA permissions for each dataset
   const permissionsCreatedResult = await processPermissionsForApprovedUsers(
