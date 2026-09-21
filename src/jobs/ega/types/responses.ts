@@ -18,14 +18,7 @@
  */
 
 import { z } from 'zod';
-import {
-  DacAccessionId,
-  DacStatus,
-  DatasetAccessionId,
-  EgaUserId,
-  IdpTokenType,
-  UserAccessionId,
-} from './common';
+import { DacAccessionId, DacStatus, DatasetAccessionId, EgaUserId, IdpTokenType } from './common';
 
 export const IdpToken = z.object({
   access_token: z.string(),
@@ -56,11 +49,12 @@ export const EgaDataset = z.object({
 });
 export type EgaDataset = z.infer<typeof EgaDataset>;
 
+// the full response from EGA has several other fields, but only those the reconciliation reads are parsed,
+// so a field this job never uses cannot fail the parse and drop the user from the approved list
 export const EgaUser = z.object({
+  email: z.string().nullable(),
   id: EgaUserId,
   username: z.string(),
-  email: z.string().nullable(),
-  accession_id: UserAccessionId,
 });
 export type EgaUser = z.infer<typeof EgaUser>;
 
@@ -71,11 +65,10 @@ export const EgaPermissionRequest = z.object({
 export type EgaPermissionRequest = z.infer<typeof EgaPermissionRequest>;
 
 export const EgaPermission = z.object({
+  dac_accession_id: DacAccessionId,
+  dataset_accession_id: DatasetAccessionId,
   permission_id: z.number(),
   username: z.string(),
-  user_accession_id: UserAccessionId,
-  dataset_accession_id: DatasetAccessionId,
-  dac_accession_id: DacAccessionId,
 });
 export type EgaPermission = z.infer<typeof EgaPermission>;
 

@@ -50,7 +50,7 @@ import {
   success,
 } from '../types/results';
 import { safeParseArray, ZodResultAccumulator } from '../types/zodSafeParseArray';
-import { ApprovedUser, getErrorMessage } from '../utils';
+import { ApprovedUser, formatZodIssues, getErrorMessage } from '../utils';
 import { fetchAccessToken, isTokenExpired } from './idpClient';
 
 const { DACS, DATASETS, PERMISSIONS, REQUESTS, USERS } = EGA_API;
@@ -237,8 +237,7 @@ export const egaApiClient = async () => {
    *   {
    *    id: 123,
    *    username: boysue@example.com,
-   *    email: boysue@example.com,
-   *    accession_id: EGAW00000009999
+   *    email: boysue@example.com
    *   }
    * getUser('boysue@example.com')
    */
@@ -250,7 +249,10 @@ export const egaApiClient = async () => {
       if (egaUser.success) {
         return success(egaUser.data);
       }
-      return failure('INVALID_USER', 'Failed to parse user response');
+      return failure(
+        'INVALID_USER',
+        `Failed to parse user response: ${formatZodIssues(egaUser.error)}`,
+      );
     } catch (err) {
       if (err instanceof AxiosError) {
         switch (err.code) {

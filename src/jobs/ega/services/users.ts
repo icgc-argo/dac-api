@@ -34,7 +34,6 @@ import { ApprovedUser } from '../utils';
  *    id: 123,
  *    username: boysue@example.com,
  *    email: boysue@example.com,
- *    accession_id: EGAW00000009999,
  *    appExpiry: 2024-10-01T14:06:41.485Z,
  *    appId: 'DACO-1'
  *   }

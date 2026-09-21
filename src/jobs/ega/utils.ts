@@ -18,6 +18,7 @@
  */
 
 import { uniqBy } from 'lodash';
+import { ZodError } from 'zod';
 import { UserDataFromApprovedApplicationsResult } from '../../domain/interface';
 import { getUsersFromApprovedApps } from '../../domain/service/applications/search';
 import { DatasetAccessionId } from './types/common';
@@ -122,6 +123,15 @@ export const createRevokePermissionRequest = (permissionId: number): RevokePermi
  */
 export const getErrorMessage = (error: unknown, defaultMessage: string): string =>
   error instanceof Error ? error.message : defaultMessage;
+
+/**
+ * Summarizes Zod validation issues as a single line, naming each failing field path and why it failed.
+ * The offending values are deliberately left out so response content never reaches the logs.
+ * @param error ZodError
+ * @returns string
+ */
+export const formatZodIssues = (error: ZodError): string =>
+  error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`).join('; ');
 
 /**
  * Verify total permission approvals sent in request matches response num_granted
