@@ -56,11 +56,12 @@ export const EgaDataset = z.object({
 });
 export type EgaDataset = z.infer<typeof EgaDataset>;
 
+// the full response from EGA has several other fields, but only those the reconciliation reads are parsed,
+// so a field this job never uses cannot fail the parse and drop the user from the approved list
 export const EgaUser = z.object({
+  email: z.string().nullable(),
   id: EgaUserId,
   username: z.string(),
-  email: z.string().nullable(),
-  accession_id: UserAccessionId,
 });
 export type EgaUser = z.infer<typeof EgaUser>;
 
