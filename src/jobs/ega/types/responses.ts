@@ -18,14 +18,7 @@
  */
 
 import { z } from 'zod';
-import {
-  DacAccessionId,
-  DacStatus,
-  DatasetAccessionId,
-  EgaUserId,
-  IdpTokenType,
-  UserAccessionId,
-} from './common';
+import { DacAccessionId, DacStatus, DatasetAccessionId, EgaUserId, IdpTokenType } from './common';
 
 export const IdpToken = z.object({
   access_token: z.string(),
@@ -72,11 +65,10 @@ export const EgaPermissionRequest = z.object({
 export type EgaPermissionRequest = z.infer<typeof EgaPermissionRequest>;
 
 export const EgaPermission = z.object({
+  dac_accession_id: DacAccessionId,
+  dataset_accession_id: DatasetAccessionId,
   permission_id: z.number(),
   username: z.string(),
-  user_accession_id: UserAccessionId,
-  dataset_accession_id: DatasetAccessionId,
-  dac_accession_id: DacAccessionId,
 });
 export type EgaPermission = z.infer<typeof EgaPermission>;
 

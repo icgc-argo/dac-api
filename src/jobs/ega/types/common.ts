@@ -51,9 +51,5 @@ const DATASET_ACCESSION_ID_REGEX = new RegExp(`^EGAD\\d{11}$`);
 export const DatasetAccessionId = z.string().regex(DATASET_ACCESSION_ID_REGEX);
 export type DatasetAccessionId = z.infer<typeof DatasetAccessionId>;
 
-const USER_ACCESSION_ID_REGEX = new RegExp(`^EGAW\\d{11}$`);
-export const UserAccessionId = z.string().regex(USER_ACCESSION_ID_REGEX);
-export type UserAccessionId = z.infer<typeof UserAccessionId>;
-
 export const EgaUserId = z.number();
 export type EgaUserId = z.infer<typeof EgaUserId>;
